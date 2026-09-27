@@ -336,7 +336,7 @@ class ReminderNotificationListenerService : NotificationListenerService() {
             )
 
             val builder = NotificationCompat.Builder(this, CHANNEL_ID)
-                .setSmallIcon(R.drawable.ic_notification_status)
+                .setSmallIcon(R.drawable.ic_notification_reminder)
                 .setContentTitle(getString(R.string.add_reminder))
                 .setContentText(statusText)
                 .setContentIntent(openMainPendingIntent)
