@@ -695,6 +695,49 @@ class MainActivityTest {
     }
 
     @Test
+    fun testMarkingPuntedReminderDonePreservesPuntTimeAndSection() {
+        val context = RuntimeEnvironment.getApplication()
+        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
+        val futureSnooze = System.currentTimeMillis() + 3600000L
+        prefs.edit().clear()
+            .putStringSet("key_reminders_list", setOf("Punted Task"))
+            .putLong("snooze_punted task", futureSnooze)
+            .commit()
+
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = controller.get()
+
+        val markDoneMethod = MainActivity::class.java.getDeclaredMethod("markReminderDone", String::class.java)
+        markDoneMethod.isAccessible = true
+        markDoneMethod.invoke(activity, "Punted Task")
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        val savedSet = prefs.getStringSet("key_reminders_list", emptySet()) ?: emptySet()
+        assertTrue("Saved set should contain 'Punted Task #done'", savedSet.contains("Punted Task #done"))
+
+        val preservedSnooze = prefs.getLong("snooze_punted task", 0L)
+        assertEquals(futureSnooze, preservedSnooze)
+
+        val displayedField = MainActivity::class.java.getDeclaredField("displayedReminders")
+        displayedField.isAccessible = true
+        @Suppress("UNCHECKED_CAST")
+        val displayed = displayedField.get(activity) as List<String>
+        assertTrue("Displayed list should contain snoozed header marker", displayed.contains("HEADER_SNOOZED_SECTION_MARKER"))
+        assertTrue("Displayed list should contain 'Punted Task #done'", displayed.contains("Punted Task #done"))
+
+        val undoMethod = MainActivity::class.java.getDeclaredMethod("undoMarkDone", String::class.java)
+        undoMethod.isAccessible = true
+        undoMethod.invoke(activity, "Punted Task #done")
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        val restoredSnooze = prefs.getLong("snooze_punted task", 0L)
+        assertEquals(futureSnooze, restoredSnooze)
+        @Suppress("UNCHECKED_CAST")
+        val restoredDisplayed = displayedField.get(activity) as List<String>
+        assertTrue("Restored displayed list should contain 'Punted Task'", restoredDisplayed.contains("Punted Task"))
+    }
+
+    @Test
     fun testSwipingDoneItemPermanentlyDeletesReminder() {
         val context = RuntimeEnvironment.getApplication()
         val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)

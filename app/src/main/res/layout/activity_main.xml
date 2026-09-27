@@ -28,8 +28,9 @@
             <!-- Tags Filter Option Display -->
             <LinearLayout
                 android:id="@+id/btn_tags_filter"
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:layout_weight="1"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
                 android:clickable="true"
@@ -50,18 +51,16 @@
 
                 <TextView
                     android:id="@+id/txt_selected_tags"
-                    android:layout_width="wrap_content"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
+                    android:layout_weight="1"
                     android:text="All"
                     android:textSize="11sp"
+                    android:singleLine="true"
+                    android:ellipsize="end"
                     android:textColor="@color/text_secondary" />
 
             </LinearLayout>
-
-            <View
-                android:layout_width="0dp"
-                android:layout_height="1dp"
-                android:layout_weight="1" />
 
             <!-- Export Button (Reminders List) -->
             <ImageView
@@ -151,7 +150,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:scrollbars="vertical"
-                    android:fadeScrollbars="false"
+                    android:fadeScrollbars="true"
                     tools:listitem="@layout/item_reminder" />
 
             </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>

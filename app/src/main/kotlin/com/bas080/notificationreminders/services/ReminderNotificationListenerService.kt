@@ -303,7 +303,7 @@ class ReminderNotificationListenerService : NotificationListenerService() {
             )
 
             val fromTextAction = NotificationCompat.Action.Builder(
-                R.drawable.ic_action_add,
+                R.drawable.ic_notification_reminder,
                 getString(R.string.from_text),
                 addReminderPendingIntent
             )
@@ -320,7 +320,7 @@ class ReminderNotificationListenerService : NotificationListenerService() {
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
             )
             val fromNotifAction = NotificationCompat.Action.Builder(
-                R.drawable.ic_action_add,
+                R.drawable.ic_notification_reminder,
                 getString(R.string.from_notification),
                 fromNotifPendingIntent
             ).build()
