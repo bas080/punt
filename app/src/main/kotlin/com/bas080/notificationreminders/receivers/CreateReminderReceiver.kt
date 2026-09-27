@@ -23,7 +23,7 @@ class CreateReminderReceiver : BroadcastReceiver() {
                 raw == "15m" || raw == "15 mins" || raw == "15 minutes" || raw == "15min" -> return "15m"
                 raw == "1h" || raw == "1 hour" || raw == "1 hr" || raw == "1hour" -> return "1h"
                 raw == "4h" || raw == "4 hours" || raw == "4 hrs" || raw == "4hour" -> return "4h"
-                raw == "24h" || raw == "1 day" || raw == "24 hours" || raw == "24 hrs" || raw == "1day" -> return "24h"
+                raw == "24h" || raw == "1 day" || raw == "24 hours" || raw == "24 hrs" || raw == "1day" || raw == "1d" -> return "24h"
                 raw == "1w" || raw == "1 week" || raw == "1week" || raw == "w" -> return "1w"
             }
 
@@ -136,7 +136,7 @@ class CreateReminderReceiver : BroadcastReceiver() {
                     return Pair(60 * 60 * 1000L, "1 hour")
                 raw == "4h" || raw == "4 hours" || raw == "4 hrs" || raw == "4hour" ->
                     return Pair(4 * 60 * 60 * 1000L, "4 hours")
-                raw == "24h" || raw == "1 day" || raw == "24 hours" || raw == "24 hrs" || raw == "1day" ->
+                raw == "24h" || raw == "1 day" || raw == "24 hours" || raw == "24 hrs" || raw == "1day" || raw == "1d" ->
                     return Pair(24 * 60 * 60 * 1000L, "24 hours")
                 raw == "1w" || raw == "1 week" || raw == "1week" || raw == "w" ->
                     return Pair(7 * 24 * 60 * 60 * 1000L, "1 week")
@@ -535,8 +535,6 @@ class CreateReminderReceiver : BroadcastReceiver() {
                 val reminderText = intent.getStringExtra(ReminderNotificationListenerService.EXTRA_REMINDER_TEXT)
                 if (!reminderText.isNullOrEmpty()) {
                     com.bas080.notificationreminders.utils.AppLogger.log(context, "CreateReminderReceiver", "Marked reminder done from notification action")
-                    val trimmed = reminderText.trim().lowercase()
-                    ReminderNotificationListenerService.lastTriggeredMap.remove("snooze_$trimmed")
 
                     val prefs = context.getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
                     val savedSet = prefs.getStringSet(KEY_REMINDERS, emptySet())?.toMutableSet() ?: mutableSetOf()
@@ -549,7 +547,7 @@ class CreateReminderReceiver : BroadcastReceiver() {
                             "$reminderText #done"
                         }
                         savedSet.add(doneText)
-                        prefs.edit().putStringSet(KEY_REMINDERS, savedSet).remove("snooze_$trimmed").apply()
+                        prefs.edit().putStringSet(KEY_REMINDERS, savedSet).apply()
                     }
 
                     val notificationId = ReminderNotificationListenerService.getNotificationIdForReminder(reminderText)

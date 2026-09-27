@@ -86,12 +86,13 @@ class CreateReminderReceiverTest {
     }
 
     @Test
-    fun testDoneReminderShowsSuccessToastAndClearsSnooze() {
+    fun testDoneReminderShowsSuccessToastAndPreservesSnooze() {
         val context = RuntimeEnvironment.getApplication()
         val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
+        val futureSnooze = System.currentTimeMillis() + 60000L
         prefs.edit()
             .putStringSet("key_reminders_list", setOf("Buy milk"))
-            .putLong("snooze_buy milk", System.currentTimeMillis() + 60000L)
+            .putLong("snooze_buy milk", futureSnooze)
             .commit()
 
         val receiver = CreateReminderReceiver()
@@ -104,7 +105,7 @@ class CreateReminderReceiverTest {
 
         assertEquals("Reminder marked done", ShadowToast.getTextOfLatestToast())
         val snoozeTimestamp = prefs.getLong("snooze_buy milk", 0L)
-        assertEquals(0L, snoozeTimestamp)
+        assertEquals(futureSnooze, snoozeTimestamp)
 
         val savedSet = prefs.getStringSet("key_reminders_list", emptySet()) ?: emptySet()
         org.junit.Assert.assertTrue("Saved set should contain 'Buy milk #done'", savedSet.contains("Buy milk #done"))
@@ -165,6 +166,10 @@ class CreateReminderReceiverTest {
         val (ms24h, label24h) = CreateReminderReceiver.parseSnoozeDuration("24h")!!
         assertEquals(24 * 60 * 60 * 1000L, ms24h)
         assertEquals("24 hours", label24h)
+
+        val (ms1d, label1d) = CreateReminderReceiver.parseSnoozeDuration("1d")!!
+        assertEquals(24 * 60 * 60 * 1000L, ms1d)
+        assertEquals("24 hours", label1d)
 
         val (ms2w, label2w) = CreateReminderReceiver.parseSnoozeDuration("2w")!!
         assertEquals(2 * 7 * 24 * 60 * 60 * 1000L, ms2w)
@@ -273,6 +278,8 @@ class CreateReminderReceiverTest {
         assertEquals("06:00", CreateReminderReceiver.canonicalizeSnoozeChoice("6am"))
         assertEquals("15m", CreateReminderReceiver.canonicalizeSnoozeChoice("15 mins"))
         assertEquals("1h", CreateReminderReceiver.canonicalizeSnoozeChoice("1 hour"))
+        assertEquals("24h", CreateReminderReceiver.canonicalizeSnoozeChoice("1d"))
+        assertEquals("24h", CreateReminderReceiver.canonicalizeSnoozeChoice("24h"))
         org.junit.Assert.assertNull(CreateReminderReceiver.canonicalizeSnoozeChoice("5s"))
     }
 

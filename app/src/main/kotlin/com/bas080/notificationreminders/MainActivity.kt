@@ -52,6 +52,10 @@ class MainActivity : AppCompatActivity() {
         private const val KEY_REMINDER_FILTER = "key_reminder_filter"
         private const val PREFS_SNOOZE_FREQ = "snooze_freq_prefs"
 
+        fun getCleanTrimmed(reminderText: String): String {
+            return reminderText.replace(Regex("(?i)\\s*#done\\b"), "").trim().lowercase()
+        }
+
         fun formatSnoozeUntil(snoozeUntil: Long, now: Long = System.currentTimeMillis()): String {
             val snoozeCal = Calendar.getInstance().apply { timeInMillis = snoozeUntil }
             val nowCal = Calendar.getInstance().apply { timeInMillis = now }
@@ -557,8 +561,8 @@ class MainActivity : AppCompatActivity() {
                             val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager
                             notificationManager?.cancel(oldNotifId)
 
-                            val oldTrimmed = oldText.trim().lowercase()
-                            val newTrimmed = updatedText.trim().lowercase()
+                            val oldTrimmed = getCleanTrimmed(oldText)
+                            val newTrimmed = getCleanTrimmed(updatedText)
                             if (oldTrimmed != newTrimmed) {
                                 val prefs = getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
                                 val snoozeTime = prefs.getLong("snooze_$oldTrimmed", 0L)
@@ -736,11 +740,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showSnoozeOptionsDialog(reminderText: String) {
-        val trimmed = reminderText.trim().lowercase()
+        val cleanTrimmed = getCleanTrimmed(reminderText)
         val prefs = getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
         val now = System.currentTimeMillis()
-        val snoozeUntil = prefs.getLong("snooze_$trimmed", 0L).let {
-            if (it > 0L) it else (ReminderNotificationListenerService.lastTriggeredMap["snooze_$trimmed"] ?: 0L)
+        val snoozeUntil = prefs.getLong("snooze_$cleanTrimmed", 0L).let {
+            if (it > 0L) it else (ReminderNotificationListenerService.lastTriggeredMap["snooze_$cleanTrimmed"] ?: 0L)
         }
         val isSnoozed = snoozeUntil > now
 
@@ -756,8 +760,8 @@ class MainActivity : AppCompatActivity() {
             .setTitle(R.string.snooze_dialog_title)
             .setItems(options) { _, which ->
                 if (isSnoozed && which == 0) {
-                    ReminderNotificationListenerService.lastTriggeredMap.remove("snooze_$trimmed")
-                    prefs.edit().remove("snooze_$trimmed").apply()
+                    ReminderNotificationListenerService.lastTriggeredMap.remove("snooze_$cleanTrimmed")
+                    prefs.edit().remove("snooze_$cleanTrimmed").apply()
                     ReminderNotificationListenerService.instance?.showStatusNotification()
                     updateSummaryAndAdapter()
                     Toast.makeText(this, R.string.toast_snooze_cancelled, Toast.LENGTH_SHORT).show()
@@ -816,11 +820,11 @@ class MainActivity : AppCompatActivity() {
 
         val (snoozeMs, durationLabel) = parseResult
         val snoozeUntil = System.currentTimeMillis() + snoozeMs
-        val trimmed = reminderText.trim().lowercase()
+        val cleanTrimmed = getCleanTrimmed(reminderText)
 
-        ReminderNotificationListenerService.lastTriggeredMap["snooze_$trimmed"] = snoozeUntil
+        ReminderNotificationListenerService.lastTriggeredMap["snooze_$cleanTrimmed"] = snoozeUntil
         val prefs = getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
-        prefs.edit().putLong("snooze_$trimmed", snoozeUntil).apply()
+        prefs.edit().putLong("snooze_$cleanTrimmed", snoozeUntil).apply()
 
         ReminderNotificationListenerService.instance?.showStatusNotification()
         updateSummaryAndAdapter()
@@ -840,10 +844,8 @@ class MainActivity : AppCompatActivity() {
             }
             activeReminders[idx] = doneText
             recentlyDoneReminders.add(doneText)
-            val trimmed = reminderText.trim().lowercase()
-            ReminderNotificationListenerService.lastTriggeredMap.remove("snooze_$trimmed")
             val prefs = getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
-            prefs.edit().putStringSet(KEY_REMINDERS, activeReminders.toSet()).remove("snooze_$trimmed").apply()
+            prefs.edit().putStringSet(KEY_REMINDERS, activeReminders.toSet()).apply()
 
             val notificationId = ReminderNotificationListenerService.getNotificationIdForReminder(reminderText)
             val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager
@@ -877,10 +879,10 @@ class MainActivity : AppCompatActivity() {
         if (idx != -1) {
             activeReminders.removeAt(idx)
             recentlyDoneReminders.remove(reminderText)
-            val trimmed = reminderText.trim().lowercase()
-            ReminderNotificationListenerService.lastTriggeredMap.remove("snooze_$trimmed")
+            val cleanTrimmed = getCleanTrimmed(reminderText)
+            ReminderNotificationListenerService.lastTriggeredMap.remove("snooze_$cleanTrimmed")
             val prefs = getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
-            prefs.edit().putStringSet(KEY_REMINDERS, activeReminders.toSet()).remove("snooze_$trimmed").apply()
+            prefs.edit().putStringSet(KEY_REMINDERS, activeReminders.toSet()).remove("snooze_$cleanTrimmed").apply()
 
             val notificationId = ReminderNotificationListenerService.getNotificationIdForReminder(reminderText)
             val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager
@@ -894,10 +896,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun unpuntReminder(reminderText: String) {
-        val trimmed = reminderText.trim().lowercase()
-        ReminderNotificationListenerService.lastTriggeredMap.remove("snooze_$trimmed")
+        val cleanTrimmed = getCleanTrimmed(reminderText)
+        ReminderNotificationListenerService.lastTriggeredMap.remove("snooze_$cleanTrimmed")
         val prefs = getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
-        prefs.edit().remove("snooze_$trimmed").apply()
+        prefs.edit().remove("snooze_$cleanTrimmed").apply()
 
         ReminderNotificationListenerService.instance?.showStatusNotification()
         updateSummaryAndAdapter()
@@ -956,20 +958,24 @@ class MainActivity : AppCompatActivity() {
                     if (isDone) searchContainsDone || recentlyDoneReminders.contains(reminder) else true
                 }
                 ReminderFilter.ACTIVE -> activeReminders.filter { reminder ->
+                    val cleanTrimmed = getCleanTrimmed(reminder)
+                    val snoozeUntil = prefs.getLong("snooze_$cleanTrimmed", 0L).let {
+                        if (it > 0L) it else (ReminderNotificationListenerService.lastTriggeredMap["snooze_$cleanTrimmed"] ?: 0L)
+                    }
                     val isDone = reminder.contains("#done", ignoreCase = true)
-                    if (isDone) return@filter searchContainsDone || recentlyDoneReminders.contains(reminder)
-                    val trimmed = reminder.trim().lowercase()
-                    val snoozeUntil = prefs.getLong("snooze_$trimmed", 0L).let {
-                        if (it > 0L) it else (ReminderNotificationListenerService.lastTriggeredMap["snooze_$trimmed"] ?: 0L)
+                    if (isDone) {
+                        return@filter snoozeUntil <= now && (searchContainsDone || recentlyDoneReminders.contains(reminder))
                     }
                     snoozeUntil <= now
                 }
                 ReminderFilter.SNOOZED -> activeReminders.filter { reminder ->
+                    val cleanTrimmed = getCleanTrimmed(reminder)
+                    val snoozeUntil = prefs.getLong("snooze_$cleanTrimmed", 0L).let {
+                        if (it > 0L) it else (ReminderNotificationListenerService.lastTriggeredMap["snooze_$cleanTrimmed"] ?: 0L)
+                    }
                     val isDone = reminder.contains("#done", ignoreCase = true)
-                    if (isDone) return@filter searchContainsDone || recentlyDoneReminders.contains(reminder)
-                    val trimmed = reminder.trim().lowercase()
-                    val snoozeUntil = prefs.getLong("snooze_$trimmed", 0L).let {
-                        if (it > 0L) it else (ReminderNotificationListenerService.lastTriggeredMap["snooze_$trimmed"] ?: 0L)
+                    if (isDone) {
+                        return@filter snoozeUntil > now && (searchContainsDone || recentlyDoneReminders.contains(reminder))
                     }
                     snoozeUntil > now
                 }
@@ -983,9 +989,9 @@ class MainActivity : AppCompatActivity() {
         val snoozedItems = mutableListOf<Pair<String, Long>>()
 
         for (reminder in filtered) {
-            val trimmed = reminder.trim().lowercase()
-            val snoozeUntil = prefs.getLong("snooze_$trimmed", 0L).let {
-                if (it > 0L) it else (ReminderNotificationListenerService.lastTriggeredMap["snooze_$trimmed"] ?: 0L)
+            val cleanTrimmed = getCleanTrimmed(reminder)
+            val snoozeUntil = prefs.getLong("snooze_$cleanTrimmed", 0L).let {
+                if (it > 0L) it else (ReminderNotificationListenerService.lastTriggeredMap["snooze_$cleanTrimmed"] ?: 0L)
             }
             if (snoozeUntil > now) {
                 snoozedItems.add(reminder to snoozeUntil)
@@ -1007,12 +1013,12 @@ class MainActivity : AppCompatActivity() {
 
         val snoozeMap = mutableMapOf<String, Long>()
         for (reminder in activeReminders) {
-            val trimmed = reminder.trim().lowercase()
-            val snoozeUntil = prefs.getLong("snooze_$trimmed", 0L).let {
-                if (it > 0L) it else (ReminderNotificationListenerService.lastTriggeredMap["snooze_$trimmed"] ?: 0L)
+            val cleanTrimmed = getCleanTrimmed(reminder)
+            val snoozeUntil = prefs.getLong("snooze_$cleanTrimmed", 0L).let {
+                if (it > 0L) it else (ReminderNotificationListenerService.lastTriggeredMap["snooze_$cleanTrimmed"] ?: 0L)
             }
             if (snoozeUntil > 0L) {
-                snoozeMap[trimmed] = snoozeUntil
+                snoozeMap[cleanTrimmed] = snoozeUntil
             }
         }
 
@@ -1199,8 +1205,8 @@ class RemindersAdapter(
                     val newItem = newList.getOrNull(newItemPosition) ?: return true
                     if (oldItem != newItem) return false
 
-                    val oldTrimmed = oldItem.trim().lowercase()
-                    val newTrimmed = newItem.trim().lowercase()
+                    val oldTrimmed = MainActivity.getCleanTrimmed(oldItem)
+                    val newTrimmed = MainActivity.getCleanTrimmed(newItem)
 
                     val oldSnooze = oldSnoozeMap[oldTrimmed] ?: 0L
                     val newSnooze = newSnoozeMap[newTrimmed] ?: 0L
@@ -1292,13 +1298,13 @@ class RemindersAdapter(
         val reminderText = displayedReminders[reminderIndex]
         val isDone = reminderText.contains("#done", ignoreCase = true)
 
-        val trimmed = reminderText.trim().lowercase()
+        val cleanTrimmed = MainActivity.getCleanTrimmed(reminderText)
         val prefs = context.getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
         val now = System.currentTimeMillis()
-        val snoozeUntil = prefs.getLong("snooze_$trimmed", 0L).let {
-            if (it > 0L) it else (ReminderNotificationListenerService.lastTriggeredMap["snooze_$trimmed"] ?: 0L)
+        val snoozeUntil = prefs.getLong("snooze_$cleanTrimmed", 0L).let {
+            if (it > 0L) it else (ReminderNotificationListenerService.lastTriggeredMap["snooze_$cleanTrimmed"] ?: 0L)
         }
-        val isSnoozed = !isDone && snoozeUntil > now
+        val isSnoozed = snoozeUntil > now
 
         holder.reminderInput.hint = "Reminder"
         holder.reminderInput.setText(reminderText)
