@@ -667,6 +667,7 @@ class MainActivity : AppCompatActivity() {
                 if (actionState == ItemTouchHelper.ACTION_STATE_SWIPE && dX != 0f) {
                     val background = ColorDrawable()
                     val icon: Drawable?
+                    val hMargin = (16 * resources.displayMetrics.density).toInt()
 
                     if (isDone) {
                         background.color = ContextCompat.getColor(this@MainActivity, R.color.bg_dark)
@@ -676,10 +677,10 @@ class MainActivity : AppCompatActivity() {
 
                             icon = ContextCompat.getDrawable(this@MainActivity, R.drawable.ic_action_delete)
                             icon?.let {
-                                val margin = (itemView.height - it.intrinsicHeight) / 2
-                                val top = itemView.top + margin
+                                val vMargin = (itemView.height - it.intrinsicHeight) / 2
+                                val top = itemView.top + vMargin
                                 val bottom = top + it.intrinsicHeight
-                                val left = itemView.left + margin
+                                val left = itemView.left + hMargin
                                 val right = left + it.intrinsicWidth
                                 it.setBounds(left, top, right, bottom)
                                 it.draw(c)
@@ -690,10 +691,10 @@ class MainActivity : AppCompatActivity() {
 
                             icon = ContextCompat.getDrawable(this@MainActivity, R.drawable.ic_action_undo)
                             icon?.let {
-                                val margin = (itemView.height - it.intrinsicHeight) / 2
-                                val top = itemView.top + margin
+                                val vMargin = (itemView.height - it.intrinsicHeight) / 2
+                                val top = itemView.top + vMargin
                                 val bottom = top + it.intrinsicHeight
-                                val right = itemView.right - margin
+                                val right = itemView.right - hMargin
                                 val left = right - it.intrinsicWidth
                                 it.setBounds(left, top, right, bottom)
                                 it.draw(c)
@@ -706,10 +707,10 @@ class MainActivity : AppCompatActivity() {
 
                         icon = ContextCompat.getDrawable(this@MainActivity, R.drawable.ic_action_done)
                         icon?.let {
-                            val margin = (itemView.height - it.intrinsicHeight) / 2
-                            val top = itemView.top + margin
+                            val vMargin = (itemView.height - it.intrinsicHeight) / 2
+                            val top = itemView.top + vMargin
                             val bottom = top + it.intrinsicHeight
-                            val left = itemView.left + margin
+                            val left = itemView.left + hMargin
                             val right = left + it.intrinsicWidth
                             it.setBounds(left, top, right, bottom)
                             it.draw(c)
@@ -721,10 +722,10 @@ class MainActivity : AppCompatActivity() {
 
                         icon = ContextCompat.getDrawable(this@MainActivity, R.drawable.ic_action_snooze)
                         icon?.let {
-                            val margin = (itemView.height - it.intrinsicHeight) / 2
-                            val top = itemView.top + margin
+                            val vMargin = (itemView.height - it.intrinsicHeight) / 2
+                            val top = itemView.top + vMargin
                             val bottom = top + it.intrinsicHeight
-                            val right = itemView.right - margin
+                            val right = itemView.right - hMargin
                             val left = right - it.intrinsicWidth
                             it.setBounds(left, top, right, bottom)
                             it.draw(c)
