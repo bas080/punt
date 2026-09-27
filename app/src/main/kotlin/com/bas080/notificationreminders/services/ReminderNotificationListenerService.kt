@@ -61,54 +61,63 @@ class ReminderNotificationListenerService : NotificationListenerService() {
             val defaultChoices = listOf("15m", "1h", "4h", "24h", "1w")
             val prefs = context.getSharedPreferences("snooze_freq_prefs", Context.MODE_PRIVATE)
             val allEntries = prefs.all
-            if (allEntries.isEmpty()) {
-                return defaultChoices.toTypedArray()
-            }
 
-            val userChoices = allEntries.entries
-                .filter { !it.key.startsWith("count_") }
-                .mapNotNull { entry ->
-                    val timestamp = (entry.value as? Number)?.toLong() ?: 0L
-                    if (timestamp > 0L) {
-                        val choice = entry.key
-                        val rawCount = prefs.getLong("count_$choice", 0L)
-                        val count = if (rawCount > 0L) rawCount else 1L
-                        Triple(choice, timestamp, count)
-                    } else null
+            val now = System.currentTimeMillis()
+
+            val rawChoices = if (allEntries.isNotEmpty()) {
+                allEntries.entries
+                    .filter { !it.key.startsWith("count_") }
+                    .mapNotNull { entry ->
+                        val timestamp = (entry.value as? Number)?.toLong() ?: 0L
+                        if (timestamp > 0L) {
+                            val choice = entry.key
+                            val canonicalChoice = CreateReminderReceiver.canonicalizeSnoozeChoice(choice) ?: choice
+                            val rawCount = prefs.getLong("count_$choice", 0L)
+                            val count = if (rawCount > 0L) rawCount else 1L
+                            Triple(canonicalChoice, timestamp, count)
+                        } else null
+                    }
+            } else emptyList()
+
+            val groupedChoices = rawChoices
+                .groupBy { it.first }
+                .map { (canonicalChoice, list) ->
+                    val maxTimestamp = list.maxOf { it.second }
+                    val totalCount = list.sumOf { it.third }
+                    Triple(canonicalChoice, maxTimestamp, totalCount)
                 }
 
-            if (userChoices.isEmpty()) {
-                return defaultChoices.toTypedArray()
-            }
-
-            val topRecent = userChoices
+            val topRecent = groupedChoices
                 .sortedByDescending { it.second }
                 .take(4)
                 .map { it.first }
 
-            val topCommon = userChoices
+            val topCommon = groupedChoices
                 .sortedWith(compareByDescending<Triple<String, Long, Long>> { it.third }.thenByDescending { it.second })
                 .take(6)
                 .map { it.first }
 
             val combined = mutableListOf<String>()
-            for (choice in topRecent) {
-                if (!combined.contains(choice)) {
-                    combined.add(choice)
-                }
-            }
-            for (choice in topCommon) {
-                if (!combined.contains(choice)) {
-                    combined.add(choice)
-                }
-            }
-            for (defaultChoice in defaultChoices) {
-                if (!combined.contains(defaultChoice)) {
-                    combined.add(defaultChoice)
+            val addedDurationMs = mutableSetOf<Long>()
+
+            fun tryAdd(choice: String) {
+                val canonical = CreateReminderReceiver.canonicalizeSnoozeChoice(choice) ?: choice
+                val durationMs = CreateReminderReceiver.parseSnoozeDuration(canonical, now)?.first
+                if (!combined.contains(canonical)) {
+                    if (durationMs != null && addedDurationMs.contains(durationMs)) {
+                        return
+                    }
+                    combined.add(canonical)
+                    if (durationMs != null) {
+                        addedDurationMs.add(durationMs)
+                    }
                 }
             }
 
-            val now = System.currentTimeMillis()
+            for (choice in topRecent) tryAdd(choice)
+            for (choice in topCommon) tryAdd(choice)
+            for (defaultChoice in defaultChoices) tryAdd(defaultChoice)
+
             combined.sortBy { choice ->
                 CreateReminderReceiver.parseSnoozeDuration(choice, now)?.first ?: Long.MAX_VALUE
             }

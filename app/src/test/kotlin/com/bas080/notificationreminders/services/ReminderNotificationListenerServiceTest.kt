@@ -365,7 +365,7 @@ class ReminderNotificationListenerServiceTest {
         assertTrue("Should contain 3h (common)", choices.contains("3h"))
         assertTrue("Should contain 5h (common)", choices.contains("5h"))
         assertTrue("Should contain 12h (common)", choices.contains("12h"))
-        assertTrue("Should contain 1d (common)", choices.contains("1d"))
+        assertTrue("Should contain 24h (common)", choices.contains("24h"))
         assertTrue("Should contain 2d (common)", choices.contains("2d"))
         assertTrue("Should contain 3d (common)", choices.contains("3d"))
 
@@ -382,6 +382,22 @@ class ReminderNotificationListenerServiceTest {
         assertTrue("30m should come before 2h", index30m < index2h)
         assertTrue("2h should come before 3h", index2h < index3h)
         assertTrue("3h should come before 5h", index3h < index5h)
+    }
+
+    @Test
+    fun testGetTopSnoozeChoicesDeduplicatesEquivalentDurationsAndCanonicalChoices() {
+        val context = RuntimeEnvironment.getApplication()
+        val prefs = context.getSharedPreferences("snooze_freq_prefs", Context.MODE_PRIVATE)
+
+        prefs.edit()
+            .putLong("1d", 1000L).putLong("count_1d", 5L)
+            .putLong("24h", 2000L).putLong("count_24h", 10L)
+            .commit()
+
+        val choices = ReminderNotificationListenerService.getTopSnoozeChoices(context).map { it.toString() }
+
+        assertEquals("24h should appear exactly once", 1, choices.count { it == "24h" })
+        assertFalse("1d should be canonicalized and deduplicated into 24h", choices.contains("1d"))
     }
 
     @Test
