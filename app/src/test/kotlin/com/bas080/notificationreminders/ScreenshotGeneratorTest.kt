@@ -21,6 +21,7 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowAlertDialog
+import com.bas080.notificationreminders.adapters.RemindersAdapter
 import com.bas080.notificationreminders.utils.AppLogger
 import java.io.File
 import java.io.FileOutputStream
