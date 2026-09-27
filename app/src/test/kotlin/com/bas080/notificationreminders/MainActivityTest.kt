@@ -24,6 +24,11 @@ import org.robolectric.shadows.ShadowToast
 @Config(sdk = [34])
 class MainActivityTest {
 
+    @org.junit.Before
+    fun setUp() {
+        com.bas080.notificationreminders.services.ReminderNotificationListenerService.lastTriggeredMap.clear()
+    }
+
     @Test
     fun testAddReminderShowsSuccessToast() {
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()

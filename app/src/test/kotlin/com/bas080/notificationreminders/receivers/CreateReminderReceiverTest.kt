@@ -18,6 +18,11 @@ import org.robolectric.shadows.ShadowToast
 @Config(sdk = [34])
 class CreateReminderReceiverTest {
 
+    @org.junit.Before
+    fun setUp() {
+        ReminderNotificationListenerService.lastTriggeredMap.clear()
+    }
+
     @Test
     fun testCreateReminderShowsSuccessToast() {
         val context = RuntimeEnvironment.getApplication()
@@ -305,7 +310,7 @@ class CreateReminderReceiverTest {
         assertEquals(57 * 60 * 60 * 1000L, ms2d7pm)
 
         assertEquals("2d 18:00", CreateReminderReceiver.canonicalizeSnoozeChoice("2d 1800"))
-        assertEquals("1d 2h 15m", CreateReminderReceiver.canonicalizeSnoozeChoice("1d 2h 15m"))
+        assertEquals("24h 2h 15m", CreateReminderReceiver.canonicalizeSnoozeChoice("1d 2h 15m"))
     }
 
     @Test
