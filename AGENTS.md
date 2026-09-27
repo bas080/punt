@@ -162,6 +162,12 @@ The GitHub Actions workflow (`.github/workflows/ci.yml`) automatically runs test
 
 ---
 
+## Commit Message Guidelines
+
+- **Git Conventions**: Write standard git commit messages using a short, imperative subject line (50 characters max) with no conversational intros (e.g., avoid "I've fixed..." or "Here is..."), followed by a blank line and a concise bulleted list or body describing the changes.
+
+---
+
 ## Code Style & Conventions
 
 - Follow standard Kotlin coding conventions.
