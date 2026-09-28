@@ -67,6 +67,10 @@
   ```
 
 ### Build & Test Commands
+- **Run detekt static analysis**:
+  ```bash
+  ./gradlew detekt
+  ```
 - **Run all unit tests** (includes JaCoCo code coverage analysis and threshold verification):
   ```bash
   ./gradlew test

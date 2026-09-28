@@ -2,6 +2,7 @@ plugins {
     id("com.android.application")
     kotlin("android")
     jacoco
+    id("io.gitlab.arturbosch.detekt")
 }
 
 android {
@@ -66,6 +67,7 @@ android {
         unitTests {
             isIncludeAndroidResources = true
             all {
+                it.systemProperty("robolectric.dependency.repo.url", "https://maven.aliyun.com/repository/public")
                 it.configure<JacocoTaskExtension> {
                     isIncludeNoLocationClasses = true
                     excludes = listOf("jdk.internal.*")
@@ -79,6 +81,11 @@ android {
         checkAllWarnings = true
         disable += "ProtectedPermissions"
     }
+}
+
+detekt {
+    buildUponDefaultConfig = true
+    source.setFrom(files("src/main/java", "src/main/kotlin"))
 }
 
 val fileFilter = listOf(
