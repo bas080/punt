@@ -82,6 +82,109 @@ class SnoozeDialogActivityTest {
     }
 
     @Test
+    fun testEmptyIntentFinishesActivity() {
+        val context = RuntimeEnvironment.getApplication()
+        val intent = Intent(context, SnoozeDialogActivity::class.java)
+
+        val controller = Robolectric.buildActivity(SnoozeDialogActivity::class.java, intent).setup()
+        val activity = controller.get()
+
+        assertTrue("Activity should finish when started without reminder targets", activity.isFinishing)
+    }
+
+    @Test
+    fun testCustomSnoozeDialogValidInput() {
+        val context = RuntimeEnvironment.getApplication()
+        val intent = Intent(context, SnoozeDialogActivity::class.java).apply {
+            putExtra(SnoozeDialogActivity.EXTRA_REMINDER_TEXT, "Buy bread")
+        }
+
+        val controller = Robolectric.buildActivity(SnoozeDialogActivity::class.java, intent).setup()
+        val activity = controller.get()
+
+        val dialog = ShadowAlertDialog.getLatestDialog() as? AlertDialog
+        assertNotNull("Snooze dialog should be shown", dialog)
+
+        val listView = dialog!!.listView
+        assertNotNull(listView)
+
+        // Click "Custom..." option (last item)
+        val customIndex = listView.adapter.count - 1
+        shadowOf(listView).performItemClick(customIndex)
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        val customDialog = ShadowAlertDialog.getLatestDialog() as? AlertDialog
+        assertNotNull("Custom snooze input dialog should be shown", customDialog)
+
+        val inputEditText = customDialog!!.findViewById<android.widget.EditText>(R.id.import_input)
+        assertNotNull("Custom input EditText should exist", inputEditText)
+        inputEditText!!.setText("30m")
+
+        customDialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        assertTrue("Activity should finish after custom snooze entry", activity.isFinishing)
+        assertEquals("Reminder punted for 30 minutes", ShadowToast.getTextOfLatestToast())
+
+        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
+        val snoozeTime = prefs.getLong("snooze_buy bread", 0L)
+        assertTrue("Snooze timestamp should be saved in preferences", snoozeTime > System.currentTimeMillis())
+    }
+
+    @Test
+    fun testCustomSnoozeDialogInvalidInput() {
+        val context = RuntimeEnvironment.getApplication()
+        val intent = Intent(context, SnoozeDialogActivity::class.java).apply {
+            putExtra(SnoozeDialogActivity.EXTRA_REMINDER_TEXT, "Buy bread")
+        }
+
+        val controller = Robolectric.buildActivity(SnoozeDialogActivity::class.java, intent).setup()
+        val activity = controller.get()
+
+        val dialog = ShadowAlertDialog.getLatestDialog() as? AlertDialog
+        assertNotNull("Snooze dialog should be shown", dialog)
+
+        val listView = dialog!!.listView
+        assertNotNull(listView)
+
+        // Click "Custom..." option (last item)
+        val customIndex = listView.adapter.count - 1
+        shadowOf(listView).performItemClick(customIndex)
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        val customDialog = ShadowAlertDialog.getLatestDialog() as? AlertDialog
+        assertNotNull(customDialog)
+
+        val inputEditText = customDialog!!.findViewById<android.widget.EditText>(R.id.import_input)
+        inputEditText!!.setText("invalid_duration")
+
+        customDialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        assertTrue("Activity should finish on invalid snooze entry", activity.isFinishing)
+        assertEquals("Failed to punt: Invalid duration entered", ShadowToast.getTextOfLatestToast())
+    }
+
+    @Test
+    fun testCancelSnoozeDialog() {
+        val context = RuntimeEnvironment.getApplication()
+        val intent = Intent(context, SnoozeDialogActivity::class.java).apply {
+            putExtra(SnoozeDialogActivity.EXTRA_REMINDER_TEXT, "Buy bread")
+        }
+
+        val controller = Robolectric.buildActivity(SnoozeDialogActivity::class.java, intent).setup()
+        val activity = controller.get()
+
+        val dialog = ShadowAlertDialog.getLatestDialog() as? AlertDialog
+        assertNotNull("Snooze dialog should be shown", dialog)
+
+        dialog!!.getButton(AlertDialog.BUTTON_NEGATIVE).performClick()
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        assertTrue("Activity should finish when dialog is cancelled", activity.isFinishing)
+    }
+
+    @Test
     fun testFlexibleDateParsingWithoutYearAndWithLeadingZeros() {
         val cal = java.util.Calendar.getInstance().apply {
             set(2026, java.util.Calendar.JANUARY, 1, 10, 0, 0)
