@@ -6,6 +6,7 @@ import android.os.Bundle
 import androidx.core.app.RemoteInput
 import com.bas080.notificationreminders.services.ReminderNotificationListenerService
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
@@ -331,6 +332,87 @@ class CreateReminderReceiverTest {
 
         val (msDate, _) = CreateReminderReceiver.parseSnoozeDuration("10/25/2026", nowMillis)!!
         assertEquals(expectedMs, msDate)
+    }
+
+    @Test
+    fun testAllWeekdaysAndInvalidTimes() {
+        val cal = java.util.Calendar.getInstance().apply {
+            set(2025, java.util.Calendar.MARCH, 12, 10, 0, 0) // Wednesday
+            set(java.util.Calendar.MILLISECOND, 0)
+        }
+        val now = cal.timeInMillis
+
+        // Test all days of the week
+        val days = listOf("tue", "tuesday", "wed", "wednesday", "thu", "thursday", "sat", "saturday", "sun", "sunday")
+        for (d in days) {
+            val res = CreateReminderReceiver.parseSnoozeDuration(d, now)
+            org.junit.Assert.assertNotNull("Weekday '$d' should parse", res)
+        }
+
+        // Test time variations on weekday
+        org.junit.Assert.assertNotNull(CreateReminderReceiver.parseSnoozeDuration("mon 12am", now))
+        org.junit.Assert.assertNotNull(CreateReminderReceiver.parseSnoozeDuration("mon 12pm", now))
+        org.junit.Assert.assertNotNull(CreateReminderReceiver.parseSnoozeDuration("mon 1800", now))
+        org.junit.Assert.assertNotNull(CreateReminderReceiver.parseSnoozeDuration("mon 9", now))
+
+        // Test invalid time variations on weekday
+        org.junit.Assert.assertNull(CreateReminderReceiver.parseSnoozeDuration("mon 25:00", now))
+        org.junit.Assert.assertNull(CreateReminderReceiver.parseSnoozeDuration("mon 13pm", now))
+        org.junit.Assert.assertNull(CreateReminderReceiver.parseSnoozeDuration("mon invalidtime", now))
+
+        // Test weekday when target day is today (Wed at 10 AM)
+        val todayFuture = CreateReminderReceiver.parseSnoozeDuration("wed 18:00", now)
+        org.junit.Assert.assertNotNull(todayFuture)
+        assertEquals(8 * 60 * 60 * 1000L, todayFuture!!.first) // 10 AM to 6 PM = 8 hours
+
+        val todayPast = CreateReminderReceiver.parseSnoozeDuration("wed 08:00", now)
+        org.junit.Assert.assertNotNull(todayPast)
+        assertTrue("Passed time today should wrap to next week (+7 days)", todayPast!!.first > 6 * 24 * 60 * 60 * 1000L)
+    }
+
+    @Test
+    fun testAllDateFormatsAndTimes() {
+        val cal = java.util.Calendar.getInstance().apply {
+            set(2026, java.util.Calendar.OCTOBER, 12, 10, 0, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }
+        val now = cal.timeInMillis
+
+        org.junit.Assert.assertNotNull(CreateReminderReceiver.parseSnoozeDuration("2026-10-25", now))
+        org.junit.Assert.assertNotNull(CreateReminderReceiver.parseSnoozeDuration("2026/10/25", now))
+        org.junit.Assert.assertNotNull(CreateReminderReceiver.parseSnoozeDuration("10/25/2026 12am", now))
+        org.junit.Assert.assertNotNull(CreateReminderReceiver.parseSnoozeDuration("10/25/2026 12pm", now))
+        org.junit.Assert.assertNotNull(CreateReminderReceiver.parseSnoozeDuration("10/25/2026 1800", now))
+        org.junit.Assert.assertNotNull(CreateReminderReceiver.parseSnoozeDuration("10/25/2026 9", now))
+
+        // Invalid month/day numbers
+        org.junit.Assert.assertNull(CreateReminderReceiver.parseSnoozeDuration("13/25/2026", now))
+        org.junit.Assert.assertNull(CreateReminderReceiver.parseSnoozeDuration("10/35/2026", now))
+        org.junit.Assert.assertNull(CreateReminderReceiver.parseSnoozeDuration("10/25/2026 25:00", now))
+
+        // Date in past without year -> wraps to next year
+        val pastDate = CreateReminderReceiver.parseSnoozeDuration("01/01", now)
+        org.junit.Assert.assertNotNull("Past date without year should wrap to next year", pastDate)
+        assertTrue(pastDate!!.first > 0)
+    }
+
+    @Test
+    fun testAllCanonicalizeSnoozeChoiceOptions() {
+        assertEquals("1h", CreateReminderReceiver.canonicalizeSnoozeChoice(""))
+        assertEquals("1h", CreateReminderReceiver.canonicalizeSnoozeChoice(null))
+        assertEquals("15m", CreateReminderReceiver.canonicalizeSnoozeChoice("15min"))
+        assertEquals("4h", CreateReminderReceiver.canonicalizeSnoozeChoice("4 hrs"))
+        assertEquals("4h", CreateReminderReceiver.canonicalizeSnoozeChoice("4hour"))
+        assertEquals("24h", CreateReminderReceiver.canonicalizeSnoozeChoice("1 day"))
+        assertEquals("24h", CreateReminderReceiver.canonicalizeSnoozeChoice("1day"))
+        assertEquals("1w", CreateReminderReceiver.canonicalizeSnoozeChoice("1w"))
+        assertEquals("1w", CreateReminderReceiver.canonicalizeSnoozeChoice("1 week"))
+        assertEquals("1w", CreateReminderReceiver.canonicalizeSnoozeChoice("1week"))
+        assertEquals("1w", CreateReminderReceiver.canonicalizeSnoozeChoice("w"))
+        assertEquals("00:00", CreateReminderReceiver.canonicalizeSnoozeChoice("12am"))
+        assertEquals("12:00", CreateReminderReceiver.canonicalizeSnoozeChoice("12pm"))
+        assertEquals("09:00", CreateReminderReceiver.canonicalizeSnoozeChoice("900"))
+        org.junit.Assert.assertNull(CreateReminderReceiver.canonicalizeSnoozeChoice("1d invalid_token"))
     }
 
     @Test

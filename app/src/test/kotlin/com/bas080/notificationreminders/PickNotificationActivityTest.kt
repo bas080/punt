@@ -100,4 +100,52 @@ class PickNotificationActivityTest {
         assertEquals("Reminder created", org.robolectric.shadows.ShadowToast.getTextOfLatestToast())
         assertTrue(activity.isFinishing)
     }
+
+    @Test
+    fun testSelfNotificationFilterAndDialogCancel() {
+        val context = org.robolectric.RuntimeEnvironment.getApplication()
+
+        val selfExtras = Bundle().apply {
+            putCharSequence("android.title", "Self Title")
+            putCharSequence("android.text", "Self Text")
+        }
+        @Suppress("DEPRECATION")
+        val selfSbn = StatusBarNotification(
+            context.packageName, context.packageName, 1, "tag", 1000, 1000, 1,
+            Notification.Builder(context, "test_channel").setExtras(selfExtras).build(),
+            android.os.Process.myUserHandle(), System.currentTimeMillis()
+        )
+
+        val otherExtras = Bundle().apply {
+            putCharSequence("android.title", "Other Title")
+            putCharSequence("android.text", "Other Text")
+        }
+        @Suppress("DEPRECATION")
+        val otherSbn = StatusBarNotification(
+            "com.other.app", "com.other.app", 2, "tag", 1000, 1000, 1,
+            Notification.Builder(context, "test_channel").setExtras(otherExtras).build(),
+            android.os.Process.myUserHandle(), System.currentTimeMillis()
+        )
+
+        PickNotificationActivity.mockActiveNotifications = arrayOf(selfSbn, otherSbn)
+
+        val controller = Robolectric.buildActivity(PickNotificationActivity::class.java).setup()
+        val activity = controller.get()
+
+        val dialog = ShadowAlertDialog.getLatestDialog() as? AlertDialog
+        assertNotNull(dialog)
+
+        val listView = dialog!!.listView
+        assertEquals(1, listView.adapter.count)
+        assertEquals("Other Title: Other Text", listView.adapter.getItem(0))
+
+        // Trigger getView on adapter
+        val rowView = listView.adapter.getView(0, null, listView)
+        assertNotNull(rowView)
+
+        // Cancel dialog
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE).performClick()
+        Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+        assertTrue(activity.isFinishing)
+    }
 }

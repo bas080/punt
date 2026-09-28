@@ -952,14 +952,134 @@ class MainActivityTest {
     }
 
     @Test
-    fun testSwipeThresholdAndEscapeVelocity() {
+    fun testSwipeHandlerCallbacksAndChildDraw() {
+        val context = RuntimeEnvironment.getApplication()
+        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
+        prefs.edit().clear()
+            .putStringSet("key_reminders_list", setOf("Active Task", "Done Task #done"))
+            .commit()
+
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
 
-        val method = MainActivity::class.java.getDeclaredMethod("setupSwipeGestures")
-        method.isAccessible = true
+        val swipeHandler = activity.createSwipeHandler()
+        val recyclerView = activity.findViewById<RecyclerView>(R.id.reminders_list)
 
-        method.invoke(activity)
+        recyclerView.measure(View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY))
+        recyclerView.layout(0, 0, 1000, 1000)
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        val activeHolder = recyclerView.findViewHolderForAdapterPosition(0) as RemindersAdapter.ItemViewHolder
+
+        // 1. Threshold and escape velocity
+        assertEquals(0.75f, swipeHandler.getSwipeThreshold(activeHolder), 0.01f)
+        assertEquals(30f, swipeHandler.getSwipeEscapeVelocity(10f), 0.01f)
+
+        // 2. getSwipeDirs
+        val activeDirs = swipeHandler.getSwipeDirs(recyclerView, activeHolder)
+        assertTrue(activeDirs != 0)
+
+        val mockHeaderHolder = recyclerView.adapter!!.createViewHolder(recyclerView, RemindersAdapter.TYPE_SNOOZED_HEADER)
+        assertEquals(0, swipeHandler.getSwipeDirs(recyclerView, mockHeaderHolder))
+
+        // 3. onMove
+        org.junit.Assert.assertFalse(swipeHandler.onMove(recyclerView, activeHolder, activeHolder))
+
+        // 4. Canvas drawing setup
+        val bitmap = android.graphics.Bitmap.createBitmap(1000, 1000, android.graphics.Bitmap.Config.ARGB_8888)
+        val canvas = android.graphics.Canvas(bitmap)
+
+        // Active item right swipe (dX = 50f)
+        swipeHandler.onChildDraw(canvas, recyclerView, activeHolder, 50f, 0f, androidx.recyclerview.widget.ItemTouchHelper.ACTION_STATE_SWIPE, true)
+        // Active item left swipe (dX = -50f)
+        swipeHandler.onChildDraw(canvas, recyclerView, activeHolder, -50f, 0f, androidx.recyclerview.widget.ItemTouchHelper.ACTION_STATE_SWIPE, true)
+
+        // 5. onSwiped for Active Task (LEFT -> show snooze dialog)
+        swipeHandler.onSwiped(activeHolder, androidx.recyclerview.widget.ItemTouchHelper.LEFT)
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+        val dialog = ShadowAlertDialog.getLatestDialog() as? AlertDialog
+        assertNotNull("Snooze dialog should open on left swipe of active task", dialog)
+        dialog?.dismiss()
+
+        // Re-layout and re-fetch position 0 holder before second swipe on active item
+        recyclerView.measure(View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY))
+        recyclerView.layout(0, 0, 1000, 1000)
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+        val activeHolder2 = recyclerView.findViewHolderForAdapterPosition(0) as RemindersAdapter.ItemViewHolder
+
+        // Swiping active task RIGHT -> mark done
+        swipeHandler.onSwiped(activeHolder2, androidx.recyclerview.widget.ItemTouchHelper.RIGHT)
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+        assertEquals("Reminder marked done", ShadowToast.getTextOfLatestToast())
+
+        // 6. Position 0 is now "Active Task #done"
+        recyclerView.measure(View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY))
+        recyclerView.layout(0, 0, 1000, 1000)
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+        val doneHolder = recyclerView.findViewHolderForAdapterPosition(0) as RemindersAdapter.ItemViewHolder
+
+        // Done item canvas drawing (dX = 50f right swipe -> delete icon, dX = -50f left swipe -> undo icon)
+        swipeHandler.onChildDraw(canvas, recyclerView, doneHolder, 50f, 0f, androidx.recyclerview.widget.ItemTouchHelper.ACTION_STATE_SWIPE, true)
+        swipeHandler.onChildDraw(canvas, recyclerView, doneHolder, -50f, 0f, androidx.recyclerview.widget.ItemTouchHelper.ACTION_STATE_SWIPE, true)
+
+        // Swiping done task LEFT -> undo mark done
+        swipeHandler.onSwiped(doneHolder, androidx.recyclerview.widget.ItemTouchHelper.LEFT)
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+        assertEquals("Mark done undone", ShadowToast.getTextOfLatestToast())
+
+        // Re-layout and mark done again so we can test deletion
+        recyclerView.measure(View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY))
+        recyclerView.layout(0, 0, 1000, 1000)
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+        val activeHolder3 = recyclerView.findViewHolderForAdapterPosition(0) as RemindersAdapter.ItemViewHolder
+        swipeHandler.onSwiped(activeHolder3, androidx.recyclerview.widget.ItemTouchHelper.RIGHT)
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        recyclerView.measure(View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY))
+        recyclerView.layout(0, 0, 1000, 1000)
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+        val doneHolder2 = recyclerView.findViewHolderForAdapterPosition(0) as RemindersAdapter.ItemViewHolder
+
+        // Swiping done task RIGHT -> delete reminder
+        swipeHandler.onSwiped(doneHolder2, androidx.recyclerview.widget.ItemTouchHelper.RIGHT)
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+        assertEquals("Reminder deleted", ShadowToast.getTextOfLatestToast())
+    }
+
+    @Test
+    fun testRemindersAdapterEditingFocusAndAccessibility() {
+        val context = RuntimeEnvironment.getApplication()
+        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
+        prefs.edit().clear().putStringSet("key_reminders_list", setOf("Editable task")).commit()
+
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = controller.get()
+
+        val recyclerView = activity.findViewById<RecyclerView>(R.id.reminders_list)
+        recyclerView.measure(View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY))
+        recyclerView.layout(0, 0, 1000, 1000)
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        val holder = recyclerView.findViewHolderForAdapterPosition(0) as RemindersAdapter.ItemViewHolder
+
+        // 1. Focus listener changes maxLines
+        holder.reminderInput.onFocusChangeListener?.onFocusChange(holder.reminderInput, true)
+        assertEquals(Int.MAX_VALUE, holder.reminderInput.maxLines)
+
+        holder.reminderInput.onFocusChangeListener?.onFocusChange(holder.reminderInput, false)
+        assertEquals(4, holder.reminderInput.maxLines)
+
+        // 2. TextWatcher updates text in adapter
+        holder.reminderInput.setText("Editable task updated")
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        val updatedSet = prefs.getStringSet("key_reminders_list", emptySet()) ?: emptySet()
+        assertTrue(updatedSet.contains("Editable task updated"))
+
+        // 3. Accessibility delegates
+        val info = androidx.core.view.accessibility.AccessibilityNodeInfoCompat.obtain()
+        androidx.core.view.ViewCompat.getAccessibilityDelegate(holder.btnShare)?.onInitializeAccessibilityNodeInfo(holder.btnShare, info)
+        assertEquals(android.widget.Button::class.java.name, info.className)
     }
 
     @Test

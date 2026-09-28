@@ -63,6 +63,30 @@ class ProcessTextActivityTest {
 
 
     @Test
+    fun testNullIntentOrOtherActionAndOnNewIntent() {
+        val controller = Robolectric.buildActivity(ProcessTextActivity::class.java)
+        val activity = controller.get()
+
+        controller.create()
+        assertTrue(activity.isFinishing)
+
+        // Test ACTION_SEND with non text/plain type
+        val imageIntent = Intent(Intent.ACTION_SEND).apply {
+            type = "image/png"
+            putExtra(Intent.EXTRA_TEXT, "Should be ignored")
+        }
+        Robolectric.buildActivity(ProcessTextActivity::class.java, imageIntent).create()
+
+        // Test CharSequence extra on ACTION_SEND
+        val charSeqIntent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, StringBuilder("CharSeq text") as CharSequence)
+        }
+        Robolectric.buildActivity(ProcessTextActivity::class.java, charSeqIntent).create()
+        assertEquals("Reminder created", ShadowToast.getTextOfLatestToast())
+    }
+
+    @Test
     fun testProcessTextEmptyShowsFailureToast() {
         val intent = Intent(Intent.ACTION_PROCESS_TEXT).apply {
             putExtra(Intent.EXTRA_PROCESS_TEXT, "   ")

@@ -62,7 +62,7 @@ class ScreenshotGeneratorTest {
     @Test
     fun captureFeatureScreenshots() {
         val shouldGenerate = System.getenv("GENERATE_SCREENSHOTS") == "true" ||
-                System.getProperty("generate.screenshots") == "true" || true
+                System.getProperty("generate.screenshots") == "true"
         if (!shouldGenerate) {
             println("Skipping Fastlane screenshot generation because GENERATE_SCREENSHOTS is not set.")
             return

@@ -608,8 +608,8 @@ class MainActivity : AppCompatActivity() {
         binding.remindersList.adapter = adapter
     }
 
-    private fun setupSwipeGestures() {
-        val swipeHandler = object : ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.LEFT or ItemTouchHelper.RIGHT) {
+    internal fun createSwipeHandler(): ItemTouchHelper.SimpleCallback {
+        return object : ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.LEFT or ItemTouchHelper.RIGHT) {
             override fun getSwipeThreshold(viewHolder: RecyclerView.ViewHolder): Float = 0.75f
 
             override fun getSwipeEscapeVelocity(defaultValue: Float): Float = defaultValue * 3f
@@ -738,6 +738,10 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+    }
+
+    private fun setupSwipeGestures() {
+        val swipeHandler = createSwipeHandler()
         ItemTouchHelper(swipeHandler).attachToRecyclerView(binding.remindersList)
     }
 

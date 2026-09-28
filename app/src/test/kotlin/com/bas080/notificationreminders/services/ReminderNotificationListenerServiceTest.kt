@@ -419,4 +419,25 @@ class ReminderNotificationListenerServiceTest {
         assertNotNull("Status notification should contain active reminder lines", textLines)
         assertEquals("Buy grocers", textLines!![0].toString())
     }
+
+    @Test
+    fun testNotificationRemovedAndLifecycleMethods() {
+        val context = RuntimeEnvironment.getApplication()
+        val service = Robolectric.buildService(ReminderNotificationListenerService::class.java).create().get()
+
+        service.onListenerConnected()
+        service.onStartCommand(Intent(), 0, 1)
+
+        val extras = Bundle().apply {
+            putCharSequence("android.title", "Test")
+            putCharSequence("android.text", "Test text")
+        }
+        @Suppress("DEPRECATION")
+        val notification = Notification.Builder(context, "test_channel").setExtras(extras).build()
+        @Suppress("DEPRECATION")
+        val sbn = StatusBarNotification("com.example.app", "com.example.app", 1, "tag", 1000, 1000, 1, notification, android.os.Process.myUserHandle(), System.currentTimeMillis())
+
+        service.onNotificationRemoved(sbn)
+        service.onListenerDisconnected()
+    }
 }
