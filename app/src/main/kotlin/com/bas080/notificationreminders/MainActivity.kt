@@ -254,7 +254,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         binding.btnExportMarkdown.setOnClickListener {
-            exportRemindersToMarkdown()
+            showExportOptionsDialog(activeReminders)
         }
 
         binding.btnListExport.setOnClickListener { view ->
@@ -271,7 +271,8 @@ class MainActivity : AppCompatActivity() {
                         true
                     }
                     "Share All" -> {
-                        exportRemindersToMarkdown()
+                        val matchedList = displayedReminders.filter { it != HEADER_SNOOZED_SECTION_MARKER }
+                        showExportOptionsDialog(matchedList)
                         true
                     }
                     else -> false
@@ -533,13 +534,45 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
-    private fun exportRemindersToMarkdown() {
-        val exportList = displayedReminders.filter { it != HEADER_SNOOZED_SECTION_MARKER }
-        if (exportList.isEmpty()) {
+    private fun showExportOptionsDialog(reminders: List<String>) {
+        if (reminders.isEmpty()) {
             Toast.makeText(this, R.string.toast_no_reminders_to_export, Toast.LENGTH_SHORT).show()
             return
         }
-        val markdownText = com.bas080.notificationreminders.utils.MarkdownRemindersUtil.exportToMarkdown(exportList)
+
+        AlertDialog.Builder(this, R.style.Theme_NotificationReminders_Dialog)
+            .setTitle(R.string.export_markdown)
+            .setMessage("Include punt state information in the exported Markdown?")
+            .setPositiveButton("Include Punt Info") { _, _ ->
+                performExport(reminders, includePuntInfo = true)
+            }
+            .setNegativeButton("Text Only") { _, _ ->
+                performExport(reminders, includePuntInfo = false)
+            }
+            .setNeutralButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun performExport(reminders: List<String>, includePuntInfo: Boolean) {
+        val prefs = getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
+        val snoozeMap = mutableMapOf<String, Long>()
+        for (reminder in activeReminders) {
+            val cleanKey = getCleanTrimmed(reminder)
+            val snoozeUntil = prefs.getLong("snooze_$cleanKey", 0L).let {
+                if (it > 0L) it else (ReminderNotificationListenerService.lastTriggeredMap["snooze_$cleanKey"] ?: 0L)
+            }
+            if (snoozeUntil > 0L) {
+                snoozeMap[cleanKey] = snoozeUntil
+            }
+        }
+
+        val markdownText = com.bas080.notificationreminders.utils.MarkdownRemindersUtil.exportToMarkdown(
+            reminders = reminders,
+            snoozeMap = snoozeMap,
+            includePuntInfo = includePuntInfo,
+            getCleanTrimmed = ::getCleanTrimmed
+        )
+
         val shareIntent = Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"
             putExtra(Intent.EXTRA_TEXT, markdownText)
@@ -567,13 +600,31 @@ class MainActivity : AppCompatActivity() {
                 val importedItems = com.bas080.notificationreminders.utils.MarkdownRemindersUtil.importFromMarkdown(markdownText)
                 if (importedItems.isNotEmpty()) {
                     var addedCount = 0
+                    val prefs = getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
+                    val editor = prefs.edit()
+                    val now = System.currentTimeMillis()
+
                     for (item in importedItems) {
-                        if (!activeReminders.contains(item)) {
-                            activeReminders.add(item)
+                        val cleanKey = getCleanTrimmed(item.text)
+                        var itemUpdatedOrAdded = false
+
+                        if (!activeReminders.contains(item.text)) {
+                            activeReminders.add(item.text)
+                            itemUpdatedOrAdded = true
+                        }
+
+                        if (item.snoozeUntilMillis != null && item.snoozeUntilMillis > now) {
+                            editor.putLong("snooze_$cleanKey", item.snoozeUntilMillis)
+                            ReminderNotificationListenerService.lastTriggeredMap["snooze_$cleanKey"] = item.snoozeUntilMillis
+                            itemUpdatedOrAdded = true
+                        }
+
+                        if (itemUpdatedOrAdded) {
                             addedCount++
                         }
                     }
                     if (addedCount > 0) {
+                        editor.apply()
                         saveRemindersToPrefs()
                         updateSummaryAndAdapter()
                         Toast.makeText(this, getString(R.string.toast_imported_reminders, addedCount), Toast.LENGTH_SHORT).show()
