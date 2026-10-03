@@ -1188,9 +1188,9 @@ class MainActivityTest {
     @Test
     fun testCheckAndShowCrashReportDialogPreservesCrashTraceInPrefs() {
         val context = RuntimeEnvironment.getApplication()
-        val prefs = context.getSharedPreferences(NotificationRemindersApplication.PREFS_NAME, Context.MODE_PRIVATE)
+        val prefs = context.getSharedPreferences(App.PREFS_NAME, Context.MODE_PRIVATE)
         val crashTrace = "java.lang.RuntimeException: Persistent crash test"
-        prefs.edit().putString(NotificationRemindersApplication.KEY_CRASH_TRACE, crashTrace).commit()
+        prefs.edit().putString(App.KEY_CRASH_TRACE, crashTrace).commit()
 
         val controller = Robolectric.buildActivity(MainActivity::class.java).create().get()
 
@@ -1202,7 +1202,7 @@ class MainActivityTest {
         assertNotNull("CrashReportActivity intent should be started", nextStartedActivity)
         assertEquals(CrashReportActivity::class.java.name, nextStartedActivity.component?.className)
 
-        val savedTrace = prefs.getString(NotificationRemindersApplication.KEY_CRASH_TRACE, null)
+        val savedTrace = prefs.getString(App.KEY_CRASH_TRACE, null)
         assertNotNull("KEY_CRASH_TRACE must remain persisted in prefs", savedTrace)
         assertEquals(crashTrace, savedTrace)
     }

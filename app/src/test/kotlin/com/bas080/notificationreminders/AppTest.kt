@@ -13,19 +13,19 @@ import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
-class NotificationRemindersApplicationTest {
+class AppTest {
 
     @Test
     fun testGlobalCrashHandlerSavesTraceAndLaunchesCrashReportActivity() {
-        val application = RuntimeEnvironment.getApplication() as NotificationRemindersApplication
+        val application = RuntimeEnvironment.getApplication() as App
         val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
         assertNotNull("Global uncaught exception handler should be registered", defaultHandler)
 
         val testException = RuntimeException("Test application uncaught exception")
         defaultHandler!!.uncaughtException(Thread.currentThread(), testException)
 
-        val prefs = application.getSharedPreferences(NotificationRemindersApplication.PREFS_NAME, Context.MODE_PRIVATE)
-        val savedTrace = prefs.getString(NotificationRemindersApplication.KEY_CRASH_TRACE, null)
+        val prefs = application.getSharedPreferences(App.PREFS_NAME, Context.MODE_PRIVATE)
+        val savedTrace = prefs.getString(App.KEY_CRASH_TRACE, null)
         assertNotNull("Crash trace should be saved in preferences", savedTrace)
         assertTrue("Saved trace should contain exception message", savedTrace!!.contains("Test application uncaught exception"))
 
