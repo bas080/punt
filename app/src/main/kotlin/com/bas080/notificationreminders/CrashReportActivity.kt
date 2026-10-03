@@ -113,9 +113,9 @@ class CrashReportActivity : AppCompatActivity() {
 
         val isFeedback = intent.getBooleanExtra(EXTRA_IS_FEEDBACK, false)
 
-        val prefs = getSharedPreferences(NotificationRemindersApplication.PREFS_NAME, Context.MODE_PRIVATE)
+        val prefs = getSharedPreferences(App.PREFS_NAME, Context.MODE_PRIVATE)
         val crashTrace = intent.getStringExtra(EXTRA_CRASH_TRACE)
-            ?: prefs.getString(NotificationRemindersApplication.KEY_CRASH_TRACE, null)
+            ?: prefs.getString(App.KEY_CRASH_TRACE, null)
             ?: "No stack trace available."
 
         val txtTitle = findViewById<TextView>(R.id.crash_title)
@@ -141,7 +141,7 @@ class CrashReportActivity : AppCompatActivity() {
         if (btnDontSend != null) {
             markAsButtonAccessibility(btnDontSend)
             btnDontSend.setOnClickListener {
-                prefs.edit().remove(NotificationRemindersApplication.KEY_CRASH_TRACE).apply()
+                prefs.edit().remove(App.KEY_CRASH_TRACE).apply()
                 restartApp()
             }
         }
