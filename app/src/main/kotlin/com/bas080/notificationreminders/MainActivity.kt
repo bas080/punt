@@ -493,7 +493,7 @@ class MainActivity : AppCompatActivity() {
             layout.addView(tagsListView)
         }
 
-        AlertDialog.Builder(this, R.style.Theme_NotificationReminders_Dialog)
+        AlertDialog.Builder(this, R.style.Theme_Punt_Dialog)
             .setTitle("Filter Reminders")
             .setView(layout)
             .setPositiveButton("Apply") { _, _ ->
@@ -559,7 +559,7 @@ class MainActivity : AppCompatActivity() {
             setPadding(padding, padding / 2, padding, 0)
         }
 
-        AlertDialog.Builder(this, R.style.Theme_NotificationReminders_Dialog)
+        AlertDialog.Builder(this, R.style.Theme_Punt_Dialog)
             .setTitle(R.string.import_dialog_title)
             .setView(input)
             .setPositiveButton(R.string.import_button) { _, _ ->
@@ -604,7 +604,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showCalendarPermissionSettingsDialog() {
-        AlertDialog.Builder(this, R.style.Theme_NotificationReminders_Dialog)
+        AlertDialog.Builder(this, R.style.Theme_Punt_Dialog)
             .setTitle(R.string.calendar_sync_title)
             .setMessage(R.string.calendar_permission_required)
             .setPositiveButton("Open Settings") { _, _ ->
@@ -928,7 +928,7 @@ class MainActivity : AppCompatActivity() {
         }
         layout.addView(input)
 
-        val dialog = AlertDialog.Builder(this, R.style.Theme_NotificationReminders_Dialog)
+        val dialog = AlertDialog.Builder(this, R.style.Theme_Punt_Dialog)
             .setTitle(R.string.snooze_dialog_title)
             .setView(layout)
             .setPositiveButton(R.string.snooze) { _, _ ->
@@ -1000,7 +1000,7 @@ class MainActivity : AppCompatActivity() {
 
         val titleText = if (targets.size > 1) "Punt All Reminders" else "Punt Reminder"
 
-        val dialog = AlertDialog.Builder(this, R.style.Theme_NotificationReminders_Dialog)
+        val dialog = AlertDialog.Builder(this, R.style.Theme_Punt_Dialog)
             .setTitle(titleText)
             .setView(layout)
             .setPositiveButton(R.string.snooze) { _, _ ->
@@ -1325,8 +1325,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkAndShowCrashReportDialog() {
-        val prefs = getSharedPreferences(NotificationRemindersApplication.PREFS_NAME, Context.MODE_PRIVATE)
-        val crashTrace = prefs.getString(NotificationRemindersApplication.KEY_CRASH_TRACE, null) ?: return
+        val prefs = getSharedPreferences(App.PREFS_NAME, Context.MODE_PRIVATE)
+        val crashTrace = prefs.getString(App.KEY_CRASH_TRACE, null) ?: return
 
         val intent = Intent(this, CrashReportActivity::class.java).apply {
             putExtra(CrashReportActivity.EXTRA_CRASH_TRACE, crashTrace)
@@ -1335,8 +1335,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun clearCrashTrace() {
-        val prefs = getSharedPreferences(NotificationRemindersApplication.PREFS_NAME, Context.MODE_PRIVATE)
-        prefs.edit().remove(NotificationRemindersApplication.KEY_CRASH_TRACE).apply()
+        val prefs = getSharedPreferences(App.PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().remove(App.KEY_CRASH_TRACE).apply()
     }
 
     private fun checkAndRequestPermissions() {
@@ -1367,7 +1367,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showNotificationListenerDialog() {
-        AlertDialog.Builder(this, R.style.Theme_NotificationReminders_Dialog)
+        AlertDialog.Builder(this, R.style.Theme_Punt_Dialog)
             .setTitle(R.string.app_name)
             .setMessage("Punt requires Notification Listener Access to monitor notifications and trigger your reminders.")
             .setPositiveButton("Enable") { _, _ ->

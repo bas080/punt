@@ -2,7 +2,7 @@
 
 ## Overview
 
-`notification-reminders` is a Kotlin Android application that monitors incoming device notifications and intelligently matches them against user-defined reminders. When a notification contains words matching an active reminder, the application creates a new notification to surface that reminder.
+`Punt` is a Kotlin Android application that monitors incoming device notifications and intelligently matches them against user-defined reminders. When a notification contains words matching an active reminder, the application creates a new notification to surface that reminder.
 
 ---
 
@@ -31,7 +31,7 @@
 │       ├── main/
 │       │   ├── AndroidManifest.xml
 │       │   ├── kotlin/com/bas080/notificationreminders/
-│       │   │   ├── NotificationRemindersApplication.kt
+│       │   │   ├── App.kt
 │       │   │   ├── MainActivity.kt
 │       │   │   └── services/
 │       │   │       └── ReminderNotificationListenerService.kt
@@ -95,7 +95,7 @@
 - **POST_NOTIFICATIONS Permission**: Prompted on first app launch for Android 13+ (API 33+).
 - **Notification Listener Service (`NotificationListenerService`)**: Check and prompt user to grant permission via `Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS`.
 - **Ongoing Status Notification**: Opened automatically via `ReminderNotificationListenerService` as soon as permissions are granted or when service connects.
-- **Process-Level Crash Handling**: `NotificationRemindersApplication` registers a global `Thread.setDefaultUncaughtExceptionHandler` at process initialization. Uncaught exceptions from any thread or component are logged to `SharedPreferences`. On next app startup or feedback request, a dedicated screen (`CrashReportActivity`) presents a multi-line text input for the user to describe what they were doing when the issue occurred, clearly informing the user what diagnostic details (device model, OS version, RAM/storage stats, stack trace, and logs) are included in the generated report so they can inspect or edit the text before sending or pasting. All collected data, breadcrumbs, metadata, stack traces, and user notes are formatted into a structured, human-readable Markdown string (`CrashReportActivity.buildFormattedReport`). The screen provides a one-tap 'COPY REPORT' action that copies the formatted payload to the system Clipboard using `ClipboardManager` accompanied by a Toast notification, and a 'SEND REPORT' action triggering a system email Intent (`Intent.ACTION_SENDTO` with `mailto:`) pre-populating target support email (`bas080@hotmail.com`), subject line, and report body.
+- **Process-Level Crash Handling**: `App` registers a global `Thread.setDefaultUncaughtExceptionHandler` at process initialization. Uncaught exceptions from any thread or component are logged to `SharedPreferences`. On next app startup or feedback request, a dedicated screen (`CrashReportActivity`) presents a multi-line text input for the user to describe what they were doing when the issue occurred, clearly informing the user what diagnostic details (device model, OS version, RAM/storage stats, stack trace, and logs) are included in the generated report so they can inspect or edit the text before sending or pasting. All collected data, breadcrumbs, metadata, stack traces, and user notes are formatted into a structured, human-readable Markdown string (`CrashReportActivity.buildFormattedReport`). The screen provides a one-tap 'COPY REPORT' action that copies the formatted payload to the system Clipboard using `ClipboardManager` accompanied by a Toast notification, and a 'SEND REPORT' action triggering a system email Intent (`Intent.ACTION_SENDTO` with `mailto:`) pre-populating target support email (`bas080@hotmail.com`), subject line, and report body.
 
 ---
 
@@ -134,7 +134,7 @@ The GitHub Actions workflow (`.github/workflows/ci.yml`) automatically runs test
 
 - **Service & System API Calls**: Wrap background service starts (e.g. `startForegroundService`, `startForeground`) and Android OS intent/system calls in `try-catch` blocks to prevent system-level framework exceptions (such as `ForegroundServiceStartNotAllowedException` or `SecurityException`) from crashing the app process.
 - **Log Errors Safely**: When catching non-fatal exceptions in `try-catch` blocks, log the error using `AppLogger` so it is captured in `app_logs.txt` for diagnostic purposes without crashing the user interface.
-- **Do Not Silently Swallow Critical Failures**: Only catch expected non-fatal system/framework exceptions. Fatal or unrecoverable application state errors should be allowed to propagate to `NotificationRemindersApplication`'s uncaught exception handler so the crash can be saved and reported.
+- **Do Not Silently Swallow Critical Failures**: Only catch expected non-fatal system/framework exceptions. Fatal or unrecoverable application state errors should be allowed to propagate to `App`'s uncaught exception handler so the crash can be saved and reported.
 - **Privacy & Logging**: Do not write sensitive user information (such as email addresses, personal messages, or private reminder content) to application logs.
 
 ---
