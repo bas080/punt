@@ -90,6 +90,22 @@ class MainActivityTest {
     }
 
     @Test
+    fun testDonateButtonLaunchesLiberapayUrl() {
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = controller.get()
+
+        val btnDonate = activity.findViewById<TextView>(R.id.btn_donate)
+        assertNotNull(btnDonate)
+
+        btnDonate.performClick()
+
+        val nextStartedActivity = shadowOf(activity).nextStartedActivity
+        assertNotNull("Donate button should start an intent", nextStartedActivity)
+        assertEquals(android.content.Intent.ACTION_VIEW, nextStartedActivity.action)
+        assertEquals("https://liberapay.com/bas080", nextStartedActivity.dataString)
+    }
+
+    @Test
     fun testAboutViewDisplaysVersionAndFeedbackLaunchesIntent() {
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
@@ -211,6 +227,38 @@ class MainActivityTest {
     }
 
     @Test
+    fun testBulkActionsMenuPuntAllAndShareAll() {
+        val context = RuntimeEnvironment.getApplication()
+        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
+        prefs.edit().clear().putStringSet("key_reminders_list", setOf("Task 1", "Task 2")).commit()
+
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = controller.get()
+
+        val showBulkMethod = MainActivity::class.java.getDeclaredMethod("showBulkSnoozeDialog", List::class.java)
+        showBulkMethod.isAccessible = true
+        showBulkMethod.invoke(activity, listOf("Task 1", "Task 2"))
+
+        val dialog = ShadowAlertDialog.getLatestDialog() as? AlertDialog
+        assertNotNull("Bulk snooze dialog should be shown", dialog)
+
+        val inputEditText = dialog!!.findViewById<EditText>(R.id.import_input)
+        assertNotNull(inputEditText)
+
+        val parentLayout = inputEditText!!.parent as android.view.ViewGroup
+        val optionsList = parentLayout.getChildAt(0) as android.view.ViewGroup
+        val firstOptionTv = optionsList.getChildAt(0) as TextView
+
+        firstOptionTv.performClick()
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        val snoozeTime1 = prefs.getLong("snooze_task 1", 0L)
+        val snoozeTime2 = prefs.getLong("snooze_task 2", 0L)
+        assertTrue("Task 1 should be snoozed", snoozeTime1 > System.currentTimeMillis())
+        assertTrue("Task 2 should be snoozed", snoozeTime2 > System.currentTimeMillis())
+    }
+
+    @Test
     fun testExportButtonOnRemindersListExportsFilteredReminders() {
         val context = RuntimeEnvironment.getApplication()
         val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
@@ -225,9 +273,9 @@ class MainActivityTest {
         input.setText("#punt")
         shadowOf(android.os.Looper.getMainLooper()).idleFor(250, java.util.concurrent.TimeUnit.MILLISECONDS)
 
-        val btnListExport = activity.findViewById<ImageView>(R.id.btn_list_export)
-        assertNotNull(btnListExport)
-        btnListExport.performClick()
+        val exportMethod = MainActivity::class.java.getDeclaredMethod("exportRemindersToMarkdown")
+        exportMethod.isAccessible = true
+        exportMethod.invoke(activity)
 
         var chooserIntent: android.content.Intent? = shadowOf(activity).nextStartedActivity
         while (chooserIntent != null && chooserIntent.action != android.content.Intent.ACTION_CHOOSER) {
@@ -472,6 +520,29 @@ class MainActivityTest {
     }
 
     @Test
+    fun testSearchQueryIsPersistedAndRestoredAcrossActivityRecreation() {
+        val context = RuntimeEnvironment.getApplication()
+        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
+        prefs.edit().clear().putStringSet("key_reminders_list", setOf("Buy milk", "Clean garage")).commit()
+
+        val controller1 = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity1 = controller1.get()
+
+        val input1 = activity1.findViewById<EditText>(R.id.search_reminder_input)
+        input1.setText("milk")
+        shadowOf(android.os.Looper.getMainLooper()).idleFor(250, java.util.concurrent.TimeUnit.MILLISECONDS)
+
+        val savedQuery = prefs.getString("key_search_query", null)
+        assertEquals("milk", savedQuery)
+
+        val controller2 = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity2 = controller2.get()
+
+        val input2 = activity2.findViewById<EditText>(R.id.search_reminder_input)
+        assertEquals("milk", input2.text.toString())
+    }
+
+    @Test
     fun testStateFilterIsPersistedAndRestoredAcrossActivityRecreation() {
         val context = RuntimeEnvironment.getApplication()
         val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
@@ -665,12 +736,15 @@ class MainActivityTest {
         val dialog = ShadowAlertDialog.getLatestDialog() as? AlertDialog
         assertNotNull("Snooze dialog should be displayed", dialog)
 
-        val listView = dialog!!.listView
-        assertNotNull("Dialog list view should exist", listView)
-        assertEquals("First option should be Unpunt", "Unpunt", listView.adapter.getItem(0))
+        val inputEditText = dialog!!.findViewById<EditText>(R.id.import_input)
+        assertNotNull(inputEditText)
 
-        // Click "Unpunt" (index 0)
-        shadowOf(listView).performItemClick(0)
+        val parentLayout = inputEditText!!.parent as android.view.ViewGroup
+        val unsnoozeTv = parentLayout.getChildAt(0) as TextView
+        assertEquals("First item should be Unpunt", "Unpunt", unsnoozeTv.text.toString())
+
+        // Click "Unpunt"
+        unsnoozeTv.performClick()
         shadowOf(android.os.Looper.getMainLooper()).idle()
 
         assertEquals("Punt cancelled", ShadowToast.getTextOfLatestToast())

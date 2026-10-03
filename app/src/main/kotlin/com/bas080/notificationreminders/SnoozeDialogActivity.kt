@@ -41,40 +41,49 @@ class SnoozeDialogActivity : AppCompatActivity() {
 
     private fun showSnoozeOptionsDialog(targets: List<String>) {
         val topChoices = ReminderNotificationListenerService.getTopSnoozeChoices(this).map { it.toString() }
-        val durations = (topChoices + "Custom...").toTypedArray()
 
         val title = if (targets.size > 1) "Punt All Reminders" else "Punt Reminder"
 
-        AlertDialog.Builder(this, R.style.Theme_NotificationReminders_Dialog)
-            .setTitle(title)
-            .setItems(durations) { _, which ->
-                if (which in 0 until durations.size - 1) {
-                    applySnoozeDuration(targets, durations[which])
-                } else {
-                    showCustomSnoozeInputDialog(targets)
+        val density = resources.displayMetrics.density
+        val padding = (24 * density).toInt()
+
+        val layout = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            setPadding(padding, padding / 2, padding, 0)
+        }
+
+        var dialogRef: AlertDialog? = null
+
+        val optionsList = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+        }
+
+        for (choice in topChoices) {
+            val itemTv = android.widget.TextView(this).apply {
+                text = choice
+                setTextAppearance(android.R.style.TextAppearance_Medium)
+                setTextColor(androidx.core.content.ContextCompat.getColor(this@SnoozeDialogActivity, R.color.text_primary))
+                setPadding(0, (10 * density).toInt(), 0, (10 * density).toInt())
+                setOnClickListener {
+                    dialogRef?.dismiss()
+                    applySnoozeDuration(targets, choice)
                 }
             }
-            .setOnCancelListener {
-                finish()
-            }
-            .setNegativeButton(R.string.cancel) { _, _ ->
-                finish()
-            }
-            .show()
-    }
+            optionsList.addView(itemTv)
+        }
+        layout.addView(optionsList)
 
-    private fun showCustomSnoozeInputDialog(targets: List<String>) {
-        val padding = (24 * resources.displayMetrics.density).toInt()
         val input = EditText(this).apply {
             id = R.id.import_input
             hint = CreateReminderReceiver.getSnoozeCustomHint(this@SnoozeDialogActivity)
             setSingleLine(true)
-            setPadding(padding, padding / 2, padding, padding / 2)
+            setPadding(0, (16 * density).toInt(), 0, (8 * density).toInt())
         }
+        layout.addView(input)
 
-        AlertDialog.Builder(this, R.style.Theme_NotificationReminders_Dialog)
-            .setTitle(if (targets.size > 1) "Punt All Reminders" else "Punt Reminder")
-            .setView(input)
+        val dialog = AlertDialog.Builder(this, R.style.Theme_NotificationReminders_Dialog)
+            .setTitle(title)
+            .setView(layout)
             .setPositiveButton(R.string.snooze) { _, _ ->
                 val customInput = input.text.toString().trim()
                 applySnoozeDuration(targets, customInput)
@@ -85,7 +94,22 @@ class SnoozeDialogActivity : AppCompatActivity() {
             .setOnCancelListener {
                 finish()
             }
-            .show()
+            .create()
+
+        dialogRef = dialog
+        dialog.show()
+
+        val positiveBtn = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+        positiveBtn?.isEnabled = false
+
+        input.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                val hasText = !s.isNullOrBlank()
+                positiveBtn?.isEnabled = hasText
+            }
+            override fun afterTextChanged(s: android.text.Editable?) {}
+        })
     }
 
     private fun applySnoozeDuration(targets: List<String>, durationChoice: String) {

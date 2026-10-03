@@ -34,6 +34,7 @@ class RemindersContentProvider : ContentProvider() {
         fun notifyChange(context: Context) {
             try {
                 context.contentResolver.notifyChange(CONTENT_URI, null)
+                com.bas080.notificationreminders.utils.CalendarSyncManager.syncRemindersToCalendar(context)
             } catch (_: Exception) {
             }
         }

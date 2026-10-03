@@ -350,6 +350,7 @@ class ReminderNotificationListenerService : NotificationListenerService() {
                 .setContentTitle(getString(R.string.add_reminder))
                 .setContentText(statusText)
                 .setContentIntent(openMainPendingIntent)
+                .setNumber(activeCount)
                 .setOngoing(true)
                 .addAction(fromTextAction)
                 .addAction(fromNotifAction)
