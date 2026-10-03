@@ -90,6 +90,35 @@ class MainActivityTest {
     }
 
     @Test
+    fun testCalendarSyncToggleInAboutView() {
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = controller.get()
+
+        val btnToggle = activity.findViewById<TextView>(R.id.btn_toggle_calendar_sync)
+        assertNotNull(btnToggle)
+        assertEquals("Calendar Sync: Disabled", btnToggle.text.toString())
+
+        shadowOf(activity.application).grantPermissions(
+            android.Manifest.permission.READ_CALENDAR,
+            android.Manifest.permission.WRITE_CALENDAR
+        )
+
+        // Toggle ON
+        btnToggle.performClick()
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        assertEquals("Calendar Sync: Enabled", btnToggle.text.toString())
+        assertTrue(com.bas080.notificationreminders.utils.CalendarSyncManager.isCalendarSyncEnabled(activity))
+
+        // Toggle OFF
+        btnToggle.performClick()
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        assertEquals("Calendar Sync: Disabled", btnToggle.text.toString())
+        org.junit.Assert.assertFalse(com.bas080.notificationreminders.utils.CalendarSyncManager.isCalendarSyncEnabled(activity))
+    }
+
+    @Test
     fun testDonateButtonLaunchesLiberapayUrl() {
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()

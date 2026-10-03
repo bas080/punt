@@ -34,6 +34,10 @@
     <string name="app_version_format">Version %s</string>
     <string name="feedback">Feedback</string>
     <string name="donate">Donate</string>
+    <string name="calendar_sync_title">Calendar Sync</string>
+    <string name="calendar_sync_disabled">Calendar Sync: Disabled</string>
+    <string name="calendar_sync_enabled">Calendar Sync: Enabled</string>
+    <string name="calendar_permission_required">Calendar Sync requires permission to access your device calendar.</string>
     <string name="snooze">Punt</string>
     <string name="snooze_upper">Punt</string>
     <string name="unsnooze">Unpunt</string>

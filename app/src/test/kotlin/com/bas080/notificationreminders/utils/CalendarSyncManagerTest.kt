@@ -1,4 +1,3 @@
-@file:Suppress("DEPRECATION")
 package com.bas080.notificationreminders.utils
 
 import android.Manifest
@@ -15,7 +14,6 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
-import org.robolectric.fakes.RoboCursor
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
@@ -29,6 +27,16 @@ class CalendarSyncManagerTest {
         val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
         prefs.edit().clear().apply()
         ReminderNotificationListenerService.lastTriggeredMap.clear()
+        CalendarSyncManager.setCalendarSyncEnabled(context, true)
+    }
+
+    @Test
+    fun testCalendarSyncDisabledByDefault() {
+        val testCtx = RuntimeEnvironment.getApplication()
+        val prefs = testCtx.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
+        prefs.edit().clear().apply()
+
+        assertFalse(CalendarSyncManager.isCalendarSyncEnabled(testCtx))
     }
 
     @Test
@@ -86,6 +94,7 @@ class CalendarSyncManagerTest {
     }
 
     @Test
+    @Suppress("DEPRECATION")
     fun testSyncCalendarMoveAndUpdatePuntTime() {
         shadowOf(context as android.app.Application).grantPermissions(
             Manifest.permission.READ_CALENDAR,
@@ -102,7 +111,7 @@ class CalendarSyncManagerTest {
         CalendarSyncManager.syncRemindersToCalendar(context)
 
         val newStartTime = initialSnooze + 7200000L
-        val roboCursor = RoboCursor().apply {
+        val roboCursor = org.robolectric.fakes.RoboCursor().apply {
             setColumnNames(listOf(
                 CalendarContract.Events._ID,
                 CalendarContract.Events.TITLE,
@@ -120,6 +129,7 @@ class CalendarSyncManagerTest {
     }
 
     @Test
+    @Suppress("DEPRECATION")
     fun testSyncCalendarDeleteMarksReminderDone() {
         shadowOf(context as android.app.Application).grantPermissions(
             Manifest.permission.READ_CALENDAR,
@@ -131,7 +141,7 @@ class CalendarSyncManagerTest {
 
         CalendarSyncManager.syncRemindersToCalendar(context)
 
-        val roboCursor = RoboCursor().apply {
+        val roboCursor = org.robolectric.fakes.RoboCursor().apply {
             setColumnNames(listOf(
                 CalendarContract.Events._ID,
                 CalendarContract.Events.TITLE,
