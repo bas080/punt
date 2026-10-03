@@ -14,5 +14,5 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "notification-reminders"
+rootProject.name = "punt"
 include(":app")

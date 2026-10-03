@@ -35,7 +35,7 @@ class PickNotificationActivity : AppCompatActivity() {
         val notificationsList = getActiveNotificationsList()
 
         if (notificationsList.isEmpty()) {
-            AlertDialog.Builder(this, R.style.Theme_NotificationReminders_Dialog)
+            AlertDialog.Builder(this, R.style.Theme_Punt_Dialog)
                 .setTitle(getString(R.string.select_notification))
                 .setMessage(getString(R.string.no_active_notifications))
                 .setNegativeButton(getString(R.string.cancel)) { _, _ -> finish() }
@@ -58,7 +58,7 @@ class PickNotificationActivity : AppCompatActivity() {
                 }
             }
 
-            AlertDialog.Builder(this, R.style.Theme_NotificationReminders_Dialog)
+            AlertDialog.Builder(this, R.style.Theme_Punt_Dialog)
                 .setTitle(getString(R.string.select_notification))
                 .setAdapter(adapter) { _, which ->
                     val selectedText = itemsArray[which]

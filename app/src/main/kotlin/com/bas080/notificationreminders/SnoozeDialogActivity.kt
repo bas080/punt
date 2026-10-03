@@ -100,7 +100,7 @@ class SnoozeDialogActivity : AppCompatActivity() {
         }
         layout.addView(input)
 
-        val dialog = AlertDialog.Builder(this, R.style.Theme_NotificationReminders_Dialog)
+        val dialog = AlertDialog.Builder(this, R.style.Theme_Punt_Dialog)
             .setTitle(title)
             .setView(layout)
             .setPositiveButton(R.string.snooze) { _, _ ->
