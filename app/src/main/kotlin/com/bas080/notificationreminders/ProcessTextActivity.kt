@@ -1,4 +1,3 @@
-@file:Suppress("ComplexCondition", "CyclomaticComplexMethod", "EmptyFunctionBlock", "LargeClass", "LongMethod", "LoopWithTooManyJumpStatements", "MagicNumber", "MaxLineLength", "NestedBlockDepth", "ReturnCount", "TooManyFunctions", "UnusedPrivateMember", "UseRequire")
 package com.bas080.notificationreminders
 
 import android.content.Context
@@ -7,6 +6,7 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.bas080.notificationreminders.services.ReminderNotificationListenerService
+import com.bas080.notificationreminders.utils.AppLogger
 
 class ProcessTextActivity : AppCompatActivity() {
 
@@ -29,21 +29,10 @@ class ProcessTextActivity : AppCompatActivity() {
 
     private fun handleIntent(intent: Intent?) {
         if (intent == null) return
-        val selectedText = when (intent.action) {
-            Intent.ACTION_PROCESS_TEXT -> {
-                intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)?.toString()
-            }
-            Intent.ACTION_SEND -> {
-                if (intent.type == "text/plain") {
-                    intent.getStringExtra(Intent.EXTRA_TEXT)
-                        ?: intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString()
-                } else null
-            }
-            else -> null
-        }?.trim()
+        val selectedText = extractSelectedText(intent)
 
         if (!selectedText.isNullOrEmpty()) {
-            com.bas080.notificationreminders.utils.AppLogger.log(this, "ProcessTextActivity", "Created reminder from system text selection/share")
+            AppLogger.log(this, "ProcessTextActivity", "Created reminder from system text selection/share")
             val prefs = getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
             val savedSet = prefs.getStringSet(KEY_REMINDERS, emptySet())?.toMutableSet() ?: mutableSetOf()
             savedSet.add(selectedText)
@@ -57,5 +46,20 @@ class ProcessTextActivity : AppCompatActivity() {
         } else if (selectedText != null) {
             Toast.makeText(this, R.string.toast_reminder_create_failed_empty, Toast.LENGTH_SHORT).show()
         }
+    }
+
+    private fun extractSelectedText(intent: Intent): String? {
+        return when (intent.action) {
+            Intent.ACTION_PROCESS_TEXT -> {
+                intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)?.toString()
+            }
+            Intent.ACTION_SEND -> {
+                if (intent.type == "text/plain") {
+                    intent.getStringExtra(Intent.EXTRA_TEXT)
+                        ?: intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString()
+                } else null
+            }
+            else -> null
+        }?.trim()
     }
 }

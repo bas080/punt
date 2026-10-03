@@ -1,4 +1,3 @@
-@file:Suppress("ComplexCondition", "CyclomaticComplexMethod", "EmptyFunctionBlock", "LargeClass", "LongMethod", "LoopWithTooManyJumpStatements", "MagicNumber", "MaxLineLength", "NestedBlockDepth", "ReturnCount", "TooManyFunctions", "UnusedPrivateMember", "UseRequire")
 package com.bas080.notificationreminders.utils
 
 import android.content.Context
@@ -11,6 +10,7 @@ object AppLogger {
     private const val LOG_FILE_NAME = "app_logs.txt"
     private const val MAX_FILE_SIZE_BYTES = 100 * 1024 // 100 KB max log size
     private const val MAX_BREADCRUMBS = 50
+    private const val DEFAULT_MAX_LINES = 50
 
     private val breadcrumbs = java.util.ArrayDeque<String>()
 
@@ -40,7 +40,7 @@ object AppLogger {
         return breadcrumbs.toList().takeLast(count)
     }
 
-    fun getLogs(context: Context, maxLines: Int = 50): String {
+    fun getLogs(context: Context, maxLines: Int = DEFAULT_MAX_LINES): String {
         return try {
             val file = getLogFile(context)
             if (file.exists()) {
