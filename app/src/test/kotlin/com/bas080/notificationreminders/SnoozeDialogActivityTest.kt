@@ -25,6 +25,29 @@ import org.robolectric.shadows.ShadowToast
 class SnoozeDialogActivityTest {
 
     @Test
+    fun testLastConfiguredDurationPlacedAtTop() {
+        val context = RuntimeEnvironment.getApplication()
+        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
+        prefs.edit().putString("last_choice_buy milk", "2d 18:00").commit()
+
+        val intent = Intent(context, SnoozeDialogActivity::class.java).apply {
+            putExtra(SnoozeDialogActivity.EXTRA_REMINDER_TEXT, "Buy milk")
+        }
+
+        Robolectric.buildActivity(SnoozeDialogActivity::class.java, intent).setup()
+
+        val dialog = ShadowAlertDialog.getLatestDialog() as? AlertDialog
+        assertNotNull("Snooze dialog should be shown", dialog)
+
+        val inputEditText = dialog!!.findViewById<EditText>(R.id.import_input)
+        val parentLayout = inputEditText!!.parent as ViewGroup
+        val optionsList = parentLayout.getChildAt(0) as ViewGroup
+        val firstOptionTv = optionsList.getChildAt(0) as TextView
+
+        assertEquals("2d 18:00", firstOptionTv.text.toString())
+    }
+
+    @Test
     fun testSingleReminderSnoozeFromSwipeIntent() {
         val context = RuntimeEnvironment.getApplication()
         val intent = Intent(context, SnoozeDialogActivity::class.java).apply {
