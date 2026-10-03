@@ -101,6 +101,21 @@ class MainActivity : AppCompatActivity() {
             checkAndRequestNotificationListenerPermission()
         }
 
+    private val requestCalendarPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
+            val allGranted = permissions.values.all { it }
+            if (allGranted) {
+                com.bas080.notificationreminders.utils.CalendarSyncManager.setCalendarSyncEnabled(this, true)
+                updateCalendarSyncButtonText()
+                com.bas080.notificationreminders.utils.CalendarSyncManager.syncRemindersToCalendar(this)
+                Toast.makeText(this, "Calendar Sync enabled", Toast.LENGTH_SHORT).show()
+            } else {
+                com.bas080.notificationreminders.utils.CalendarSyncManager.setCalendarSyncEnabled(this, false)
+                updateCalendarSyncButtonText()
+                showCalendarPermissionSettingsDialog()
+            }
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -157,8 +172,31 @@ class MainActivity : AppCompatActivity() {
         markAsButtonAccessibility(binding.btnListExport)
         markAsButtonAccessibility(binding.btnImportMarkdown)
         markAsButtonAccessibility(binding.btnDonate)
+        markAsButtonAccessibility(binding.btnToggleCalendarSync)
         markAsButtonAccessibility(binding.btnFeedback)
         markAsButtonAccessibility(binding.btnTagsFilter)
+
+        updateCalendarSyncButtonText()
+
+        binding.btnToggleCalendarSync.setOnClickListener {
+            val currentlyEnabled = com.bas080.notificationreminders.utils.CalendarSyncManager.isCalendarSyncEnabled(this)
+            if (currentlyEnabled) {
+                com.bas080.notificationreminders.utils.CalendarSyncManager.setCalendarSyncEnabled(this, false)
+                updateCalendarSyncButtonText()
+                Toast.makeText(this, "Calendar Sync disabled", Toast.LENGTH_SHORT).show()
+            } else {
+                if (com.bas080.notificationreminders.utils.CalendarSyncManager.hasCalendarPermission(this)) {
+                    com.bas080.notificationreminders.utils.CalendarSyncManager.setCalendarSyncEnabled(this, true)
+                    updateCalendarSyncButtonText()
+                    com.bas080.notificationreminders.utils.CalendarSyncManager.syncRemindersToCalendar(this)
+                    Toast.makeText(this, "Calendar Sync enabled", Toast.LENGTH_SHORT).show()
+                } else {
+                    requestCalendarPermissionLauncher.launch(
+                        arrayOf(Manifest.permission.READ_CALENDAR, Manifest.permission.WRITE_CALENDAR)
+                    )
+                }
+            }
+        }
 
         binding.btnDonate.setOnClickListener {
             val donateUri = android.net.Uri.parse("https://liberapay.com/bas080")
@@ -563,6 +601,31 @@ class MainActivity : AppCompatActivity() {
         binding.btnNavReminders.setTextColor(ContextCompat.getColor(this, R.color.text_primary))
         binding.btnNavAbout.setTypeface(null, android.graphics.Typeface.NORMAL)
         binding.btnNavAbout.setTextColor(ContextCompat.getColor(this, R.color.text_secondary))
+    }
+
+    private fun showCalendarPermissionSettingsDialog() {
+        AlertDialog.Builder(this, R.style.Theme_NotificationReminders_Dialog)
+            .setTitle(R.string.calendar_sync_title)
+            .setMessage(R.string.calendar_permission_required)
+            .setPositiveButton("Open Settings") { _, _ ->
+                val intent = Intent(
+                    Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    android.net.Uri.fromParts("package", packageName, null)
+                )
+                try {
+                    startActivity(intent)
+                } catch (_: Exception) {
+                }
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun updateCalendarSyncButtonText() {
+        val enabled = com.bas080.notificationreminders.utils.CalendarSyncManager.isCalendarSyncEnabled(this)
+        binding.btnToggleCalendarSync.setText(
+            if (enabled) R.string.calendar_sync_enabled else R.string.calendar_sync_disabled
+        )
     }
 
     private fun showAboutView() {
