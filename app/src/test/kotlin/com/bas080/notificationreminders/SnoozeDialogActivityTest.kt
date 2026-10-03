@@ -2,8 +2,12 @@ package com.bas080.notificationreminders
 
 import android.content.Context
 import android.content.Intent
+import android.view.ViewGroup
+import android.widget.EditText
+import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -33,11 +37,15 @@ class SnoozeDialogActivityTest {
         val dialog = ShadowAlertDialog.getLatestDialog() as? AlertDialog
         assertNotNull("Snooze dialog should be shown", dialog)
 
-        val listView = dialog!!.listView
-        assertNotNull("List view in dialog should exist", listView)
+        val inputEditText = dialog!!.findViewById<EditText>(R.id.import_input)
+        assertNotNull(inputEditText)
+
+        val parentLayout = inputEditText!!.parent as ViewGroup
+        val optionsList = parentLayout.getChildAt(0) as ViewGroup
+        val firstOptionTv = optionsList.getChildAt(0) as TextView
 
         // Select first duration option (e.g. 15m)
-        shadowOf(listView).performItemClick(0)
+        firstOptionTv.performClick()
         shadowOf(android.os.Looper.getMainLooper()).idle()
 
         assertTrue("Activity should be finishing after snooze choice", activity.isFinishing)
@@ -62,11 +70,15 @@ class SnoozeDialogActivityTest {
         val dialog = ShadowAlertDialog.getLatestDialog() as? AlertDialog
         assertNotNull("Snooze All dialog should be shown", dialog)
 
-        val listView = dialog!!.listView
-        assertNotNull("List view in dialog should exist", listView)
+        val inputEditText = dialog!!.findViewById<EditText>(R.id.import_input)
+        assertNotNull(inputEditText)
+
+        val parentLayout = inputEditText!!.parent as ViewGroup
+        val optionsList = parentLayout.getChildAt(0) as ViewGroup
+        val firstOptionTv = optionsList.getChildAt(0) as TextView
 
         // Select first duration option (e.g. 15m)
-        shadowOf(listView).performItemClick(0)
+        firstOptionTv.performClick()
         shadowOf(android.os.Looper.getMainLooper()).idle()
 
         assertTrue("Activity should finish after snoozing all reminders", activity.isFinishing)
@@ -105,22 +117,17 @@ class SnoozeDialogActivityTest {
         val dialog = ShadowAlertDialog.getLatestDialog() as? AlertDialog
         assertNotNull("Snooze dialog should be shown", dialog)
 
-        val listView = dialog!!.listView
-        assertNotNull(listView)
+        val inputEditText = dialog!!.findViewById<EditText>(R.id.import_input)
+        assertNotNull("Custom input EditText should exist directly in snooze dialog", inputEditText)
 
-        // Click "Custom..." option (last item)
-        val customIndex = listView.adapter.count - 1
-        shadowOf(listView).performItemClick(customIndex)
-        shadowOf(android.os.Looper.getMainLooper()).idle()
+        val positiveBtn = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+        assertNotNull(positiveBtn)
+        assertFalse("Positive button should be disabled initially", positiveBtn.isEnabled)
 
-        val customDialog = ShadowAlertDialog.getLatestDialog() as? AlertDialog
-        assertNotNull("Custom snooze input dialog should be shown", customDialog)
-
-        val inputEditText = customDialog!!.findViewById<android.widget.EditText>(R.id.import_input)
-        assertNotNull("Custom input EditText should exist", inputEditText)
         inputEditText!!.setText("30m")
+        assertTrue("Positive button should be enabled after typing input", positiveBtn.isEnabled)
 
-        customDialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+        positiveBtn.performClick()
         shadowOf(android.os.Looper.getMainLooper()).idle()
 
         assertTrue("Activity should finish after custom snooze entry", activity.isFinishing)
@@ -144,21 +151,12 @@ class SnoozeDialogActivityTest {
         val dialog = ShadowAlertDialog.getLatestDialog() as? AlertDialog
         assertNotNull("Snooze dialog should be shown", dialog)
 
-        val listView = dialog!!.listView
-        assertNotNull(listView)
-
-        // Click "Custom..." option (last item)
-        val customIndex = listView.adapter.count - 1
-        shadowOf(listView).performItemClick(customIndex)
-        shadowOf(android.os.Looper.getMainLooper()).idle()
-
-        val customDialog = ShadowAlertDialog.getLatestDialog() as? AlertDialog
-        assertNotNull(customDialog)
-
-        val inputEditText = customDialog!!.findViewById<android.widget.EditText>(R.id.import_input)
+        val inputEditText = dialog!!.findViewById<EditText>(R.id.import_input)
+        assertNotNull(inputEditText)
         inputEditText!!.setText("invalid_duration")
 
-        customDialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+        val positiveBtn = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+        positiveBtn.performClick()
         shadowOf(android.os.Looper.getMainLooper()).idle()
 
         assertTrue("Activity should finish on invalid snooze entry", activity.isFinishing)

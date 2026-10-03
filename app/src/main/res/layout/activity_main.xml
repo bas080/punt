@@ -238,10 +238,10 @@
                 android:orientation="horizontal">
 
                 <TextView
-                    android:id="@+id/btn_feedback"
+                    android:id="@+id/btn_donate"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="@string/feedback"
+                    android:text="@string/donate"
                     android:textSize="12sp"
                     android:textStyle="bold"
                     android:textColor="@color/accent"
@@ -252,6 +252,21 @@
                     android:focusable="true"
                     android:background="?attr/selectableItemBackground" />
 
+                <TextView
+                    android:id="@+id/btn_feedback"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/feedback"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/accent"
+                    android:letterSpacing="0.05"
+                    android:paddingVertical="6dp"
+                    android:paddingHorizontal="8dp"
+                    android:layout_marginStart="8dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:background="?attr/selectableItemBackground" />
 
                 <TextView
                     android:id="@+id/btn_import_markdown"

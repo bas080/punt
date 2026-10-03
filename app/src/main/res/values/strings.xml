@@ -33,6 +33,7 @@
     <string name="clear_logs">Clear Logs</string>
     <string name="app_version_format">Version %s</string>
     <string name="feedback">Feedback</string>
+    <string name="donate">Donate</string>
     <string name="snooze">Punt</string>
     <string name="snooze_upper">Punt</string>
     <string name="unsnooze">Unpunt</string>

@@ -51,6 +51,7 @@ class MainActivity : AppCompatActivity() {
         private const val PREFS_REMINDERS = "reminders_prefs"
         private const val KEY_REMINDERS = "key_reminders_list"
         private const val KEY_REMINDER_FILTER = "key_reminder_filter"
+        private const val KEY_SEARCH_QUERY = "key_search_query"
         private const val PREFS_SNOOZE_FREQ = "snooze_freq_prefs"
 
         fun getCleanTrimmed(reminderText: String): String {
@@ -155,8 +156,19 @@ class MainActivity : AppCompatActivity() {
         markAsButtonAccessibility(binding.btnExportMarkdown)
         markAsButtonAccessibility(binding.btnListExport)
         markAsButtonAccessibility(binding.btnImportMarkdown)
+        markAsButtonAccessibility(binding.btnDonate)
         markAsButtonAccessibility(binding.btnFeedback)
         markAsButtonAccessibility(binding.btnTagsFilter)
+
+        binding.btnDonate.setOnClickListener {
+            val donateUri = android.net.Uri.parse("https://liberapay.com/bas080")
+            val intent = Intent(Intent.ACTION_VIEW, donateUri)
+            try {
+                startActivity(intent)
+            } catch (_: Exception) {
+                Toast.makeText(this, "Unable to open donation link", Toast.LENGTH_SHORT).show()
+            }
+        }
         binding.btnListExport.setColorFilter(ContextCompat.getColor(this, R.color.accent))
         markAsButtonAccessibility(binding.btnClearSearch)
         markAsButtonAccessibility(binding.btnEmptyClearFilter)
@@ -167,6 +179,7 @@ class MainActivity : AppCompatActivity() {
             getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
                 .edit()
                 .putString(KEY_REMINDER_FILTER, currentFilter.name)
+                .putString(KEY_SEARCH_QUERY, "")
                 .apply()
             recentlyDoneReminders.clear()
             binding.searchReminderInput.setText("")
@@ -206,8 +219,27 @@ class MainActivity : AppCompatActivity() {
             exportRemindersToMarkdown()
         }
 
-        binding.btnListExport.setOnClickListener {
-            exportRemindersToMarkdown()
+        binding.btnListExport.setOnClickListener { view ->
+            val popup = androidx.appcompat.widget.PopupMenu(this, view)
+            popup.menu.add("Punt All")
+            popup.menu.add("Share All")
+            popup.setOnMenuItemClickListener { item ->
+                when (item.title) {
+                    "Punt All" -> {
+                        val activeList = displayedReminders.filter {
+                            it != HEADER_SNOOZED_SECTION_MARKER && !it.contains("#done", ignoreCase = true)
+                        }
+                        showBulkSnoozeDialog(activeList)
+                        true
+                    }
+                    "Share All" -> {
+                        exportRemindersToMarkdown()
+                        true
+                    }
+                    else -> false
+                }
+            }
+            popup.show()
         }
 
         binding.btnImportMarkdown.setOnClickListener {
@@ -235,6 +267,10 @@ class MainActivity : AppCompatActivity() {
                 binding.searchReminderInput.setText("")
                 activeReminders.add(text)
                 currentSearchQuery = ""
+                getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
+                    .edit()
+                    .putString(KEY_SEARCH_QUERY, "")
+                    .apply()
                 recentlyDoneReminders.clear()
                 saveRemindersToPrefs()
                 ReminderNotificationListenerService.instance?.postMatchNotification(text)
@@ -268,6 +304,10 @@ class MainActivity : AppCompatActivity() {
                         recentlyDoneReminders.clear()
                     }
                     currentSearchQuery = query
+                    getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
+                        .edit()
+                        .putString(KEY_SEARCH_QUERY, query)
+                        .apply()
                     updateSummaryAndAdapter()
                 }
                 searchHandler.postDelayed(searchRunnable!!, 200L)
@@ -425,11 +465,6 @@ class MainActivity : AppCompatActivity() {
                     else -> ReminderFilter.ALL
                 }
 
-                getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
-                    .edit()
-                    .putString(KEY_REMINDER_FILTER, currentFilter.name)
-                    .apply()
-
                 var updatedQuery = currentSearchQuery
                 for (i in allTags.indices) {
                     val tag = allTags[i]
@@ -446,6 +481,12 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 currentSearchQuery = updatedQuery
+                getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
+                    .edit()
+                    .putString(KEY_REMINDER_FILTER, currentFilter.name)
+                    .putString(KEY_SEARCH_QUERY, updatedQuery)
+                    .apply()
+
                 recentlyDoneReminders.clear()
                 binding.searchReminderInput.setText(updatedQuery)
                 updateSummaryAndAdapter()
@@ -755,56 +796,165 @@ class MainActivity : AppCompatActivity() {
         val isSnoozed = snoozeUntil > now
 
         val topChoices = ReminderNotificationListenerService.getTopSnoozeChoices(this).map { it.toString() }
-        val durations = (topChoices + "Custom...").toTypedArray()
-        val options = if (isSnoozed) {
-            arrayOf(getString(R.string.unsnooze)) + durations
-        } else {
-            durations
+
+        val density = resources.displayMetrics.density
+        val padding = (24 * density).toInt()
+
+        val layout = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            setPadding(padding, padding / 2, padding, 0)
         }
 
-        AlertDialog.Builder(this, R.style.Theme_NotificationReminders_Dialog)
-            .setTitle(R.string.snooze_dialog_title)
-            .setItems(options) { _, which ->
-                if (isSnoozed && which == 0) {
+        var dialogRef: AlertDialog? = null
+
+        if (isSnoozed) {
+            val unsnoozeTv = TextView(this).apply {
+                text = getString(R.string.unsnooze)
+                setTextAppearance(android.R.style.TextAppearance_Medium)
+                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.accent))
+                setPadding(0, (4 * density).toInt(), 0, (12 * density).toInt())
+                setOnClickListener {
+                    dialogRef?.dismiss()
                     ReminderNotificationListenerService.lastTriggeredMap.remove("snooze_$cleanTrimmed")
                     prefs.edit().remove("snooze_$cleanTrimmed").apply()
                     ReminderNotificationListenerService.instance?.showStatusNotification()
                     updateSummaryAndAdapter()
-                    Toast.makeText(this, R.string.toast_snooze_cancelled, Toast.LENGTH_SHORT).show()
-                } else {
-                    val durationIndex = if (isSnoozed) which - 1 else which
-                    if (durationIndex in 0 until durations.size - 1) {
-                        applySnoozeDuration(reminderText, durations[durationIndex])
-                    } else {
-                        showCustomSnoozeInputDialog(reminderText)
-                    }
+                    Toast.makeText(this@MainActivity, R.string.toast_snooze_cancelled, Toast.LENGTH_SHORT).show()
                 }
             }
-            .setNegativeButton(R.string.cancel, null)
-            .show()
-    }
+            layout.addView(unsnoozeTv)
+        }
 
-    private fun showCustomSnoozeInputDialog(reminderText: String) {
-        val padding = (24 * resources.displayMetrics.density).toInt()
+        val optionsList = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+        }
+
+        for (choice in topChoices) {
+            val itemTv = TextView(this).apply {
+                text = choice
+                setTextAppearance(android.R.style.TextAppearance_Medium)
+                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_primary))
+                setPadding(0, (10 * density).toInt(), 0, (10 * density).toInt())
+                setOnClickListener {
+                    dialogRef?.dismiss()
+                    applySnoozeDuration(reminderText, choice)
+                }
+            }
+            optionsList.addView(itemTv)
+        }
+        layout.addView(optionsList)
+
         val input = EditText(this).apply {
             id = R.id.import_input
             hint = CreateReminderReceiver.getSnoozeCustomHint(this@MainActivity)
             setSingleLine(true)
-            setPadding(padding, padding / 2, padding, padding / 2)
+            setPadding(0, (16 * density).toInt(), 0, (8 * density).toInt())
         }
+        layout.addView(input)
 
-        AlertDialog.Builder(this, R.style.Theme_NotificationReminders_Dialog)
+        val dialog = AlertDialog.Builder(this, R.style.Theme_NotificationReminders_Dialog)
             .setTitle(R.string.snooze_dialog_title)
-            .setView(input)
+            .setView(layout)
             .setPositiveButton(R.string.snooze) { _, _ ->
                 val customInput = input.text.toString().trim()
                 applySnoozeDuration(reminderText, customInput)
             }
             .setNegativeButton(R.string.cancel, null)
-            .show()
+            .create()
+
+        dialogRef = dialog
+        dialog.show()
+
+        val positiveBtn = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+        positiveBtn?.isEnabled = false
+
+        input.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                val hasText = !s.isNullOrBlank()
+                positiveBtn?.isEnabled = hasText
+            }
+            override fun afterTextChanged(s: Editable?) {}
+        })
+    }
+
+    private fun showBulkSnoozeDialog(targets: List<String>) {
+        if (targets.isEmpty()) {
+            Toast.makeText(this, "No active reminders to punt", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val topChoices = ReminderNotificationListenerService.getTopSnoozeChoices(this).map { it.toString() }
+
+        val density = resources.displayMetrics.density
+        val padding = (24 * density).toInt()
+
+        val layout = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            setPadding(padding, padding / 2, padding, 0)
+        }
+
+        var dialogRef: AlertDialog? = null
+
+        val optionsList = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+        }
+
+        for (choice in topChoices) {
+            val itemTv = TextView(this).apply {
+                text = choice
+                setTextAppearance(android.R.style.TextAppearance_Medium)
+                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_primary))
+                setPadding(0, (10 * density).toInt(), 0, (10 * density).toInt())
+                setOnClickListener {
+                    dialogRef?.dismiss()
+                    applySnoozeDurationToTargets(targets, choice)
+                }
+            }
+            optionsList.addView(itemTv)
+        }
+        layout.addView(optionsList)
+
+        val input = EditText(this).apply {
+            id = R.id.import_input
+            hint = CreateReminderReceiver.getSnoozeCustomHint(this@MainActivity)
+            setSingleLine(true)
+            setPadding(0, (16 * density).toInt(), 0, (8 * density).toInt())
+        }
+        layout.addView(input)
+
+        val titleText = if (targets.size > 1) "Punt All Reminders" else "Punt Reminder"
+
+        val dialog = AlertDialog.Builder(this, R.style.Theme_NotificationReminders_Dialog)
+            .setTitle(titleText)
+            .setView(layout)
+            .setPositiveButton(R.string.snooze) { _, _ ->
+                val customInput = input.text.toString().trim()
+                applySnoozeDurationToTargets(targets, customInput)
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .create()
+
+        dialogRef = dialog
+        dialog.show()
+
+        val positiveBtn = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+        positiveBtn?.isEnabled = false
+
+        input.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                val hasText = !s.isNullOrBlank()
+                positiveBtn?.isEnabled = hasText
+            }
+            override fun afterTextChanged(s: Editable?) {}
+        })
     }
 
     private fun applySnoozeDuration(reminderText: String, durationChoice: String) {
+        applySnoozeDurationToTargets(listOf(reminderText), durationChoice)
+    }
+
+    private fun applySnoozeDurationToTargets(targets: List<String>, durationChoice: String) {
         val parseResult = CreateReminderReceiver.parseSnoozeDuration(durationChoice)
         if (parseResult == null) {
             AppLogger.log(this, "MainActivity", "Failed to snooze: invalid duration '$durationChoice'")
@@ -826,16 +976,21 @@ class MainActivity : AppCompatActivity() {
 
         val (snoozeMs, durationLabel) = parseResult
         val snoozeUntil = System.currentTimeMillis() + snoozeMs
-        val cleanTrimmed = getCleanTrimmed(reminderText)
 
-        ReminderNotificationListenerService.lastTriggeredMap["snooze_$cleanTrimmed"] = snoozeUntil
         val prefs = getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
-        prefs.edit().putLong("snooze_$cleanTrimmed", snoozeUntil).apply()
+        val editor = prefs.edit()
+
+        for (reminderText in targets) {
+            val cleanTrimmed = getCleanTrimmed(reminderText)
+            ReminderNotificationListenerService.lastTriggeredMap["snooze_$cleanTrimmed"] = snoozeUntil
+            editor.putLong("snooze_$cleanTrimmed", snoozeUntil)
+        }
+        editor.apply()
 
         ReminderNotificationListenerService.instance?.showStatusNotification()
         updateSummaryAndAdapter()
 
-        AppLogger.log(this, "MainActivity", "Punted reminder for $durationLabel")
+        AppLogger.log(this, "MainActivity", "Punted ${targets.size} reminder(s) for $durationLabel")
         val toastText = getString(R.string.toast_reminder_snoozed_duration, durationLabel)
         Toast.makeText(this, toastText, Toast.LENGTH_SHORT).show()
     }
@@ -921,6 +1076,11 @@ class MainActivity : AppCompatActivity() {
             ReminderFilter.valueOf(savedFilterName ?: ReminderFilter.ALL.name)
         } catch (_: Exception) {
             ReminderFilter.ALL
+        }
+        val savedQuery = prefs.getString(KEY_SEARCH_QUERY, "") ?: ""
+        currentSearchQuery = savedQuery
+        if (binding.searchReminderInput.text.toString() != savedQuery) {
+            binding.searchReminderInput.setText(savedQuery)
         }
         activeReminders.clear()
         activeReminders.addAll(savedSet)
@@ -1077,6 +1237,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        com.bas080.notificationreminders.utils.CalendarSyncManager.syncCalendarChangesToReminders(this)
         loadReminders()
         if (binding.aboutContainer.visibility == View.VISIBLE) {
             loadLogs()
