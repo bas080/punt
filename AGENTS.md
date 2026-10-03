@@ -2,7 +2,7 @@
 
 ## Overview
 
-`notification-reminders` is a Kotlin Android application that monitors incoming device notifications and intelligently matches them against user-defined reminders. When a notification contains words matching an active reminder, the application creates a new notification to surface that reminder.
+`Punt` is a Kotlin Android application that monitors incoming device notifications and intelligently matches them against user-defined reminders. When a notification contains words matching an active reminder, the application creates a new notification to surface that reminder.
 
 ---
 

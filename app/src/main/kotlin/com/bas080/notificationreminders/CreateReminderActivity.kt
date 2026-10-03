@@ -94,7 +94,7 @@ class CreateReminderActivity : AppCompatActivity() {
             container.addView(txtTime)
         }
 
-        AlertDialog.Builder(this, R.style.Theme_NotificationReminders_Dialog)
+        AlertDialog.Builder(this, R.style.Theme_Punt_Dialog)
             .setTitle(R.string.add_reminder)
             .setView(container)
             .setPositiveButton("Create") { _, _ ->
