@@ -1,4 +1,3 @@
-@file:Suppress("ComplexCondition", "CyclomaticComplexMethod", "EmptyFunctionBlock", "LargeClass", "LongMethod", "LoopWithTooManyJumpStatements", "MagicNumber", "MaxLineLength", "NestedBlockDepth", "ReturnCount", "TooManyFunctions", "UnusedPrivateMember", "UseRequire")
 package com.bas080.notificationreminders.providers
 
 import android.content.ContentProvider
@@ -19,6 +18,8 @@ class RemindersContentProvider : ContentProvider() {
         private const val REMINDERS = 1
         private const val PREFS_REMINDERS = "reminders_prefs"
         private const val KEY_REMINDERS = "key_reminders_list"
+        private const val IS_DONE_TRUE = 1
+        private const val IS_DONE_FALSE = 0
 
         const val COLUMN_ID = "_id"
         const val COLUMN_TEXT = "text"
@@ -50,9 +51,7 @@ class RemindersContentProvider : ContentProvider() {
         sortOrder: String?
     ): Cursor? {
         val ctx = context ?: return null
-        if (uriMatcher.match(uri) != REMINDERS) {
-            throw IllegalArgumentException("Unknown URI: $uri")
-        }
+        require(uriMatcher.match(uri) == REMINDERS) { "Unknown URI: $uri" }
 
         val prefs = ctx.getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
         val rawSet = prefs.getStringSet(KEY_REMINDERS, emptySet()) ?: emptySet()
@@ -71,14 +70,26 @@ class RemindersContentProvider : ContentProvider() {
 
         val columns = projection ?: DEFAULT_PROJECTION
         val cursor = MatrixCursor(columns)
+        populateMatrixCursor(cursor, columns, filteredReminders, ctx)
 
+        cursor.setNotificationUri(ctx.contentResolver, uri)
+        return cursor
+    }
+
+    private fun populateMatrixCursor(
+        cursor: MatrixCursor,
+        columns: Array<out String>,
+        reminders: List<String>,
+        ctx: Context
+    ) {
+        val prefs = ctx.getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
         var idCounter = 1L
         val now = System.currentTimeMillis()
 
-        for (reminder in filteredReminders) {
+        for (reminder in reminders) {
             val trimmed = reminder.trim().lowercase()
             val snoozeUntil = prefs.getLong("snooze_$trimmed", 0L)
-            val isDone = if (reminder.contains("#done", ignoreCase = true)) 1 else 0
+            val isDone = if (reminder.contains("#done", ignoreCase = true)) IS_DONE_TRUE else IS_DONE_FALSE
 
             val rowBuilder = cursor.newRow()
             for (col in columns) {
@@ -92,16 +103,11 @@ class RemindersContentProvider : ContentProvider() {
             }
             idCounter++
         }
-
-        cursor.setNotificationUri(ctx.contentResolver, uri)
-        return cursor
     }
 
     override fun getType(uri: Uri): String {
-        return when (uriMatcher.match(uri)) {
-            REMINDERS -> "vnd.android.cursor.dir/vnd.$AUTHORITY.reminders"
-            else -> throw IllegalArgumentException("Unknown URI: $uri")
-        }
+        require(uriMatcher.match(uri) == REMINDERS) { "Unknown URI: $uri" }
+        return "vnd.android.cursor.dir/vnd.$AUTHORITY.reminders"
     }
 
     override fun insert(uri: Uri, values: ContentValues?): Uri? {
