@@ -188,9 +188,16 @@ class MainActivityTest {
         assertNotNull(btnExport)
         btnExport.performClick()
 
-        val nextStartedActivity = shadowOf(activity).nextStartedActivity
-        assertNotNull(nextStartedActivity)
-        assertEquals(android.content.Intent.ACTION_CHOOSER, nextStartedActivity.action)
+        val dialog = ShadowAlertDialog.getLatestDialog() as? AlertDialog
+        assertNotNull("Export dialog should be shown", dialog)
+        dialog!!.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        var chooserIntent: android.content.Intent? = shadowOf(activity).nextStartedActivity
+        while (chooserIntent != null && chooserIntent.action != android.content.Intent.ACTION_CHOOSER) {
+            chooserIntent = shadowOf(activity).nextStartedActivity
+        }
+        assertNotNull("Share chooser intent should be launched", chooserIntent)
     }
 
     @Test
@@ -208,9 +215,17 @@ class MainActivityTest {
         input.setText("#punt")
         shadowOf(android.os.Looper.getMainLooper()).idleFor(250, java.util.concurrent.TimeUnit.MILLISECONDS)
 
-        val btnExport = activity.findViewById<TextView>(R.id.btn_export_markdown)
-        assertNotNull(btnExport)
-        btnExport.performClick()
+        val btnListExport = activity.findViewById<ImageView>(R.id.btn_list_export)
+        assertNotNull(btnListExport)
+
+        val showExportOptionsMethod = MainActivity::class.java.getDeclaredMethod("showExportOptionsDialog", List::class.java)
+        showExportOptionsMethod.isAccessible = true
+        showExportOptionsMethod.invoke(activity, listOf("Buy milk #punt", "Fix bike #punt"))
+
+        val dialog = ShadowAlertDialog.getLatestDialog() as? AlertDialog
+        assertNotNull("Export dialog should be shown", dialog)
+        dialog!!.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+        shadowOf(android.os.Looper.getMainLooper()).idle()
 
         var chooserIntent: android.content.Intent? = shadowOf(activity).nextStartedActivity
         while (chooserIntent != null && chooserIntent.action != android.content.Intent.ACTION_CHOOSER) {
@@ -243,9 +258,9 @@ class MainActivityTest {
         input.setText("nonexistentquery")
         shadowOf(android.os.Looper.getMainLooper()).idleFor(250, java.util.concurrent.TimeUnit.MILLISECONDS)
 
-        val btnExport = activity.findViewById<TextView>(R.id.btn_export_markdown)
-        assertNotNull(btnExport)
-        btnExport.performClick()
+        val showExportOptionsMethod = MainActivity::class.java.getDeclaredMethod("showExportOptionsDialog", List::class.java)
+        showExportOptionsMethod.isAccessible = true
+        showExportOptionsMethod.invoke(activity, emptyList<String>())
 
         assertEquals("No reminders to export", ShadowToast.getTextOfLatestToast())
         var chooserIntent: android.content.Intent? = shadowOf(activity).nextStartedActivity
@@ -302,9 +317,14 @@ class MainActivityTest {
         input.setText("#punt")
         shadowOf(android.os.Looper.getMainLooper()).idleFor(250, java.util.concurrent.TimeUnit.MILLISECONDS)
 
-        val exportMethod = MainActivity::class.java.getDeclaredMethod("exportRemindersToMarkdown")
-        exportMethod.isAccessible = true
-        exportMethod.invoke(activity)
+        val showExportOptionsMethod = MainActivity::class.java.getDeclaredMethod("showExportOptionsDialog", List::class.java)
+        showExportOptionsMethod.isAccessible = true
+        showExportOptionsMethod.invoke(activity, listOf("Task 1 #punt"))
+
+        val dialog = ShadowAlertDialog.getLatestDialog() as? AlertDialog
+        assertNotNull("Export dialog should be shown", dialog)
+        dialog!!.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+        shadowOf(android.os.Looper.getMainLooper()).idle()
 
         var chooserIntent: android.content.Intent? = shadowOf(activity).nextStartedActivity
         while (chooserIntent != null && chooserIntent.action != android.content.Intent.ACTION_CHOOSER) {
@@ -319,6 +339,41 @@ class MainActivityTest {
 
         assertTrue("Export should contain 'Task 1 #punt'", exportedText.contains("Task 1 #punt"))
         org.junit.Assert.assertFalse("Export should NOT contain 'Task 2 #other'", exportedText.contains("Task 2 #other"))
+    }
+
+    @Test
+    fun testExportOptionsDialogTextOnlyExcludesPuntInfo() {
+        val context = RuntimeEnvironment.getApplication()
+        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
+        val snoozeUntil = System.currentTimeMillis() + 86400000L
+        prefs.edit().clear()
+            .putStringSet("key_reminders_list", setOf("Punted task"))
+            .putLong("snooze_punted task", snoozeUntil)
+            .commit()
+
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = controller.get()
+
+        val showExportOptionsMethod = MainActivity::class.java.getDeclaredMethod("showExportOptionsDialog", List::class.java)
+        showExportOptionsMethod.isAccessible = true
+        showExportOptionsMethod.invoke(activity, listOf("Punted task"))
+
+        val dialog = ShadowAlertDialog.getLatestDialog() as? AlertDialog
+        assertNotNull("Export dialog should be shown", dialog)
+        dialog!!.getButton(AlertDialog.BUTTON_NEGATIVE).performClick() // Text Only
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        var chooserIntent: android.content.Intent? = shadowOf(activity).nextStartedActivity
+        while (chooserIntent != null && chooserIntent.action != android.content.Intent.ACTION_CHOOSER) {
+            chooserIntent = shadowOf(activity).nextStartedActivity
+        }
+        assertNotNull("Chooser intent should be launched", chooserIntent)
+
+        @Suppress("DEPRECATION")
+        val targetIntent = chooserIntent!!.getParcelableExtra<android.content.Intent>(android.content.Intent.EXTRA_INTENT)
+        val exportedText = targetIntent?.getStringExtra(android.content.Intent.EXTRA_TEXT) ?: ""
+        org.junit.Assert.assertFalse("Export should NOT contain <time tag when Text Only is selected", exportedText.contains("<time"))
+        assertTrue("Export should contain task text", exportedText.contains("Punted task"))
     }
 
     @Test
@@ -343,6 +398,32 @@ class MainActivityTest {
         shadowOf(android.os.Looper.getMainLooper()).idle()
 
         assertEquals("Imported 2 new reminder(s)", ShadowToast.getTextOfLatestToast())
+    }
+
+    @Test
+    fun testImportMarkdownDialogParsesPuntStateAndSetsSnoozeInPrefs() {
+        val context = RuntimeEnvironment.getApplication()
+        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
+        prefs.edit().clear().commit()
+
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = controller.get()
+
+        val futureTime = System.currentTimeMillis() + 86400000L
+        val isoStr = com.bas080.notificationreminders.utils.MarkdownRemindersUtil.millisToIso(futureTime)
+        val markdownText = "- [ ] Water plants <time datetime=\"$isoStr\">punted until future</time>"
+
+        val btnImport = activity.findViewById<TextView>(R.id.btn_import_markdown)
+        btnImport.performClick()
+
+        val dialog = ShadowAlertDialog.getLatestDialog() as? AlertDialog
+        val editText = dialog!!.findViewById<EditText>(R.id.import_input)
+        editText!!.setText(markdownText)
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        val savedSnooze = prefs.getLong("snooze_water plants", 0L)
+        assertTrue("Imported punt timestamp should be saved in prefs", savedSnooze > System.currentTimeMillis())
     }
 
     @Test
