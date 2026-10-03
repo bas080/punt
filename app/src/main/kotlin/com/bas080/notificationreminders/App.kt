@@ -7,7 +7,7 @@ import com.bas080.notificationreminders.utils.AppLogger
 import java.io.PrintWriter
 import java.io.StringWriter
 
-class NotificationRemindersApplication : Application() {
+class App : Application() {
 
     companion object {
         const val PREFS_NAME = "crash_prefs"

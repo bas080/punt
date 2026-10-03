@@ -133,8 +133,8 @@ class CrashReportActivityTest {
     @Test
     fun testDontSendRemovesPersistedCrashTraceAndRestartsApp() {
         val app = RuntimeEnvironment.getApplication()
-        val prefs = app.getSharedPreferences(NotificationRemindersApplication.PREFS_NAME, Context.MODE_PRIVATE)
-        prefs.edit().putString(NotificationRemindersApplication.KEY_CRASH_TRACE, "Sample crash stack").commit()
+        val prefs = app.getSharedPreferences(App.PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putString(App.KEY_CRASH_TRACE, "Sample crash stack").commit()
 
         val controller = Robolectric.buildActivity(CrashReportActivity::class.java).setup()
         val activity = controller.get()
@@ -143,7 +143,7 @@ class CrashReportActivityTest {
         assertNotNull(btnDontSend)
         btnDontSend.performClick()
 
-        val savedTrace = prefs.getString(NotificationRemindersApplication.KEY_CRASH_TRACE, null)
+        val savedTrace = prefs.getString(App.KEY_CRASH_TRACE, null)
         org.junit.Assert.assertNull("Crash trace should be removed from prefs when DON'T SEND is clicked", savedTrace)
         assertTrue("CrashReportActivity should be finished", activity.isFinishing)
     }
@@ -228,7 +228,7 @@ class CrashReportActivityTest {
 
     @Test
     fun testGlobalUncaughtExceptionHandlerSavesCrashTraceToPrefs() {
-        val app = RuntimeEnvironment.getApplication() as NotificationRemindersApplication
+        val app = RuntimeEnvironment.getApplication() as App
         val handler = Thread.getDefaultUncaughtExceptionHandler()
         assertNotNull(handler)
 
@@ -240,8 +240,8 @@ class CrashReportActivityTest {
         } catch (_: Exception) {
         }
 
-        val prefs = app.getSharedPreferences(NotificationRemindersApplication.PREFS_NAME, Context.MODE_PRIVATE)
-        val savedTrace = prefs.getString(NotificationRemindersApplication.KEY_CRASH_TRACE, null)
+        val prefs = app.getSharedPreferences(App.PREFS_NAME, Context.MODE_PRIVATE)
+        val savedTrace = prefs.getString(App.KEY_CRASH_TRACE, null)
         assertNotNull("Crash trace should be saved in prefs", savedTrace)
         assertTrue(savedTrace!!.contains("Global crash handler test exception"))
     }

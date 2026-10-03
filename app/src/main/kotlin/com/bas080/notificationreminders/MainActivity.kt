@@ -1390,8 +1390,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkAndShowCrashReportDialog() {
-        val prefs = getSharedPreferences(NotificationRemindersApplication.PREFS_NAME, Context.MODE_PRIVATE)
-        val crashTrace = prefs.getString(NotificationRemindersApplication.KEY_CRASH_TRACE, null) ?: return
+        val prefs = getSharedPreferences(App.PREFS_NAME, Context.MODE_PRIVATE)
+        val crashTrace = prefs.getString(App.KEY_CRASH_TRACE, null) ?: return
 
         val intent = Intent(this, CrashReportActivity::class.java).apply {
             putExtra(CrashReportActivity.EXTRA_CRASH_TRACE, crashTrace)
@@ -1400,8 +1400,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun clearCrashTrace() {
-        val prefs = getSharedPreferences(NotificationRemindersApplication.PREFS_NAME, Context.MODE_PRIVATE)
-        prefs.edit().remove(NotificationRemindersApplication.KEY_CRASH_TRACE).apply()
+        val prefs = getSharedPreferences(App.PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().remove(App.KEY_CRASH_TRACE).apply()
     }
 
     private fun checkAndRequestPermissions() {
