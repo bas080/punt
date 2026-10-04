@@ -526,27 +526,23 @@ class MainActivityTest {
 
         val recyclerView = activity.findViewById<RecyclerView>(R.id.reminders_list)
         val input = activity.findViewById<EditText>(R.id.search_reminder_input)
-        val btnClearSearch = activity.findViewById<ImageView>(R.id.btn_clear_search)
-        assertNotNull(btnClearSearch)
 
         // Type "milk" to filter list
         input.setText("milk")
         shadowOf(android.os.Looper.getMainLooper()).idleFor(250, java.util.concurrent.TimeUnit.MILLISECONDS)
 
         assertEquals("Expected 2 items when filtered", 2, recyclerView.adapter!!.itemCount)
-        assertTrue("Clear button should be enabled when text is entered", btnClearSearch.isEnabled)
 
-        // Click Clear button
-        btnClearSearch.performClick()
-        shadowOf(android.os.Looper.getMainLooper()).idle()
+        // Clear search text
+        input.setText("")
+        shadowOf(android.os.Looper.getMainLooper()).idleFor(250, java.util.concurrent.TimeUnit.MILLISECONDS)
 
         assertEquals("", input.text.toString())
         assertEquals("Expected 3 items total when cleared", 3, recyclerView.adapter!!.itemCount)
-        org.junit.Assert.assertFalse("Clear button should be disabled when search is cleared", btnClearSearch.isEnabled)
     }
 
     @Test
-    fun testClearSearchButtonEnabledAndResetsStateFilterWhenFilterActive() {
+    fun testFilterDialogClearButtonResetsStateFilterWhenFilterActive() {
         val context = RuntimeEnvironment.getApplication()
         val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
         val snoozeTime = System.currentTimeMillis() + 3600000L
@@ -559,16 +555,21 @@ class MainActivityTest {
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
 
-        val btnClearSearch = activity.findViewById<ImageView>(R.id.btn_clear_search)
-        assertTrue("Clear search button should be enabled when filter is not ALL", btnClearSearch.isEnabled)
+        val btnFilter = activity.findViewById<View>(R.id.btn_tags_filter)
+        assertNotNull(btnFilter)
+        btnFilter.performClick()
 
-        btnClearSearch.performClick()
+        val dialog = ShadowAlertDialog.getLatestDialog() as? AlertDialog
+        assertNotNull(dialog)
+
+        val neutralBtn = dialog!!.getButton(AlertDialog.BUTTON_NEUTRAL)
+        assertNotNull(neutralBtn)
+        assertEquals("Clear", neutralBtn.text.toString())
+        neutralBtn.performClick()
         shadowOf(android.os.Looper.getMainLooper()).idle()
 
         val currentFilterName = prefs.getString("key_reminder_filter", null)
         assertEquals(ReminderFilter.ALL.name, currentFilterName)
-        val txtSelectedTags = activity.findViewById<TextView>(R.id.txt_selected_tags)
-        assertEquals("All", txtSelectedTags.text.toString())
     }
 
     @Test
@@ -661,9 +662,9 @@ class MainActivityTest {
         val controller1 = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity1 = controller1.get()
 
-        val btnTagsFilter = activity1.findViewById<android.widget.LinearLayout>(R.id.btn_tags_filter)
-        assertNotNull(btnTagsFilter)
-        btnTagsFilter.performClick()
+        val btnTagsFilter1 = activity1.findViewById<View>(R.id.btn_tags_filter)
+        assertNotNull(btnTagsFilter1)
+        btnTagsFilter1.performClick()
 
         val dialog = ShadowAlertDialog.getLatestDialog() as? AlertDialog
         assertNotNull(dialog)
@@ -674,9 +675,10 @@ class MainActivityTest {
 
         val controller2 = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity2 = controller2.get()
+        assertNotNull(activity2)
 
-        val txtSelectedTags = activity2.findViewById<TextView>(R.id.txt_selected_tags)
-        assertNotNull(txtSelectedTags)
+        val restoredFilterName = prefs.getString("key_reminder_filter", null)
+        assertEquals(ReminderFilter.ALL.name, restoredFilterName)
     }
 
     @Test
@@ -690,10 +692,8 @@ class MainActivityTest {
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
 
-        val btnTagsFilter = activity.findViewById<android.widget.LinearLayout>(R.id.btn_tags_filter)
-        val txtSelectedTags = activity.findViewById<TextView>(R.id.txt_selected_tags)
+        val btnTagsFilter = activity.findViewById<View>(R.id.btn_tags_filter)
         assertNotNull(btnTagsFilter)
-        assertNotNull(txtSelectedTags)
 
         // Open filter selection dialog
         btnTagsFilter.performClick()
@@ -703,8 +703,6 @@ class MainActivityTest {
 
         dialog!!.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
         shadowOf(android.os.Looper.getMainLooper()).idle()
-
-        assertEquals("All", txtSelectedTags.text.toString())
     }
 
     @Test

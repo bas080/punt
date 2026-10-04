@@ -208,25 +208,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
         binding.btnListExport.setColorFilter(ContextCompat.getColor(this, R.color.accent))
-        markAsButtonAccessibility(binding.btnClearSearch)
         markAsButtonAccessibility(binding.btnEmptyClearFilter)
-
-        val clearFilterAndSearchAction = {
-            currentSearchQuery = ""
-            currentFilter = ReminderFilter.ALL
-            getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
-                .edit()
-                .putString(KEY_REMINDER_FILTER, currentFilter.name)
-                .putString(KEY_SEARCH_QUERY, "")
-                .apply()
-            recentlyDoneReminders.clear()
-            binding.searchReminderInput.setText("")
-            updateSummaryAndAdapter()
-        }
-
-        binding.btnClearSearch.setOnClickListener {
-            clearFilterAndSearchAction()
-        }
 
         binding.btnEmptyClearFilter.setOnClickListener {
             clearFilterAndSearchAction()
@@ -530,8 +512,24 @@ class MainActivity : AppCompatActivity() {
                 binding.searchReminderInput.setText(updatedQuery)
                 updateSummaryAndAdapter()
             }
+            .setNeutralButton("Clear") { _, _ ->
+                clearFilterAndSearchAction()
+            }
             .setNegativeButton(R.string.cancel, null)
             .show()
+    }
+
+    private fun clearFilterAndSearchAction() {
+        currentSearchQuery = ""
+        currentFilter = ReminderFilter.ALL
+        getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
+            .edit()
+            .putString(KEY_REMINDER_FILTER, currentFilter.name)
+            .putString(KEY_SEARCH_QUERY, "")
+            .apply()
+        recentlyDoneReminders.clear()
+        binding.searchReminderInput.setText("")
+        updateSummaryAndAdapter()
     }
 
     private fun showExportOptionsDialog(reminders: List<String>) {
@@ -1339,29 +1337,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateSummary() {
-        val stateText = when (currentFilter) {
-            ReminderFilter.ACTIVE -> "Active"
-            ReminderFilter.SNOOZED -> "Punted"
-            ReminderFilter.ALL -> "All"
-        }
-        val selectedTags = Regex("#[a-zA-Z0-9_]+").findAll(currentSearchQuery).map { it.value }.toList()
-        if (selectedTags.isEmpty()) {
-            binding.txtSelectedTags.text = stateText
-        } else {
-            binding.txtSelectedTags.text = "$stateText • ${selectedTags.joinToString(" ")}"
-        }
-
         val hasFilterOrSearch = currentSearchQuery.isNotBlank() || currentFilter != ReminderFilter.ALL
-        binding.btnClearSearch.isEnabled = hasFilterOrSearch
-        binding.btnClearSearch.isClickable = hasFilterOrSearch
-        binding.btnClearSearch.isFocusable = hasFilterOrSearch
-        if (hasFilterOrSearch) {
-            binding.btnClearSearch.setColorFilter(ContextCompat.getColor(this, R.color.accent))
-            binding.btnClearSearch.alpha = 1.0f
-        } else {
-            binding.btnClearSearch.setColorFilter(ContextCompat.getColor(this, R.color.text_muted))
-            binding.btnClearSearch.alpha = 0.4f
-        }
 
         if (displayedReminders.isEmpty()) {
             binding.layoutEmptyReminders.visibility = View.VISIBLE

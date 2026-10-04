@@ -25,42 +25,10 @@
             android:gravity="center_vertical"
             android:layout_marginBottom="8dp">
 
-            <!-- Tags Filter Option Display -->
-            <LinearLayout
-                android:id="@+id/btn_tags_filter"
+            <View
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:clickable="true"
-                android:focusable="true"
-                android:paddingVertical="2dp"
-                android:paddingHorizontal="4dp"
-                android:background="?attr/selectableItemBackground">
-
-                <TextView
-                    android:id="@+id/txt_tags_label"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Filter:"
-                    android:textSize="11sp"
-                    android:textStyle="bold"
-                    android:textColor="@color/accent"
-                    android:layout_marginEnd="6dp" />
-
-                <TextView
-                    android:id="@+id/txt_selected_tags"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="All"
-                    android:textSize="11sp"
-                    android:singleLine="true"
-                    android:ellipsize="end"
-                    android:textColor="@color/text_secondary" />
-
-            </LinearLayout>
+                android:layout_height="0dp"
+                android:layout_weight="1" />
 
             <!-- Bulk Action Button (Reminders List) -->
             <ImageView
@@ -70,23 +38,8 @@
                 android:src="@drawable/ic_action_bulk"
                 android:contentDescription="Bulk actions"
                 android:padding="3dp"
-                android:layout_marginEnd="6dp"
                 android:clickable="true"
                 android:focusable="true"
-                android:background="?attr/selectableItemBackgroundBorderless" />
-
-            <!-- Clear Search/Filter Button -->
-            <ImageView
-                android:id="@+id/btn_clear_search"
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:src="@drawable/ic_action_clear"
-                android:contentDescription="Clear search"
-                android:padding="3dp"
-                android:clickable="false"
-                android:focusable="false"
-                android:enabled="false"
-                android:alpha="0.4"
                 android:background="?attr/selectableItemBackgroundBorderless" />
 
         </LinearLayout>
@@ -102,6 +55,21 @@
             android:paddingVertical="10dp"
             android:paddingHorizontal="12dp"
             android:layout_marginBottom="8dp">
+
+            <!-- Filter Icon Button -->
+            <ImageView
+                android:id="@+id/btn_tags_filter"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:src="@drawable/ic_action_filter"
+                app:tint="@color/accent"
+                android:contentDescription="Filter reminders"
+                android:scaleType="centerInside"
+                android:padding="4dp"
+                android:layout_marginEnd="4dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="?attr/selectableItemBackgroundBorderless" />
 
             <EditText
                 android:id="@+id/search_reminder_input"
