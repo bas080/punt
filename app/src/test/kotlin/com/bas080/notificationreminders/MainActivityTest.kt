@@ -1253,7 +1253,7 @@ class MainActivityTest {
 
         // 2. TextWatcher updates text in adapter
         holder.reminderInput.setText("Editable task updated")
-        shadowOf(android.os.Looper.getMainLooper()).idle()
+        shadowOf(android.os.Looper.getMainLooper()).idleFor(350, java.util.concurrent.TimeUnit.MILLISECONDS)
 
         val updatedSet = prefs.getStringSet("key_reminders_list", emptySet()) ?: emptySet()
         assertTrue(updatedSet.contains("Editable task updated"))
@@ -1284,5 +1284,30 @@ class MainActivityTest {
         val savedTrace = prefs.getString(App.KEY_CRASH_TRACE, null)
         assertNotNull("KEY_CRASH_TRACE must remain persisted in prefs", savedTrace)
         assertEquals(crashTrace, savedTrace)
+    }
+
+    @Test
+    fun testDebouncedReminderEditingFlushesOnFocusLossOrDebounce() {
+        val context = RuntimeEnvironment.getApplication()
+        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
+        prefs.edit().clear().putStringSet("key_reminders_list", setOf("Original Task")).commit()
+
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = controller.get()
+
+        val recyclerView = activity.findViewById<RecyclerView>(R.id.reminders_list)
+        recyclerView.measure(View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY))
+        recyclerView.layout(0, 0, 1000, 1000)
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        val holder = recyclerView.findViewHolderForAdapterPosition(0) as RemindersAdapter.ItemViewHolder
+
+        holder.reminderInput.setText("Original Task Updated")
+
+        holder.reminderInput.onFocusChangeListener?.onFocusChange(holder.reminderInput, false)
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        val updatedSet = prefs.getStringSet("key_reminders_list", emptySet()) ?: emptySet()
+        assertTrue(updatedSet.contains("Original Task Updated"))
     }
 }

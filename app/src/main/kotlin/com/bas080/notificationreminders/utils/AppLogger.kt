@@ -5,6 +5,7 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.Executors
 
 object AppLogger {
     private const val LOG_FILE_NAME = "app_logs.txt"
@@ -13,6 +14,7 @@ object AppLogger {
     private const val DEFAULT_MAX_LINES = 50
 
     private val breadcrumbs = java.util.ArrayDeque<String>()
+    private val logExecutor = Executors.newSingleThreadExecutor()
 
     @Synchronized
     fun log(context: Context, tag: String, message: String) {
@@ -24,13 +26,16 @@ object AppLogger {
         }
         breadcrumbs.addLast(logEntry)
 
-        try {
-            val file = getLogFile(context)
-            if (file.exists() && file.length() > MAX_FILE_SIZE_BYTES) {
-                file.delete()
+        val appContext = context.applicationContext
+        logExecutor.execute {
+            try {
+                val file = getLogFile(appContext)
+                if (file.exists() && file.length() > MAX_FILE_SIZE_BYTES) {
+                    file.delete()
+                }
+                file.appendText("$logEntry\n")
+            } catch (_: Exception) {
             }
-            file.appendText("$logEntry\n")
-        } catch (_: Exception) {
         }
     }
 
@@ -58,12 +63,15 @@ object AppLogger {
     @Synchronized
     fun clearLogs(context: Context) {
         breadcrumbs.clear()
-        try {
-            val file = getLogFile(context)
-            if (file.exists()) {
-                file.delete()
+        val appContext = context.applicationContext
+        logExecutor.execute {
+            try {
+                val file = getLogFile(appContext)
+                if (file.exists()) {
+                    file.delete()
+                }
+            } catch (_: Exception) {
             }
-        } catch (_: Exception) {
         }
     }
 

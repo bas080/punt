@@ -96,6 +96,19 @@ class MainActivity : AppCompatActivity() {
     private var currentSearchQuery = ""
     private val recentlyDoneReminders = mutableSetOf<String>()
 
+    private val editReminderHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private var pendingEditRunnable: Runnable? = null
+    private var pendingOldText: String? = null
+    private var pendingUpdatedText: String? = null
+
+    fun flushPendingReminderUpdate() {
+        pendingEditRunnable?.let {
+            editReminderHandler.removeCallbacks(it)
+            it.run()
+            pendingEditRunnable = null
+        }
+    }
+
     private val requestNotificationPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { _ ->
             checkAndRequestNotificationListenerPermission()
@@ -724,28 +737,45 @@ class MainActivity : AppCompatActivity() {
                     val masterIdx = activeReminders.indexOf(oldText)
                     if (masterIdx != -1) {
                         if (oldText != updatedText) {
-                            AppLogger.log(this, "MainActivity", "Updated reminder text")
-                            val oldNotifId = ReminderNotificationListenerService.getNotificationIdForReminder(oldText)
-                            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager
-                            notificationManager?.cancel(oldNotifId)
+                            activeReminders[masterIdx] = updatedText
+                            displayedReminders[index] = updatedText
 
-                            val oldTrimmed = getCleanTrimmed(oldText)
-                            val newTrimmed = getCleanTrimmed(updatedText)
-                            if (oldTrimmed != newTrimmed) {
-                                val prefs = getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
-                                val snoozeTime = prefs.getLong("snooze_$oldTrimmed", 0L)
-                                if (snoozeTime > 0L) {
-                                    prefs.edit().remove("snooze_$oldTrimmed").putLong("snooze_$newTrimmed", snoozeTime).apply()
-                                    ReminderNotificationListenerService.lastTriggeredMap.remove("snooze_$oldTrimmed")
-                                    ReminderNotificationListenerService.lastTriggeredMap["snooze_$newTrimmed"] = snoozeTime
+                            pendingEditRunnable?.let { editReminderHandler.removeCallbacks(it) }
+                            val initialOldText = pendingOldText ?: oldText
+                            pendingOldText = initialOldText
+                            pendingUpdatedText = updatedText
+
+                            val runnable = Runnable {
+                                val currentOldText = pendingOldText
+                                val currentUpdatedText = pendingUpdatedText
+                                pendingEditRunnable = null
+                                pendingOldText = null
+                                pendingUpdatedText = null
+
+                                if (currentOldText != null && currentUpdatedText != null && currentOldText != currentUpdatedText) {
+                                    AppLogger.log(this@MainActivity, "MainActivity", "Updated reminder text")
+                                    val oldNotifId = ReminderNotificationListenerService.getNotificationIdForReminder(currentOldText)
+                                    val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager
+                                    notificationManager?.cancel(oldNotifId)
+
+                                    val oldTrimmed = getCleanTrimmed(currentOldText)
+                                    val newTrimmed = getCleanTrimmed(currentUpdatedText)
+                                    if (oldTrimmed != newTrimmed) {
+                                        val prefs = getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
+                                        val snoozeTime = prefs.getLong("snooze_$oldTrimmed", 0L)
+                                        if (snoozeTime > 0L) {
+                                            prefs.edit().remove("snooze_$oldTrimmed").putLong("snooze_$newTrimmed", snoozeTime).apply()
+                                            ReminderNotificationListenerService.lastTriggeredMap.remove("snooze_$oldTrimmed")
+                                            ReminderNotificationListenerService.lastTriggeredMap["snooze_$newTrimmed"] = snoozeTime
+                                        }
+                                    }
+                                    saveRemindersToPrefs(updateStatusNotification = false)
+                                    updateSummary()
                                 }
                             }
+                            pendingEditRunnable = runnable
+                            editReminderHandler.postDelayed(runnable, 300L)
                         }
-
-                        activeReminders[masterIdx] = updatedText
-                        displayedReminders[index] = updatedText
-                        saveRemindersToPrefs(updateStatusNotification = false)
-                        updateSummary()
                     }
                 }
             },
@@ -1365,6 +1395,11 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    override fun onPause() {
+        super.onPause()
+        flushPendingReminderUpdate()
+    }
+
     private fun checkAndShowCrashReportDialog() {
         val prefs = getSharedPreferences(App.PREFS_NAME, Context.MODE_PRIVATE)
         val crashTrace = prefs.getString(App.KEY_CRASH_TRACE, null) ?: return
@@ -1577,6 +1612,9 @@ class RemindersAdapter(
 
         holder.reminderInput.setOnFocusChangeListener { _, hasFocus ->
             holder.reminderInput.maxLines = if (hasFocus) Int.MAX_VALUE else 4
+            if (!hasFocus) {
+                (context as? MainActivity)?.flushPendingReminderUpdate()
+            }
         }
 
         val reminderIndex = position
