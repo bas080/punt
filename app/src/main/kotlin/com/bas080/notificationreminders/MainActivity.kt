@@ -540,7 +540,7 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        AlertDialog.Builder(this, R.style.Theme_NotificationReminders_Dialog)
+        AlertDialog.Builder(this, R.style.Theme_Punt_Dialog)
             .setTitle(R.string.export_markdown)
             .setMessage("Include punt state information in the exported Markdown?")
             .setPositiveButton("Include Punt Info") { _, _ ->
