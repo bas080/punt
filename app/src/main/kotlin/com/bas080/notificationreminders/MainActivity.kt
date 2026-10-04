@@ -592,6 +592,20 @@ class MainActivity : AppCompatActivity() {
             setPadding(padding, padding / 2, padding, 0)
         }
 
+        try {
+            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
+            val clipData = clipboard?.primaryClip
+            if (clipData != null && clipData.itemCount > 0) {
+                val clipText = clipData.getItemAt(0).text
+                if (!clipText.isNullOrBlank()) {
+                    input.setText(clipText)
+                    input.setSelection(clipText.length)
+                }
+            }
+        } catch (_: Exception) {
+            // Ignore clipboard access exceptions gracefully
+        }
+
         AlertDialog.Builder(this, R.style.Theme_NotificationReminders_Dialog)
             .setTitle(R.string.import_dialog_title)
             .setView(input)
