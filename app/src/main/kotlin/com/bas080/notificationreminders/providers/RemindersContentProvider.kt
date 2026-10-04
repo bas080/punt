@@ -8,6 +8,7 @@ import android.database.Cursor
 import android.database.MatrixCursor
 import android.net.Uri
 import com.bas080.notificationreminders.utils.ReminderMatcher
+import java.util.concurrent.Executors
 
 class RemindersContentProvider : ContentProvider() {
 
@@ -32,10 +33,15 @@ class RemindersContentProvider : ContentProvider() {
             addURI(AUTHORITY, "reminders", REMINDERS)
         }
 
+        private val syncExecutor = Executors.newSingleThreadExecutor()
+
         fun notifyChange(context: Context) {
             try {
                 context.contentResolver.notifyChange(CONTENT_URI, null)
-                com.bas080.notificationreminders.utils.CalendarSyncManager.syncRemindersToCalendar(context)
+                val appContext = context.applicationContext
+                syncExecutor.execute {
+                    com.bas080.notificationreminders.utils.CalendarSyncManager.syncRemindersToCalendar(appContext)
+                }
             } catch (_: Exception) {
             }
         }
