@@ -3,7 +3,9 @@ title: Migrate Fastlane screenshot generation to Android emulator
 status: open
 priority: 2
 issue-type: task
-created-at: 2026-10-05T12:00:00Z
+created-at: "2026-10-05T12:00:00Z"
+blocks:
+  - punt-implement-full-emulator-cb4310aa
 ---
 
 # Overview
@@ -65,3 +67,23 @@ adb pull /sdcard/Android/data/com.bas080.notificationreminders/files/screenshots
 - Structure screenshot captures into separate `@Test` methods (`capture1Overview` .. `capture6KeyboardEditing`) so each capture runs in its own clean `ActivityScenario` lifecycle.
 - Avoid calling `finish()` on dialog activities (such as `PickNotificationActivity`) before screenshot capture.
 - Refrain from guarding activity states with `isFinishing`/`isDestroyed` checks so that any window rendering issue fails the screenshot test explicitly.
+
+---
+
+## 4. Task Breakdown & Research Dependency Graph
+
+Implementation of the full emulator screenshot suite is blocked by preliminary research tasks to verify and prove each component step-by-step:
+
+```
+[1. Research test argument forwarding]  ──┐
+                                          ├───> [4. Research ADB pull workflow in CI] ──┐
+[2. Research screenshot capture & storage] ┘                                           │
+                                                                                       ├───> [5. Implement full emulator suite] ───> [Parent task completion]
+[3. Research ActivityScenario lifecycle isolation] ────────────────────────────────────┘
+```
+
+1. **`punt-research-test-arg-20594d39`**: Research & prove test argument forwarding (`generate.screenshots=true`).
+2. **`punt-research-screenshot-capture-b1469c85`**: Research & prove bitmap capture and file saving to external storage in `androidTest`.
+3. **`punt-research-activityscenario-89b32b97`**: Research & prove `ActivityScenario` lifecycle isolation across `@Test` methods.
+4. **`punt-research-adb-pull-cfa6629c`**: Research & prove `adb pull` asset extraction in CI (Blocked by #1 & #2).
+5. **`punt-implement-full-emulator-cb4310aa`**: Implement end-to-end `ScreenshotGeneratorAndroidTest` suite (Blocked by #1, #2, #3, and #4).
