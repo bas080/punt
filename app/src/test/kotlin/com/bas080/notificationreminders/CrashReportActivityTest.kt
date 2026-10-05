@@ -213,6 +213,33 @@ class CrashReportActivityTest {
     }
 
     @Test
+    fun testReportIncludesExperimentDetailsInBreadcrumbsAndLogs() {
+        val context = RuntimeEnvironment.getApplication()
+        com.bas080.notificationreminders.utils.AppLogger.clearLogs(context)
+        com.bas080.notificationreminders.utils.ExperimentTracker.resetForTesting()
+
+        // Trigger 10 creation channel events to hit threshold
+        for (i in 1..10) {
+            com.bas080.notificationreminders.utils.ExperimentTracker.trackCreation(context, "notification_reply")
+        }
+
+        // Allow async log write
+        Thread.sleep(100)
+
+        val report = CrashReportActivity.buildFormattedReport(
+            context = context,
+            crashTrace = "TestTrace",
+            userComment = "Feedback with experiment data",
+            includeLogs = true,
+            isFeedback = true
+        )
+
+        assertTrue("Report breadcrumbs should contain experiment summary", report.contains("Experiment:CreationChannel"))
+        assertTrue("Report breadcrumbs should contain creation details", report.contains("notification_reply: 10"))
+        assertTrue("Report should include application logs section", report.contains("### Application Logs"))
+    }
+
+    @Test
     fun testSendEmailFallbackWhenNoHandlerAvailable() {
         val controller = Robolectric.buildActivity(CrashReportActivity::class.java).setup()
         val activity = controller.get()
