@@ -3,7 +3,7 @@ title: Connect Punt Android client to Punt backend server with offline-capable w
 status: active
 priority: 2
 issue-type: feature
-created-at: "\"2026-10-05T15:30:00.000000+00:00\""
+created-at: "2026-10-05T15:30:00.000000+00:00"
 ---
 
 Enable multi-device synchronization by connecting the Punt Android client to a backend Punt server.
