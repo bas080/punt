@@ -17,7 +17,7 @@
 - **Documentation & Workflow**:
   - Keep `README.md` high-level, user-focused, and non-technical.
   - Fastlane metadata and store screenshots are managed automatically in release CI workflows; do not regenerate screenshots locally.
-  - For architecture details on migrating screenshot generation to an Android emulator, see `EMULATOR_SCREENSHOTS.md`.
+  - For task tracking and architecture details on migrating screenshot generation to an Android emulator, see `.dots/punt-migrate-emulator-screenshots-e1a2b3c4.md`.
 - **Commit Messages**:
   - Write standard Git commit messages using a short, imperative subject line (50 characters max) with no conversational intros, followed by a blank line and a concise body.
 - **Testing**:

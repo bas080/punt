@@ -1,26 +1,27 @@
-# Emulator Screenshot Generation Architecture & Future Migration Guide
+---
+title: Migrate Fastlane screenshot generation to Android emulator
+status: open
+priority: 2
+issue-type: task
+created-at: 2026-10-05T12:00:00Z
+---
 
-This document outlines the architecture, workflow, and design considerations for capturing Fastlane store screenshots directly on an Android Emulator during instrumented UI test execution.
+# Overview
+
+This task documents the architecture, workflow, and design considerations for capturing Fastlane store screenshots directly on an Android Emulator during instrumented UI test execution (`connectedCheck`).
 
 ---
 
-## 1. Overview
+## 1. Instrumented Test Argument Forwarding
 
-While Fastlane screenshots are currently generated during JVM unit tests using Robolectric (`ScreenshotGeneratorTest`), capturing screenshots on a real hardware-accelerated or software-rendered Android Emulator (`connectedCheck`) provides native OS font rendering, system status bars, and window elevations.
-
----
-
-## 2. Instrumented Screenshot Test Architecture
-
-### A. Test Argument Forwarding
-To avoid generating screenshots on every routine test run, screenshot generation is gated behind an instrumentation test runner argument.
+To avoid running screenshot generation during routine benchmark runs, execution is gated behind an instrumentation test runner argument.
 
 Passing the argument via Gradle command line:
 ```bash
 ./gradlew connectedCheck -Pandroid.testInstrumentationRunnerArguments.generate.screenshots=true
 ```
 
-Reading the argument inside `androidTest` using `InstrumentationRegistry`:
+Reading the argument inside `androidTest` (`ScreenshotGeneratorAndroidTest.kt`) using `InstrumentationRegistry`:
 ```kotlin
 import androidx.test.platform.app.InstrumentationRegistry
 
@@ -34,7 +35,7 @@ if (!shouldGenerate) {
 
 ---
 
-## 3. Storage & ADB Pull Workflow
+## 2. Storage & ADB Pull Workflow
 
 ### A. Saving PNGs to App Storage
 In Android instrumented tests (`androidTest`), saving screenshots to external app storage (`context.getExternalFilesDir("screenshots")`) requires no additional runtime storage permissions (`WRITE_EXTERNAL_STORAGE`):
@@ -59,14 +60,8 @@ adb pull /sdcard/Android/data/com.bas080.notificationreminders/files/screenshots
 
 ---
 
-## 4. Multi-Display & Resolution Considerations
+## 3. Key Lifecycle Considerations
 
-When generating store assets on a single emulator instance (e.g. Pixel 4 with 1080x1920 screen size):
-- **Phone Screenshots (375x667 / 1080x1920)**: Directly captured from decorView or `UiDevice.takeScreenshot()`.
-- **10-Inch Tablet Screenshots (1024x768)**: For optimal 4:3 aspect ratios without scaling distortion, future work should either launch a dedicated tablet AVD profile (e.g., `10in WSVGA (Tablet)`) or programmatically layout tablet decor views.
-
----
-
-## 5. Summary
-
-This setup allows future engineers to seamlessly re-enable on-emulator screenshot capturing by configuring `connectedCheck` arguments and `adb pull` steps in CI.
+- Structure screenshot captures into separate `@Test` methods (`capture1Overview` .. `capture6KeyboardEditing`) so each capture runs in its own clean `ActivityScenario` lifecycle.
+- Avoid calling `finish()` on dialog activities (such as `PickNotificationActivity`) before screenshot capture.
+- Refrain from guarding activity states with `isFinishing`/`isDestroyed` checks so that any window rendering issue fails the screenshot test explicitly.
