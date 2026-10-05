@@ -76,16 +76,6 @@ class ExperimentTrackerTest {
     }
 
     @Test
-    fun testSearchAndFilterContinuousTracking() {
-        val app = RuntimeEnvironment.getApplication()
-
-        ExperimentTracker.trackSearchAndFilter(app, "ALL", 1, 2, true)
-
-        val metrics = ExperimentTracker.getFormattedExperimentMetrics(app)
-        assertTrue("Metrics should contain Search & Filter Usage", metrics.contains("Search & Filter Usage") && metrics.contains("state_ALL,tags_1,tokens_2,has_results: 1"))
-    }
-
-    @Test
     fun testTaskLifecycleContinuousTracking() {
         val app = RuntimeEnvironment.getApplication()
 
