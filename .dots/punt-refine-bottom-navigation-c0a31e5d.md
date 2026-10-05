@@ -1,6 +1,6 @@
 ---
 title: Refine bottom navigation bar layout and visual design
-status: open
+status: closed
 priority: 2
 issue-type: task
 created-at: "2026-10-05T13:40:45.555253+00:00"
