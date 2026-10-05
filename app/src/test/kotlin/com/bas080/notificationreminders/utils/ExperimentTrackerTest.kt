@@ -20,6 +20,19 @@ class ExperimentTrackerTest {
     }
 
     @Test
+    fun testCrashTrackingAndStartDates() {
+        val app = RuntimeEnvironment.getApplication()
+
+        ExperimentTracker.trackCrash(app)
+        ExperimentTracker.trackCrash(app)
+
+        val metrics = ExperimentTracker.getFormattedExperimentMetrics(app)
+        assertTrue("Metrics should contain Application Crashes", metrics.contains("Application Crashes"))
+        assertTrue("Metrics should contain start date", metrics.contains("(since "))
+        assertTrue("Metrics should contain total=2 crashes", metrics.contains("total=2"))
+    }
+
+    @Test
     fun testEditIntervalRollingMetrics() {
         val app = RuntimeEnvironment.getApplication()
 
