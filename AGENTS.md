@@ -17,6 +17,7 @@
   - Maintain a clean, high-contrast typography-driven UI relying on Android system colors (`?android:attr/colorBackground`, `?android:attr/textColorPrimary`) without heavy borders or graphic cards.
 - **Documentation & Workflow**:
   - Keep `README.md` high-level, user-focused, and non-technical.
+  - Tasks, feature backlogs, and technical migration guides are tracked as Markdown files with YAML frontmatter inside `.dots/` using `dots` (https://github.com/joelreymont/dots). Use `dot ls` to list tasks, `dot add "title"` to create tasks, `dot on <id>` to mark active, and `dot off <id>` to complete.
   - Fastlane metadata and store screenshots are managed automatically in release CI workflows; do not regenerate screenshots locally.
 - **Commit Messages**:
   - Write standard Git commit messages using a short, imperative subject line (50 characters max) with no conversational intros, followed by a blank line and a concise body.
