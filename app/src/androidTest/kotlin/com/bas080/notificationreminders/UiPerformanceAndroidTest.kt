@@ -31,6 +31,7 @@ class UiPerformanceAndroidTest {
             .commit()
     }
 
+    @Suppress("DEPRECATION")
     private fun prepareActivity(scenario: ActivityScenario<MainActivity>) {
         scenario.onActivity { activity ->
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
