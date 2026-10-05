@@ -133,6 +133,11 @@ class SnoozeDialogActivity : AppCompatActivity() {
 
     private fun applySnoozeDuration(targets: List<String>, durationChoice: String) {
         val parseResult = CreateReminderReceiver.parseSnoozeDuration(durationChoice)
+        val topChoices = ReminderNotificationListenerService.getTopSnoozeChoices(this).map { it.toString() }
+        val isPreset = topChoices.contains(durationChoice)
+        val choiceType = if (isPreset) "preset" else if (parseResult != null) "custom_valid" else "custom_invalid"
+        com.bas080.notificationreminders.utils.ExperimentTracker.trackSnoozeChoice(this, choiceType)
+
         if (parseResult == null) {
             Toast.makeText(this, R.string.toast_invalid_snooze_input, Toast.LENGTH_SHORT).show()
             finish()

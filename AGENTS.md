@@ -12,6 +12,7 @@
 - **Exception Handling & Logging**:
   - Wrap background service starts and Android system API calls in `try-catch` blocks, logging non-fatal errors via `AppLogger`.
   - Allow fatal/unrecoverable errors to propagate to `App`'s global uncaught exception handler.
+  - Experiment logging across app features must strictly adhere to the guidelines and sample thresholds defined in `EXPERIMENTS.md`.
 - **Minimal Text Interface Design**:
   - Maintain a clean, high-contrast typography-driven UI relying on Android system colors (`?android:attr/colorBackground`, `?android:attr/textColorPrimary`) without heavy borders or graphic cards.
 - **Documentation & Workflow**:
