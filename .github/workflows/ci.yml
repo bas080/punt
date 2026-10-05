@@ -104,7 +104,13 @@ jobs:
           target: google_apis
           arch: x86_64
           profile: pixel
-          script: ./gradlew connectedCheck
+          script: |
+            adb shell settings put global window_animation_scale 0.0
+            adb shell settings put global transition_animation_scale 0.0
+            adb shell settings put global animator_duration_scale 0.0
+            adb shell wm dismiss-keyguard
+            adb shell cmd notification allow_listener com.bas080.notificationreminders/com.bas080.notificationreminders.services.ReminderNotificationListenerService || true
+            ./gradlew connectedCheck
 
       - name: Upload Performance Benchmark & Test Reports
         if: always()

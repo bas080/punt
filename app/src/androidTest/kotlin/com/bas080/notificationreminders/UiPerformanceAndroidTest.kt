@@ -1,12 +1,15 @@
 package com.bas080.notificationreminders
 
 import android.content.Context
+import android.os.Build
+import android.view.WindowManager
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.action.ViewActions.typeText
 import androidx.test.espresso.matcher.ViewMatchers.withId
+import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -28,10 +31,32 @@ class UiPerformanceAndroidTest {
             .commit()
     }
 
+    private fun prepareActivity(scenario: ActivityScenario<MainActivity>) {
+        scenario.onActivity { activity ->
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                activity.setShowWhenLocked(true)
+                activity.setTurnScreenOn(true)
+            }
+            activity.window.addFlags(
+                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
+                WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD or
+                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+            )
+        }
+        try {
+            onView(withText("Cancel")).perform(click())
+        } catch (_: Exception) {
+            // Dialog was not shown
+        }
+    }
+
     @Test
     fun testRealtimeSearchUiSnappinessOnEmulator() {
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         try {
+            prepareActivity(scenario)
+
             val elapsedNs = measureNanoTime {
                 onView(withId(R.id.search_reminder_input)).perform(typeText("Active Task 10"))
             }
@@ -51,6 +76,8 @@ class UiPerformanceAndroidTest {
     fun testAddReminderUiSnappinessOnEmulator() {
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         try {
+            prepareActivity(scenario)
+
             onView(withId(R.id.search_reminder_input)).perform(typeText("Benchmark Reminder Item"))
 
             val elapsedNs = measureNanoTime {
