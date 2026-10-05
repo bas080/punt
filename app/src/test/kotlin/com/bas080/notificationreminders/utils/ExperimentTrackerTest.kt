@@ -1,6 +1,5 @@
 package com.bas080.notificationreminders.utils
 
-import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -18,6 +17,22 @@ class ExperimentTrackerTest {
         val app = RuntimeEnvironment.getApplication()
         AppLogger.clearLogs(app)
         ExperimentTracker.resetForTesting()
+    }
+
+    @Test
+    fun testEditIntervalThresholdSummary() {
+        val app = RuntimeEnvironment.getApplication()
+
+        // Track 11 consecutive edit events to exceed the threshold of 10 intervals
+        for (i in 1..11) {
+            ExperimentTracker.trackEditInterval(app)
+            Thread.sleep(10)
+        }
+
+        val breadcrumbs = AppLogger.getBreadcrumbs()
+        assertTrue("Edit interval summary logged when threshold reached", breadcrumbs.any {
+            it.contains("Experiment:EditInterval") && it.contains("Reminder edit intervals summary over 10 edits")
+        })
     }
 
     @Test

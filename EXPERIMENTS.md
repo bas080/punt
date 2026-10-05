@@ -20,10 +20,10 @@ To prevent misleading conclusions drawn from isolated single events, every exper
 
 ## 3. Active Experiments
 
-### 1. Frame Drop / Jank Tracking (`Experiment:FrameDrop`)
-- **Objective**: Measure UI rendering smoothness and identify jank during list scrolling and interactions.
-- **Threshold**: **100 frames** (measured via `Window.OnFrameMetricsAvailableListener` on Android N+).
-- **Log Format**: `Frame metrics summary over 100 frames: X dropped frame(s) (Y%), max frame duration: Zms`
+### 1. Reminder Edit Interval (`Experiment:EditInterval`)
+- **Objective**: Measure user editing cadence and average time elapsed between consecutive reminder text updates.
+- **Threshold**: **10 edit intervals**.
+- **Log Format**: `Reminder edit intervals summary over 10 edits: avg X.Xs, min Ys, max Zs`
 
 ### 2. Creation Channels (`Experiment:CreationChannel`)
 - **Objective**: Understand which entry points users prefer for adding reminders.
