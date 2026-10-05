@@ -86,6 +86,13 @@ class CrashReportActivity : AppCompatActivity() {
                     append("\n```\n")
                 }
 
+                val expMetrics = com.bas080.notificationreminders.utils.ExperimentTracker.getFormattedExperimentMetrics(context)
+                if (expMetrics.isNotBlank()) {
+                    append("### Experiment Metrics\n")
+                    append(expMetrics)
+                    append("\n\n")
+                }
+
                 val breadcrumbs = AppLogger.getBreadcrumbs()
                 if (breadcrumbs.isNotEmpty()) {
                     append("\n### Breadcrumbs (Recent User Actions)\n")

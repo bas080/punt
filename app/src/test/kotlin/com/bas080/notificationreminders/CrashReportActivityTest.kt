@@ -213,18 +213,12 @@ class CrashReportActivityTest {
     }
 
     @Test
-    fun testReportIncludesExperimentDetailsInBreadcrumbsAndLogs() {
+    fun testReportIncludesExperimentDetailsSection() {
         val context = RuntimeEnvironment.getApplication()
         com.bas080.notificationreminders.utils.AppLogger.clearLogs(context)
-        com.bas080.notificationreminders.utils.ExperimentTracker.resetForTesting()
+        com.bas080.notificationreminders.utils.ExperimentTracker.resetForTesting(context)
 
-        // Trigger 10 creation channel events to hit threshold
-        for (i in 1..10) {
-            com.bas080.notificationreminders.utils.ExperimentTracker.trackCreation(context, "notification_reply")
-        }
-
-        // Allow async log write
-        Thread.sleep(100)
+        com.bas080.notificationreminders.utils.ExperimentTracker.trackCreation(context, "notification_reply")
 
         val report = CrashReportActivity.buildFormattedReport(
             context = context,
@@ -234,9 +228,8 @@ class CrashReportActivityTest {
             isFeedback = true
         )
 
-        assertTrue("Report breadcrumbs should contain experiment summary", report.contains("Experiment:CreationChannel"))
-        assertTrue("Report breadcrumbs should contain creation details", report.contains("notification_reply: 10"))
-        assertTrue("Report should include application logs section", report.contains("### Application Logs"))
+        assertTrue("Report should contain ### Experiment Metrics section", report.contains("### Experiment Metrics"))
+        assertTrue("Report should contain Creation Channels summary", report.contains("Creation Channels") && report.contains("notification_reply: 1"))
     }
 
     @Test
