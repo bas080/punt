@@ -100,7 +100,9 @@ class ScreenshotGeneratorAndroidTest {
         try {
             prepareWindow(scenario)
             scenario.onActivity { activity ->
-                saveViewScreenshots(activity.window.decorView, "1")
+                if (!activity.isFinishing && !activity.isDestroyed) {
+                    saveViewScreenshots(activity.window.decorView, "1")
+                }
             }
         } finally {
             scenario.close()
@@ -120,7 +122,9 @@ class ScreenshotGeneratorAndroidTest {
         try {
             prepareWindow(scenario)
             scenario.onActivity { activity ->
-                saveViewScreenshots(activity.window.decorView, "2")
+                if (!activity.isFinishing && !activity.isDestroyed) {
+                    saveViewScreenshots(activity.window.decorView, "2")
+                }
             }
         } finally {
             scenario.close()
@@ -139,7 +143,9 @@ class ScreenshotGeneratorAndroidTest {
             prepareWindow(scenario)
             onView(withId(R.id.btn_tags_filter)).perform(click())
             scenario.onActivity { activity ->
-                saveViewScreenshots(activity.window.decorView, "3")
+                if (!activity.isFinishing && !activity.isDestroyed) {
+                    saveViewScreenshots(activity.window.decorView, "3")
+                }
             }
         } finally {
             scenario.close()
@@ -158,7 +164,9 @@ class ScreenshotGeneratorAndroidTest {
         try {
             prepareWindow(scenario)
             scenario.onActivity { activity ->
-                saveViewScreenshots(activity.window.decorView, "4")
+                if (!activity.isFinishing && !activity.isDestroyed) {
+                    saveViewScreenshots(activity.window.decorView, "4")
+                }
             }
         } finally {
             scenario.close()
@@ -177,7 +185,9 @@ class ScreenshotGeneratorAndroidTest {
             prepareWindow(scenario)
             onView(withId(R.id.btn_nav_about)).perform(click())
             scenario.onActivity { activity ->
-                saveViewScreenshots(activity.window.decorView, "5")
+                if (!activity.isFinishing && !activity.isDestroyed) {
+                    saveViewScreenshots(activity.window.decorView, "5")
+                }
             }
         } finally {
             scenario.close()
@@ -196,7 +206,9 @@ class ScreenshotGeneratorAndroidTest {
             prepareWindow(scenario)
             onView(withId(R.id.search_reminder_input)).perform(typeText("Buy groceries and milk #groceries"))
             scenario.onActivity { activity ->
-                saveViewScreenshots(activity.window.decorView, "6")
+                if (!activity.isFinishing && !activity.isDestroyed) {
+                    saveViewScreenshots(activity.window.decorView, "6")
+                }
             }
         } finally {
             scenario.close()
