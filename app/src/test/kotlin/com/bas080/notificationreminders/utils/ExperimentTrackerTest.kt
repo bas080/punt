@@ -16,99 +16,69 @@ class ExperimentTrackerTest {
     fun setUp() {
         val app = RuntimeEnvironment.getApplication()
         AppLogger.clearLogs(app)
-        ExperimentTracker.resetForTesting()
+        ExperimentTracker.resetForTesting(app)
     }
 
     @Test
-    fun testEditIntervalThresholdSummary() {
+    fun testEditIntervalRollingMetrics() {
         val app = RuntimeEnvironment.getApplication()
 
-        // Track 11 consecutive edit events to exceed the threshold of 10 intervals
-        for (i in 1..11) {
-            ExperimentTracker.trackEditInterval(app)
-            Thread.sleep(10)
-        }
+        ExperimentTracker.trackEditInterval(app)
+        Thread.sleep(10)
+        ExperimentTracker.trackEditInterval(app)
 
-        val breadcrumbs = AppLogger.getBreadcrumbs()
-        assertTrue("Edit interval summary logged when threshold reached", breadcrumbs.any {
-            it.contains("Experiment:EditInterval") && it.contains("Reminder edit intervals summary over 10 edits")
-        })
+        val metrics = ExperimentTracker.getFormattedExperimentMetrics(app)
+        assertTrue("Metrics should contain Edit Intervals with n=1", metrics.contains("Reminder Edit Intervals") && metrics.contains("n=1"))
     }
 
     @Test
-    fun testCreationChannelThresholdSummary() {
+    fun testCreationChannelContinuousTracking() {
         val app = RuntimeEnvironment.getApplication()
 
-        for (i in 1..9) {
-            ExperimentTracker.trackCreation(app, "app_input")
-        }
-
-        var breadcrumbs = AppLogger.getBreadcrumbs()
-        assertTrue("No summary before threshold reached", breadcrumbs.none { it.contains("Experiment:CreationChannel") })
-
+        ExperimentTracker.trackCreation(app, "app_input")
         ExperimentTracker.trackCreation(app, "notification_reply")
-        breadcrumbs = AppLogger.getBreadcrumbs()
-        assertTrue("Summary logged when threshold (10) reached", breadcrumbs.any {
-            it.contains("Experiment:CreationChannel") && it.contains("app_input: 9") && it.contains("notification_reply: 1")
-        })
+
+        val metrics = ExperimentTracker.getFormattedExperimentMetrics(app)
+        assertTrue("Metrics should contain Creation Channels with total=2", metrics.contains("Creation Channels") && metrics.contains("total=2") && metrics.contains("app_input: 1"))
     }
 
     @Test
-    fun testMatcherTierThresholdSummary() {
+    fun testMatcherTierContinuousTracking() {
         val app = RuntimeEnvironment.getApplication()
 
-        for (i in 1..10) {
-            val tier = if (i <= 6) "tier_1_and_word" else "tier_2_and_substring"
-            ExperimentTracker.trackMatcherTier(app, tier)
-        }
+        ExperimentTracker.trackMatcherTier(app, "tier_1_and_word")
 
-        val breadcrumbs = AppLogger.getBreadcrumbs()
-        assertTrue("Matcher tier summary logged when threshold reached", breadcrumbs.any {
-            it.contains("Experiment:MatcherTier") && it.contains("tier_1_and_word: 6")
-        })
+        val metrics = ExperimentTracker.getFormattedExperimentMetrics(app)
+        assertTrue("Metrics should contain Matcher Tiers with total=1", metrics.contains("Matcher Algorithm Tiers") && metrics.contains("tier_1_and_word: 1"))
     }
 
     @Test
-    fun testSnoozeChoiceThresholdSummary() {
+    fun testSnoozeChoiceContinuousTracking() {
         val app = RuntimeEnvironment.getApplication()
 
-        for (i in 1..10) {
-            val choice = if (i <= 7) "preset" else "custom_valid"
-            ExperimentTracker.trackSnoozeChoice(app, choice)
-        }
+        ExperimentTracker.trackSnoozeChoice(app, "preset")
 
-        val breadcrumbs = AppLogger.getBreadcrumbs()
-        assertTrue("Snooze choice summary logged when threshold reached", breadcrumbs.any {
-            it.contains("Experiment:SnoozeChoice") && it.contains("preset: 7")
-        })
+        val metrics = ExperimentTracker.getFormattedExperimentMetrics(app)
+        assertTrue("Metrics should contain Snooze Choices with total=1", metrics.contains("Snooze Choice Patterns") && metrics.contains("preset: 1"))
     }
 
     @Test
-    fun testSearchAndFilterThresholdSummary() {
+    fun testSearchAndFilterContinuousTracking() {
         val app = RuntimeEnvironment.getApplication()
 
-        for (i in 1..10) {
-            ExperimentTracker.trackSearchAndFilter(app, "ALL", 1, 2, true)
-        }
+        ExperimentTracker.trackSearchAndFilter(app, "ALL", 1, 2, true)
 
-        val breadcrumbs = AppLogger.getBreadcrumbs()
-        assertTrue("Search and filter summary logged when threshold reached", breadcrumbs.any {
-            it.contains("Experiment:SearchAndFilter") && it.contains("state_ALL,tags_1,tokens_2,has_results")
-        })
+        val metrics = ExperimentTracker.getFormattedExperimentMetrics(app)
+        assertTrue("Metrics should contain Search & Filter Usage", metrics.contains("Search & Filter Usage") && metrics.contains("state_ALL,tags_1,tokens_2,has_results: 1"))
     }
 
     @Test
-    fun testTaskLifecycleThresholdSummary() {
+    fun testTaskLifecycleContinuousTracking() {
         val app = RuntimeEnvironment.getApplication()
 
-        for (i in 1..10) {
-            val action = if (i <= 5) "marked_done" else "deleted"
-            ExperimentTracker.trackTaskLifecycle(app, action)
-        }
+        ExperimentTracker.trackTaskLifecycle(app, "marked_done")
 
-        val breadcrumbs = AppLogger.getBreadcrumbs()
-        assertTrue("Task lifecycle summary logged when threshold reached", breadcrumbs.any {
-            it.contains("Experiment:TaskLifecycle") && it.contains("marked_done: 5") && it.contains("deleted: 5")
-        })
+        val metrics = ExperimentTracker.getFormattedExperimentMetrics(app)
+        assertTrue("Metrics should contain Task Lifecycle Events", metrics.contains("Task Lifecycle Events") && metrics.contains("marked_done: 1"))
     }
 }

@@ -34,22 +34,18 @@ class AppLoggerTest {
     }
 
     @Test
-    fun testLogRotationFilesCreated() {
+    fun testLogFileCreationAndClear() {
         val app = RuntimeEnvironment.getApplication()
         AppLogger.clearLogs(app)
 
-        // Write enough data to trigger rotation (> 500 KB per log file)
-        val largeMessage = "A".repeat(1000)
-        for (i in 1..1200) {
-            AppLogger.log(app, "RotationTest", "Entry $i: $largeMessage")
-        }
+        AppLogger.log(app, "LogTest", "Test log message")
+        Thread.sleep(100)
 
-        // Wait brief moment for async executor
-        Thread.sleep(500)
+        val logFile = AppLogger.getLogFile(app)
+        assertTrue("Log file should exist after logging", logFile.exists())
 
-        val activeFile = AppLogger.getLogFile(app, 0)
-        val backup1 = AppLogger.getLogFile(app, 1)
-
-        assertTrue(activeFile.exists() || backup1.exists())
+        AppLogger.clearLogs(app)
+        Thread.sleep(100)
+        assertTrue("Log file should be deleted after clearLogs", !logFile.exists())
     }
 }

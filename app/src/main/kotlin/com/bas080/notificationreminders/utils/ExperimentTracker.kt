@@ -3,98 +3,69 @@ package com.bas080.notificationreminders.utils
 import android.content.Context
 
 object ExperimentTracker {
-    const val THRESHOLD_EDIT_INTERVALS = 10
-    const val THRESHOLD_CREATION_CHANNELS = 10
-    const val THRESHOLD_MATCHER_TIERS = 10
-    const val THRESHOLD_SNOOZE_CHOICES = 10
-    const val THRESHOLD_SEARCH_FILTER = 10
-    const val THRESHOLD_TASK_LIFECYCLE = 10
-
+    private const val PREFS_NAME = "experiment_prefs"
     private const val MAX_VALID_INTERVAL_SEC = 86400L
     private const val MILLIS_PER_SECOND = 1000L
 
-    private var lastEditTimestampMs = 0L
-    private val editIntervals = mutableListOf<Long>()
-
-    private val creationChannelCounts = mutableMapOf<String, Int>()
-    private var creationTotalCount = 0
-
-    private val matcherTierCounts = mutableMapOf<String, Int>()
-    private var matcherTotalCount = 0
-
-    private val snoozeChoiceCounts = mutableMapOf<String, Int>()
-    private var snoozeTotalCount = 0
-
-    private val searchFilterCounts = mutableMapOf<String, Int>()
-    private var searchFilterTotalCount = 0
-
-    private val taskLifecycleCounts = mutableMapOf<String, Int>()
-    private var taskLifecycleTotalCount = 0
-
     @Synchronized
     fun trackEditInterval(context: Context) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val now = System.currentTimeMillis()
-        if (lastEditTimestampMs > 0L) {
-            val deltaSeconds = (now - lastEditTimestampMs) / MILLIS_PER_SECOND
-            if (deltaSeconds in 0..MAX_VALID_INTERVAL_SEC) {
-                editIntervals.add(deltaSeconds)
-            }
+        val lastTimestamp = prefs.getLong("last_edit_timestamp", 0L)
+
+        if (lastTimestamp <= 0L) {
+            prefs.edit().putLong("last_edit_timestamp", now).apply()
+            return
         }
-        lastEditTimestampMs = now
 
-        if (editIntervals.size >= THRESHOLD_EDIT_INTERVALS) {
-            val avg = editIntervals.average()
-            val min = editIntervals.minOrNull() ?: 0L
-            val max = editIntervals.maxOrNull() ?: 0L
-            val count = editIntervals.size
-            editIntervals.clear()
+        val deltaSec = (now - lastTimestamp) / MILLIS_PER_SECOND
+        if (deltaSec in 0..MAX_VALID_INTERVAL_SEC) {
+            val currentCount = prefs.getInt("edit_interval_count", 0) + 1
+            val currentSum = prefs.getLong("edit_interval_sum", 0L) + deltaSec
+            val currentMin = prefs.getLong("edit_interval_min", Long.MAX_VALUE).let {
+                if (it == Long.MAX_VALUE) deltaSec else kotlin.math.min(it, deltaSec)
+            }
+            val currentMax = prefs.getLong("edit_interval_max", 0L).let {
+                kotlin.math.max(it, deltaSec)
+            }
 
-            val avgStr = String.format(java.util.Locale.US, "%.1f", avg)
-            val msg = "Reminder edit intervals summary over $count edits: avg ${avgStr}s, min ${min}s, max ${max}s"
-            AppLogger.log(context, "Experiment:EditInterval", msg)
+            prefs.edit()
+                .putInt("edit_interval_count", currentCount)
+                .putLong("edit_interval_sum", currentSum)
+                .putLong("edit_interval_min", currentMin)
+                .putLong("edit_interval_max", currentMax)
+                .putLong("last_edit_timestamp", now)
+                .apply()
+        } else {
+            prefs.edit().putLong("last_edit_timestamp", now).apply()
         }
     }
 
     @Synchronized
     fun trackCreation(context: Context, channel: String) {
-        creationChannelCounts[channel] = (creationChannelCounts[channel] ?: 0) + 1
-        creationTotalCount++
-
-        if (creationTotalCount >= THRESHOLD_CREATION_CHANNELS) {
-            val summary = creationChannelCounts.entries.joinToString(", ") { "${it.key}: ${it.value}" }
-            val msg = "Creation channels summary over $creationTotalCount items ($summary)"
-            AppLogger.log(context, "Experiment:CreationChannel", msg)
-            creationTotalCount = 0
-            creationChannelCounts.clear()
-        }
+        incrementCategoryCount(context, "creation_total_count", "creation_channel_$channel")
     }
 
     @Synchronized
     fun trackMatcherTier(context: Context, tier: String) {
-        matcherTierCounts[tier] = (matcherTierCounts[tier] ?: 0) + 1
-        matcherTotalCount++
-
-        if (matcherTotalCount >= THRESHOLD_MATCHER_TIERS) {
-            val summary = matcherTierCounts.entries.joinToString(", ") { "${it.key}: ${it.value}" }
-            val msg = "Matcher tiers summary over $matcherTotalCount evaluations ($summary)"
-            AppLogger.log(context, "Experiment:MatcherTier", msg)
-            matcherTotalCount = 0
-            matcherTierCounts.clear()
-        }
+        incrementCategoryCount(context, "matcher_total_count", "matcher_tier_$tier")
     }
 
     @Synchronized
     fun trackSnoozeChoice(context: Context, choiceType: String) {
-        snoozeChoiceCounts[choiceType] = (snoozeChoiceCounts[choiceType] ?: 0) + 1
-        snoozeTotalCount++
+        incrementCategoryCount(context, "snooze_total_count", "snooze_choice_$choiceType")
+    }
 
-        if (snoozeTotalCount >= THRESHOLD_SNOOZE_CHOICES) {
-            val summary = snoozeChoiceCounts.entries.joinToString(", ") { "${it.key}: ${it.value}" }
-            val msg = "Snooze choices summary over $snoozeTotalCount actions ($summary)"
-            AppLogger.log(context, "Experiment:SnoozeChoice", msg)
-            snoozeTotalCount = 0
-            snoozeChoiceCounts.clear()
-        }
+    @Synchronized
+    fun trackTaskLifecycle(context: Context, action: String) {
+        incrementCategoryCount(context, "lifecycle_total_count", "lifecycle_action_$action")
+    }
+
+    private fun incrementCategoryCount(context: Context, totalKey: String, itemKey: String) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val total = prefs.getInt(totalKey, 0) + 1
+        val item = prefs.getInt(itemKey, 0) + 1
+        prefs.edit().putInt(totalKey, total).putInt(itemKey, item).apply()
     }
 
     @Synchronized
@@ -105,47 +76,96 @@ object ExperimentTracker {
         tokenCount: Int,
         hasResults: Boolean
     ) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val resultKey = if (hasResults) "has_results" else "zero_results"
-        val key = "state_$filterState,tags_$tagCount,tokens_$tokenCount,$resultKey"
-        searchFilterCounts[key] = (searchFilterCounts[key] ?: 0) + 1
-        searchFilterTotalCount++
+        val queryKey = "state_$filterState,tags_$tagCount,tokens_$tokenCount,$resultKey"
 
-        if (searchFilterTotalCount >= THRESHOLD_SEARCH_FILTER) {
-            val summary = searchFilterCounts.entries.joinToString("; ") { "${it.key}: ${it.value}" }
-            val msg = "Search/filter summary over $searchFilterTotalCount queries ($summary)"
-            AppLogger.log(context, "Experiment:SearchAndFilter", msg)
-            searchFilterTotalCount = 0
-            searchFilterCounts.clear()
+        val total = prefs.getInt("search_total_count", 0) + 1
+        val queryCount = prefs.getInt("search_query_$queryKey", 0) + 1
+
+        val savedQueryKeys = prefs.getStringSet("search_query_keys", emptySet())?.toMutableSet() ?: mutableSetOf()
+        savedQueryKeys.add(queryKey)
+
+        prefs.edit()
+            .putInt("search_total_count", total)
+            .putInt("search_query_$queryKey", queryCount)
+            .putStringSet("search_query_keys", savedQueryKeys)
+            .apply()
+    }
+
+    @Synchronized
+    fun getFormattedExperimentMetrics(context: Context): String {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val sb = StringBuilder()
+
+        val count = prefs.getInt("edit_interval_count", 0)
+        if (count > 0) {
+            val sum = prefs.getLong("edit_interval_sum", 0L)
+            val min = prefs.getLong("edit_interval_min", 0L)
+            val max = prefs.getLong("edit_interval_max", 0L)
+            val avg = sum.toDouble() / count
+            val avgStr = String.format(java.util.Locale.US, "%.1f", avg)
+            sb.append("- **Reminder Edit Intervals**: n=$count, avg ${avgStr}s, min ${min}s, max ${max}s\n")
+        }
+
+        appendCategorySummary(
+            prefs, sb, "creation", "Creation Channels",
+            listOf("app_input", "notification_reply", "text_selection", "create_intent", "pick_notification")
+        )
+        appendCategorySummary(
+            prefs, sb, "matcher", "Matcher Algorithm Tiers",
+            listOf("tier_1_and_word", "tier_2_and_substring", "tier_3_or_word", "tier_4_or_substring", "no_match")
+        )
+        appendCategorySummary(
+            prefs, sb, "snooze", "Snooze Choice Patterns",
+            listOf("preset", "custom_valid", "custom_invalid")
+        )
+
+        val searchTotal = prefs.getInt("search_total_count", 0)
+        if (searchTotal > 0) {
+            val savedKeys = prefs.getStringSet("search_query_keys", emptySet()) ?: emptySet()
+            val parts = savedKeys.mapNotNull { key ->
+                val cnt = prefs.getInt("search_query_$key", 0)
+                if (cnt > 0) "$key: $cnt" else null
+            }
+            sb.append("- **Search & Filter Usage**: total=$searchTotal (${parts.joinToString("; ")})\n")
+        }
+
+        appendCategorySummary(
+            prefs, sb, "lifecycle", "Task Lifecycle Events",
+            listOf("marked_done", "mark_done_undone", "deleted", "unpunted")
+        )
+
+        val result = sb.toString().trim()
+        return if (result.isNotEmpty()) result else "No experiment metrics recorded yet."
+    }
+
+    private fun appendCategorySummary(
+        prefs: android.content.SharedPreferences,
+        sb: StringBuilder,
+        prefix: String,
+        label: String,
+        items: List<String>
+    ) {
+        val total = prefs.getInt("${prefix}_total_count", 0)
+        if (total > 0) {
+            val actualPrefix = when (prefix) {
+                "creation" -> "creation_channel_"
+                "matcher" -> "matcher_tier_"
+                "snooze" -> "snooze_choice_"
+                else -> "lifecycle_action_"
+            }
+            val parts = items.mapNotNull { item ->
+                val cnt = prefs.getInt("$actualPrefix$item", 0)
+                if (cnt > 0) "$item: $cnt" else null
+            }
+            sb.append("- **$label**: total=$total (${parts.joinToString(", ")})\n")
         }
     }
 
     @Synchronized
-    fun trackTaskLifecycle(context: Context, action: String) {
-        taskLifecycleCounts[action] = (taskLifecycleCounts[action] ?: 0) + 1
-        taskLifecycleTotalCount++
-
-        if (taskLifecycleTotalCount >= THRESHOLD_TASK_LIFECYCLE) {
-            val summary = taskLifecycleCounts.entries.joinToString(", ") { "${it.key}: ${it.value}" }
-            val msg = "Task lifecycle summary over $taskLifecycleTotalCount actions ($summary)"
-            AppLogger.log(context, "Experiment:TaskLifecycle", msg)
-            taskLifecycleTotalCount = 0
-            taskLifecycleCounts.clear()
-        }
-    }
-
-    @Synchronized
-    fun resetForTesting() {
-        lastEditTimestampMs = 0L
-        editIntervals.clear()
-        creationChannelCounts.clear()
-        creationTotalCount = 0
-        matcherTierCounts.clear()
-        matcherTotalCount = 0
-        snoozeChoiceCounts.clear()
-        snoozeTotalCount = 0
-        searchFilterCounts.clear()
-        searchFilterTotalCount = 0
-        taskLifecycleCounts.clear()
-        taskLifecycleTotalCount = 0
+    fun resetForTesting(context: Context) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().clear().commit()
     }
 }

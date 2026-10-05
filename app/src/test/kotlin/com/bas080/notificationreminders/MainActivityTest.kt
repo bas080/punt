@@ -1312,18 +1312,18 @@ class MainActivityTest {
     }
 
     @Test
-    fun testEditIntervalTrackingThresholdSummary() {
+    fun testEditIntervalTrackingContinuousMetrics() {
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
 
         com.bas080.notificationreminders.utils.AppLogger.clearLogs(activity)
-        com.bas080.notificationreminders.utils.ExperimentTracker.resetForTesting()
+        com.bas080.notificationreminders.utils.ExperimentTracker.resetForTesting(activity)
 
-        for (i in 1..11) {
-            com.bas080.notificationreminders.utils.ExperimentTracker.trackEditInterval(activity)
-        }
+        com.bas080.notificationreminders.utils.ExperimentTracker.trackEditInterval(activity)
+        Thread.sleep(10)
+        com.bas080.notificationreminders.utils.ExperimentTracker.trackEditInterval(activity)
 
-        val breadcrumbs = com.bas080.notificationreminders.utils.AppLogger.getBreadcrumbs()
-        assertTrue(breadcrumbs.any { it.contains("Experiment:EditInterval") && it.contains("10 edits") })
+        val metrics = com.bas080.notificationreminders.utils.ExperimentTracker.getFormattedExperimentMetrics(activity)
+        assertTrue(metrics.contains("Reminder Edit Intervals") && metrics.contains("n=1"))
     }
 }
