@@ -1,20 +1,10 @@
 # AGENTS.md
 
-- **Overview**: Punt is a Kotlin Android application that monitors incoming device notifications and matches them against active user reminders.
+- **Overview**: Punt is a Kotlin Android task and reminder application that monitors incoming device notifications and matches them against active user reminders.
 - **Build & Test Commands**:
-  - Detekt static analysis: `./gradlew detekt`
-  - Unit tests: `./gradlew test`
-  - Build signed release APK: `./gradlew assembleRelease`
-- **Code Style & Conventions**:
-  - Follow standard Kotlin coding conventions using ViewBinding for layout interactions.
-- **Exception Handling & Logging**:
-  - Wrap background service starts and Android system API calls in `try-catch` blocks, logging non-fatal errors via `AppLogger`.
-  - Allow fatal/unrecoverable errors to propagate to `App`'s global uncaught exception handler.
-  - Experiment logging across app features must strictly adhere to the guidelines and sample thresholds defined in `EXPERIMENTS.md`.
+  - Use `./gradlew` for building, linting, and testing.
 - **Minimal Text Interface Design**:
   - Maintain a clean, high-contrast typography-driven UI relying on Android system colors (`?android:attr/colorBackground`, `?android:attr/textColorPrimary`) without heavy borders or graphic cards.
-- **Documentation & Workflow**:
-  - Keep `README.md` high-level, user-focused, and non-technical.
 - **Task tracking**:
   - Use dots as the persistent task tracker for this project.
   - Before starting work, run `dot ready` and choose an unblocked task. Use `dot show` and `dot tree` when you need context or dependencies.
