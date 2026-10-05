@@ -80,10 +80,15 @@ jobs:
 
       - name: Run Tests & Performance Benchmarks
         run: |
+          EXTRA_ARGS=""
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || ([[ "${{ github.event_name }}" = "push" ]] && [[ "${{ github.ref }}" == refs/tags/v* ]]); then
+            echo "Release run detected. Enabling Fastlane screenshot generation."
+            EXTRA_ARGS="-Dgenerate.screenshots=true"
+          fi
           if [ -f "./gradlew" ]; then
-            ./gradlew test
+            ./gradlew test $EXTRA_ARGS
           else
-            gradle test
+            gradle test $EXTRA_ARGS
           fi
 
       - name: Enable KVM Virtualization for Emulator
@@ -92,7 +97,7 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      - name: Run Android Emulator Instrumented UI Benchmarks & Screenshots
+      - name: Run Android Emulator Instrumented UI Benchmarks
         uses: ReactiveCircus/android-emulator-runner@v2
         with:
           api-level: 30
@@ -105,10 +110,7 @@ jobs:
             adb shell settings put global animator_duration_scale 0.0
             adb shell wm dismiss-keyguard
             adb shell cmd notification allow_listener com.bas080.notificationreminders/com.bas080.notificationreminders.services.ReminderNotificationListenerService || true
-            ./gradlew connectedCheck -Pandroid.testInstrumentationRunnerArguments.generate.screenshots=true
-            mkdir -p fastlane/metadata/android/en-US/images/phoneScreenshots fastlane/metadata/android/en-US/images/tenInchScreenshots
-            adb pull /sdcard/Android/data/com.bas080.notificationreminders/files/screenshots/phoneScreenshots/. fastlane/metadata/android/en-US/images/phoneScreenshots/ || true
-            adb pull /sdcard/Android/data/com.bas080.notificationreminders/files/screenshots/tenInchScreenshots/. fastlane/metadata/android/en-US/images/tenInchScreenshots/ || true
+            ./gradlew connectedCheck
 
       - name: Upload Performance Benchmark & Test Reports
         if: always()
