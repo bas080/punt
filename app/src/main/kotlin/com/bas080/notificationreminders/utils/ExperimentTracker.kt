@@ -3,11 +3,18 @@ package com.bas080.notificationreminders.utils
 import android.content.Context
 
 object ExperimentTracker {
+    const val THRESHOLD_EDIT_INTERVALS = 10
     const val THRESHOLD_CREATION_CHANNELS = 10
     const val THRESHOLD_MATCHER_TIERS = 10
     const val THRESHOLD_SNOOZE_CHOICES = 10
     const val THRESHOLD_SEARCH_FILTER = 10
     const val THRESHOLD_TASK_LIFECYCLE = 10
+
+    private const val MAX_VALID_INTERVAL_SEC = 86400L
+    private const val MILLIS_PER_SECOND = 1000L
+
+    private var lastEditTimestampMs = 0L
+    private val editIntervals = mutableListOf<Long>()
 
     private val creationChannelCounts = mutableMapOf<String, Int>()
     private var creationTotalCount = 0
@@ -23,6 +30,30 @@ object ExperimentTracker {
 
     private val taskLifecycleCounts = mutableMapOf<String, Int>()
     private var taskLifecycleTotalCount = 0
+
+    @Synchronized
+    fun trackEditInterval(context: Context) {
+        val now = System.currentTimeMillis()
+        if (lastEditTimestampMs > 0L) {
+            val deltaSeconds = (now - lastEditTimestampMs) / MILLIS_PER_SECOND
+            if (deltaSeconds in 0..MAX_VALID_INTERVAL_SEC) {
+                editIntervals.add(deltaSeconds)
+            }
+        }
+        lastEditTimestampMs = now
+
+        if (editIntervals.size >= THRESHOLD_EDIT_INTERVALS) {
+            val avg = editIntervals.average()
+            val min = editIntervals.minOrNull() ?: 0L
+            val max = editIntervals.maxOrNull() ?: 0L
+            val count = editIntervals.size
+            editIntervals.clear()
+
+            val avgStr = String.format(java.util.Locale.US, "%.1f", avg)
+            val msg = "Reminder edit intervals summary over $count edits: avg ${avgStr}s, min ${min}s, max ${max}s"
+            AppLogger.log(context, "Experiment:EditInterval", msg)
+        }
+    }
 
     @Synchronized
     fun trackCreation(context: Context, channel: String) {
@@ -104,6 +135,8 @@ object ExperimentTracker {
 
     @Synchronized
     fun resetForTesting() {
+        lastEditTimestampMs = 0L
+        editIntervals.clear()
         creationChannelCounts.clear()
         creationTotalCount = 0
         matcherTierCounts.clear()
