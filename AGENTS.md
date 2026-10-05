@@ -7,7 +7,7 @@
   - Maintain a clean, high-contrast typography-driven UI relying on Android system colors (`?android:attr/colorBackground`, `?android:attr/textColorPrimary`) without heavy borders or graphic cards.
 - **Task tracking**:
   - Use dots as the persistent task tracker for this project.
-  - Before starting work, run `dot ready` and choose an unblocked task. Use `dot show` and `dot tree` when you need context or dependencies.
+  - Before starting work, run `dot ready` and choose an unblocked task. Use `dot show` and `dot tree` when you need context or dependencies. Run `dot --help` to see all available commands.
   - When you discover new project work, create a task in dots and add the appropriate dependency rather than keeping it only in your notes or conversation.
   - Keep task status up to date. Mark a task complete only after the implementation and relevant tests are finished.
 - **Commit Messages**:
