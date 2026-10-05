@@ -32,8 +32,19 @@ The app is named **Punt** after the verb *to punt*—meaning to defer, postpone,
 - **Grouped Notification Alerts**: Matched reminders are neatly organized together in your notification center.
 - **In-App Activity Logs**: Easily view app activity logs directly inside the app.
 - **Automatic Crash Reporting**: Includes a simple optional crash report helper if something unexpected occurs.
+- **Backend Synchronization Server**: Synchronize active reminders across devices with simple one-time connection setup using temporary pairing codes instead of traditional passwords.
 
 To view screenshots of the app features, check out the [Screenshots Gallery](fastlane/metadata/android/en-US/images/phoneScreenshots/).
+
+## Synchronization Server
+
+Punt includes a lightweight backend server in `server/` for multi-device reminder synchronization.
+
+### Connection Setup & Authentication
+Authentication uses temporary setup codes to pair devices once without requiring accounts or passwords:
+1. **Generate Setup Code**: Client or server requests a temporary 6-digit setup code (`POST /api/auth/code`).
+2. **One-Time Pairing**: Enter the code on the secondary device (`POST /api/auth/pair`).
+3. **Session Token**: Upon single-use code verification, a persistent connection token is issued to authenticate future sync requests (`GET /api/reminders`, `POST /api/reminders/sync`).
 
 ## Permissions
 
