@@ -65,24 +65,26 @@ class UiPerformanceBenchmarkTest {
     }
 
     @Test
-    fun testUpdateSummaryAndAdapterBenchmark() {
-        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
-        val activity = controller.get()
+    fun testActivityInitializationAndStateLoadPerformance() {
+        val context = RuntimeEnvironment.getApplication()
+        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
 
-        val method = MainActivity::class.java.getDeclaredMethod("updateSummaryAndAdapter")
-        method.isAccessible = true
+        val activeList = (1..1000).map { "Task $it #tag${it % 5}" }
+        prefs.edit().clear().putStringSet("key_reminders_list", activeList.toSet()).commit()
+
+        val controller = Robolectric.buildActivity(MainActivity::class.java)
 
         val elapsedNs = measureNanoTime {
-            method.invoke(activity)
+            controller.setup()
         }
 
         val elapsedMs = elapsedNs / 1_000_000.0
 
-        println("=== JVM Update Summary and Adapter Benchmark ===")
-        println("Adapter update execution latency: %.3f ms".format(elapsedMs))
+        println("=== JVM Activity Launch & List Load Benchmark (1,000 items) ===")
+        println("Activity initialization execution latency: %.3f ms".format(elapsedMs))
 
-        // Performance Assertion: Refreshing list adapter state must execute in < 100ms
-        assertTrue("Adapter update calculation took too long (${elapsedMs}ms)", elapsedMs < 100.0)
+        // Performance Assertion: Activity setup with 1,000 items must complete in < 600ms
+        assertTrue("Activity setup took too long (${elapsedMs}ms)", elapsedMs < 600.0)
     }
 
     @Test
