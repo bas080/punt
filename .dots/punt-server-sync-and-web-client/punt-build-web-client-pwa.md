@@ -8,5 +8,5 @@ blocks:
 created-at: "2026-10-05T15:40:00.000000+00:00"
 ---
 
-Develop an offline-capable Progressive Web App (PWA) web client for Punt connecting to the backend server for reminder management in web browsers.
-Authenticate using temporary connection setup codes for initial connection instead of username/password auth.
+Develop an offline-capable Progressive Web App (PWA) web client for Punt connecting to the backend server over local network HTTP for reminder management in web browsers.
+Allow users to configure the backend server address/host and authenticate using temporary connection setup pairing codes for initial connection instead of username/password auth.
