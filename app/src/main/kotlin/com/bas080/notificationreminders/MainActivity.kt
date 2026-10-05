@@ -674,8 +674,10 @@ class MainActivity : AppCompatActivity() {
         binding.remindersContainer.visibility = View.VISIBLE
         binding.aboutContainer.visibility = View.GONE
 
+        binding.btnNavReminders.isSelected = true
         binding.btnNavReminders.setTypeface(null, android.graphics.Typeface.BOLD)
         binding.btnNavReminders.setTextColor(ContextCompat.getColor(this, R.color.text_primary))
+        binding.btnNavAbout.isSelected = false
         binding.btnNavAbout.setTypeface(null, android.graphics.Typeface.NORMAL)
         binding.btnNavAbout.setTextColor(ContextCompat.getColor(this, R.color.text_secondary))
     }
@@ -709,8 +711,10 @@ class MainActivity : AppCompatActivity() {
         binding.remindersContainer.visibility = View.GONE
         binding.aboutContainer.visibility = View.VISIBLE
 
+        binding.btnNavReminders.isSelected = false
         binding.btnNavReminders.setTypeface(null, android.graphics.Typeface.NORMAL)
         binding.btnNavReminders.setTextColor(ContextCompat.getColor(this, R.color.text_secondary))
+        binding.btnNavAbout.isSelected = true
         binding.btnNavAbout.setTypeface(null, android.graphics.Typeface.BOLD)
         binding.btnNavAbout.setTextColor(ContextCompat.getColor(this, R.color.text_primary))
 
