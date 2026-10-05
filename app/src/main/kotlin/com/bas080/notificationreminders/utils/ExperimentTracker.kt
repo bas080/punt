@@ -1,11 +1,25 @@
 package com.bas080.notificationreminders.utils
 
 import android.content.Context
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 object ExperimentTracker {
     private const val PREFS_NAME = "experiment_prefs"
     private const val MAX_VALID_INTERVAL_SEC = 86400L
     private const val MILLIS_PER_SECOND = 1000L
+
+    @Synchronized
+    fun trackCrash(context: Context) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val editor = prefs.edit()
+        if (!prefs.contains("start_date_crashes")) {
+            editor.putString("start_date_crashes", SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date()))
+        }
+        val currentCount = prefs.getInt("crash_total_count", 0) + 1
+        editor.putInt("crash_total_count", currentCount).apply()
+    }
 
     @Synchronized
     fun trackEditInterval(context: Context) {
@@ -20,6 +34,10 @@ object ExperimentTracker {
 
         val deltaSec = (now - lastTimestamp) / MILLIS_PER_SECOND
         if (deltaSec in 0..MAX_VALID_INTERVAL_SEC) {
+            val editor = prefs.edit()
+            if (!prefs.contains("start_date_edit_interval")) {
+                editor.putString("start_date_edit_interval", SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date()))
+            }
             val currentCount = prefs.getInt("edit_interval_count", 0) + 1
             val currentSum = prefs.getLong("edit_interval_sum", 0L) + deltaSec
             val currentMin = prefs.getLong("edit_interval_min", Long.MAX_VALUE).let {
@@ -29,8 +47,7 @@ object ExperimentTracker {
                 kotlin.math.max(it, deltaSec)
             }
 
-            prefs.edit()
-                .putInt("edit_interval_count", currentCount)
+            editor.putInt("edit_interval_count", currentCount)
                 .putLong("edit_interval_sum", currentSum)
                 .putLong("edit_interval_min", currentMin)
                 .putLong("edit_interval_max", currentMax)
@@ -43,29 +60,50 @@ object ExperimentTracker {
 
     @Synchronized
     fun trackCreation(context: Context, channel: String) {
-        incrementCategoryCount(context, "creation_total_count", "creation_channel_$channel")
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val editor = prefs.edit()
+        if (!prefs.contains("start_date_creation")) {
+            editor.putString("start_date_creation", SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date()))
+        }
+        val total = prefs.getInt("creation_total_count", 0) + 1
+        val item = prefs.getInt("creation_channel_$channel", 0) + 1
+        editor.putInt("creation_total_count", total).putInt("creation_channel_$channel", item).apply()
     }
 
     @Synchronized
     fun trackMatcherTier(context: Context, tier: String) {
-        incrementCategoryCount(context, "matcher_total_count", "matcher_tier_$tier")
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val editor = prefs.edit()
+        if (!prefs.contains("start_date_matcher")) {
+            editor.putString("start_date_matcher", SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date()))
+        }
+        val total = prefs.getInt("matcher_total_count", 0) + 1
+        val item = prefs.getInt("matcher_tier_$tier", 0) + 1
+        editor.putInt("matcher_total_count", total).putInt("matcher_tier_$tier", item).apply()
     }
 
     @Synchronized
     fun trackSnoozeChoice(context: Context, choiceType: String) {
-        incrementCategoryCount(context, "snooze_total_count", "snooze_choice_$choiceType")
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val editor = prefs.edit()
+        if (!prefs.contains("start_date_snooze")) {
+            editor.putString("start_date_snooze", SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date()))
+        }
+        val total = prefs.getInt("snooze_total_count", 0) + 1
+        val item = prefs.getInt("snooze_choice_$choiceType", 0) + 1
+        editor.putInt("snooze_total_count", total).putInt("snooze_choice_$choiceType", item).apply()
     }
 
     @Synchronized
     fun trackTaskLifecycle(context: Context, action: String) {
-        incrementCategoryCount(context, "lifecycle_total_count", "lifecycle_action_$action")
-    }
-
-    private fun incrementCategoryCount(context: Context, totalKey: String, itemKey: String) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val total = prefs.getInt(totalKey, 0) + 1
-        val item = prefs.getInt(itemKey, 0) + 1
-        prefs.edit().putInt(totalKey, total).putInt(itemKey, item).apply()
+        val editor = prefs.edit()
+        if (!prefs.contains("start_date_lifecycle")) {
+            editor.putString("start_date_lifecycle", SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date()))
+        }
+        val total = prefs.getInt("lifecycle_total_count", 0) + 1
+        val item = prefs.getInt("lifecycle_action_$action", 0) + 1
+        editor.putInt("lifecycle_total_count", total).putInt("lifecycle_action_$action", item).apply()
     }
 
     @Synchronized
@@ -77,6 +115,10 @@ object ExperimentTracker {
         hasResults: Boolean
     ) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val editor = prefs.edit()
+        if (!prefs.contains("start_date_search")) {
+            editor.putString("start_date_search", SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date()))
+        }
         val resultKey = if (hasResults) "has_results" else "zero_results"
         val queryKey = "state_$filterState,tags_$tagCount,tokens_$tokenCount,$resultKey"
 
@@ -86,8 +128,7 @@ object ExperimentTracker {
         val savedQueryKeys = prefs.getStringSet("search_query_keys", emptySet())?.toMutableSet() ?: mutableSetOf()
         savedQueryKeys.add(queryKey)
 
-        prefs.edit()
-            .putInt("search_total_count", total)
+        editor.putInt("search_total_count", total)
             .putInt("search_query_$queryKey", queryCount)
             .putStringSet("search_query_keys", savedQueryKeys)
             .apply()
@@ -98,14 +139,15 @@ object ExperimentTracker {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val sb = StringBuilder()
 
-        val count = prefs.getInt("edit_interval_count", 0)
-        if (count > 0) {
+        val editCount = prefs.getInt("edit_interval_count", 0)
+        if (editCount > 0) {
+            val date = prefs.getString("start_date_edit_interval", "")
             val sum = prefs.getLong("edit_interval_sum", 0L)
             val min = prefs.getLong("edit_interval_min", 0L)
             val max = prefs.getLong("edit_interval_max", 0L)
-            val avg = sum.toDouble() / count
-            val avgStr = String.format(java.util.Locale.US, "%.1f", avg)
-            sb.append("- **Reminder Edit Intervals**: n=$count, avg ${avgStr}s, min ${min}s, max ${max}s\n")
+            val avgStr = String.format(Locale.US, "%.1f", sum.toDouble() / editCount)
+            sb.append("- **Reminder Edit Intervals** (since $date): ")
+                .append("n=$editCount, avg ${avgStr}s, min ${min}s, max ${max}s\n")
         }
 
         appendCategorySummary(
@@ -123,18 +165,26 @@ object ExperimentTracker {
 
         val searchTotal = prefs.getInt("search_total_count", 0)
         if (searchTotal > 0) {
+            val date = prefs.getString("start_date_search", "")
             val savedKeys = prefs.getStringSet("search_query_keys", emptySet()) ?: emptySet()
             val parts = savedKeys.mapNotNull { key ->
                 val cnt = prefs.getInt("search_query_$key", 0)
                 if (cnt > 0) "$key: $cnt" else null
             }
-            sb.append("- **Search & Filter Usage**: total=$searchTotal (${parts.joinToString("; ")})\n")
+            sb.append("- **Search & Filter Usage** (since $date): ")
+                .append("total=$searchTotal (${parts.joinToString("; ")})\n")
         }
 
         appendCategorySummary(
             prefs, sb, "lifecycle", "Task Lifecycle Events",
             listOf("marked_done", "mark_done_undone", "deleted", "unpunted")
         )
+
+        val crashTotal = prefs.getInt("crash_total_count", 0)
+        if (crashTotal > 0) {
+            val date = prefs.getString("start_date_crashes", "")
+            sb.append("- **Application Crashes** (since $date): total=$crashTotal\n")
+        }
 
         val result = sb.toString().trim()
         return if (result.isNotEmpty()) result else "No experiment metrics recorded yet."
@@ -149,6 +199,7 @@ object ExperimentTracker {
     ) {
         val total = prefs.getInt("${prefix}_total_count", 0)
         if (total > 0) {
+            val date = prefs.getString("start_date_$prefix", "")
             val actualPrefix = when (prefix) {
                 "creation" -> "creation_channel_"
                 "matcher" -> "matcher_tier_"
@@ -159,7 +210,7 @@ object ExperimentTracker {
                 val cnt = prefs.getInt("$actualPrefix$item", 0)
                 if (cnt > 0) "$item: $cnt" else null
             }
-            sb.append("- **$label**: total=$total (${parts.joinToString(", ")})\n")
+            sb.append("- **$label** (since $date): total=$total (${parts.joinToString(", ")})\n")
         }
     }
 

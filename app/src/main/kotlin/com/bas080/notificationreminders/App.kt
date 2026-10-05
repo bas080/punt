@@ -24,6 +24,7 @@ class App : Application() {
     private fun setupGlobalCrashHandler() {
         val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            com.bas080.notificationreminders.utils.ExperimentTracker.trackCrash(this)
             val stackTrace = saveCrashTrace(throwable)
             AppLogger.log(this, "CrashHandler", "Uncaught crash saved: ${throwable.message}")
 
