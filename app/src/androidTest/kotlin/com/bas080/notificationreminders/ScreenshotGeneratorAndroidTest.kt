@@ -56,7 +56,7 @@ class ScreenshotGeneratorAndroidTest {
     }
 
     @Suppress("DEPRECATION")
-    private fun prepareWindow(scenario: ActivityScenario<*>) {
+    private fun prepareWindow(scenario: ActivityScenario<*>, dismissPermissionDialog: Boolean = false) {
         scenario.onActivity { activity ->
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
                 activity.setShowWhenLocked(true)
@@ -69,10 +69,12 @@ class ScreenshotGeneratorAndroidTest {
                 WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
             )
         }
-        try {
-            onView(withText("Cancel")).perform(click())
-        } catch (_: Exception) {
-            // Dialog was not present
+        if (dismissPermissionDialog) {
+            try {
+                onView(withText("Cancel")).perform(click())
+            } catch (_: Exception) {
+                // Dialog was not present
+            }
         }
     }
 
@@ -88,7 +90,7 @@ class ScreenshotGeneratorAndroidTest {
 
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         try {
-            prepareWindow(scenario)
+            prepareWindow(scenario, dismissPermissionDialog = true)
             scenario.onActivity { activity ->
                 saveViewScreenshots(activity.window.decorView, "1")
             }
@@ -111,7 +113,7 @@ class ScreenshotGeneratorAndroidTest {
 
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         try {
-            prepareWindow(scenario)
+            prepareWindow(scenario, dismissPermissionDialog = true)
             scenario.onActivity { activity ->
                 saveViewScreenshots(activity.window.decorView, "2")
             }
@@ -132,7 +134,7 @@ class ScreenshotGeneratorAndroidTest {
 
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         try {
-            prepareWindow(scenario)
+            prepareWindow(scenario, dismissPermissionDialog = true)
             onView(withId(R.id.btn_tags_filter)).perform(click())
             scenario.onActivity { activity ->
                 saveViewScreenshots(activity.window.decorView, "3")
@@ -155,7 +157,7 @@ class ScreenshotGeneratorAndroidTest {
 
         val scenario = ActivityScenario.launch(PickNotificationActivity::class.java)
         try {
-            prepareWindow(scenario)
+            prepareWindow(scenario, dismissPermissionDialog = false)
             scenario.onActivity { activity ->
                 saveViewScreenshots(activity.window.decorView, "4")
             }
@@ -176,7 +178,7 @@ class ScreenshotGeneratorAndroidTest {
 
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         try {
-            prepareWindow(scenario)
+            prepareWindow(scenario, dismissPermissionDialog = true)
             onView(withId(R.id.btn_nav_about)).perform(click())
             scenario.onActivity { activity ->
                 saveViewScreenshots(activity.window.decorView, "5")
@@ -198,7 +200,7 @@ class ScreenshotGeneratorAndroidTest {
 
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         try {
-            prepareWindow(scenario)
+            prepareWindow(scenario, dismissPermissionDialog = true)
             onView(withId(R.id.search_reminder_input)).perform(typeText("Buy groceries and milk #groceries"))
             scenario.onActivity { activity ->
                 saveViewScreenshots(activity.window.decorView, "6")
@@ -238,6 +240,9 @@ class ScreenshotGeneratorAndroidTest {
         }
         @Suppress("DEPRECATION")
         val notification = Notification.Builder(context, "test_channel")
+            .setContentTitle(title)
+            .setContentText(text)
+            .setSmallIcon(R.drawable.ic_notification_reminder)
             .setExtras(extras)
             .build()
         @Suppress("DEPRECATION")
