@@ -80,15 +80,10 @@ jobs:
 
       - name: Run Tests & Performance Benchmarks
         run: |
-          EXTRA_ARGS=""
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || ([[ "${{ github.event_name }}" = "push" ]] && [[ "${{ github.ref }}" == refs/tags/v* ]]); then
-            echo "Release run detected. Enabling Fastlane screenshot generation."
-            EXTRA_ARGS="-Dgenerate.screenshots=true"
-          fi
           if [ -f "./gradlew" ]; then
-            ./gradlew test $EXTRA_ARGS
+            ./gradlew test
           else
-            gradle test $EXTRA_ARGS
+            gradle test
           fi
 
       - name: Enable KVM Virtualization for Emulator
@@ -97,7 +92,7 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      - name: Run Android Emulator Instrumented UI Benchmarks
+      - name: Run Android Emulator Instrumented UI Benchmarks & Screenshots
         uses: ReactiveCircus/android-emulator-runner@v2
         with:
           api-level: 30
@@ -110,7 +105,22 @@ jobs:
             adb shell settings put global animator_duration_scale 0.0
             adb shell wm dismiss-keyguard
             adb shell cmd notification allow_listener com.bas080.notificationreminders/com.bas080.notificationreminders.services.ReminderNotificationListenerService || true
-            ./gradlew connectedCheck
+
+            EXTRA_ARGS=""
+            if [ "${{ github.event_name }}" = "workflow_dispatch" ] || ([[ "${{ github.event_name }}" = "push" ]] && [[ "${{ github.ref }}" == refs/tags/v* ]]); then
+              echo "Release run detected. Enabling Fastlane screenshot generation."
+              EXTRA_ARGS="-Pandroid.testInstrumentationRunnerArguments.generate.screenshots=true"
+            fi
+
+            ./gradlew connectedCheck $EXTRA_ARGS
+
+            if [ "${{ github.event_name }}" = "workflow_dispatch" ] || ([[ "${{ github.event_name }}" = "push" ]] && [[ "${{ github.ref }}" == refs/tags/v* ]]); then
+              echo "Pulling generated Fastlane screenshots from emulator..."
+              mkdir -p fastlane/metadata/android/en-US/images/phoneScreenshots
+              mkdir -p fastlane/metadata/android/en-US/images/tenInchScreenshots
+              adb pull /sdcard/Android/data/com.bas080.notificationreminders/files/screenshots/phoneScreenshots/. fastlane/metadata/android/en-US/images/phoneScreenshots/ || true
+              adb pull /sdcard/Android/data/com.bas080.notificationreminders/files/screenshots/tenInchScreenshots/. fastlane/metadata/android/en-US/images/tenInchScreenshots/ || true
+            fi
 
       - name: Upload Performance Benchmark & Test Reports
         if: always()
