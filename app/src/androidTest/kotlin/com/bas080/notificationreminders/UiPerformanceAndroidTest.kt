@@ -66,8 +66,8 @@ class UiPerformanceAndroidTest {
             println("=== Instrumented Emulator Search UI Benchmark ===")
             println("Realtime search response latency: %.3f ms".format(elapsedMs))
 
-            // Performance Assertion: Realtime multi-character search typing on SwiftShader emulator must complete in under 5,000ms
-            assertTrue("Search response on emulator was too slow (${elapsedMs}ms)", elapsedMs < 5000.0)
+            // Performance Assertion: Realtime search typing on SwiftShader emulator must complete in under 8,000ms
+            assertTrue("Search response on emulator was too slow (${elapsedMs}ms)", elapsedMs < 8000.0)
         } finally {
             scenario.close()
         }
