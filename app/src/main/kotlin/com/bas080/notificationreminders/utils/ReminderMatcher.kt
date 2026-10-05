@@ -73,7 +73,11 @@ object ReminderMatcher {
      * Tier 3: Case-insensitive OR word match
      * Tier 4: Case-insensitive OR substring match
      */
-    fun filterSearchQueryTiered(reminders: List<String>, query: String): List<String> {
+    fun filterSearchQueryTiered(
+        reminders: List<String>,
+        query: String,
+        context: android.content.Context? = null
+    ): List<String> {
         val q = query.trim()
         if (q.isEmpty()) return reminders
 
@@ -92,14 +96,20 @@ object ReminderMatcher {
                 val words = tokenize(reminder)
                 tokenizedQueryWords.all { qWord -> words.contains(qWord) }
             }
-            if (tier1.isNotEmpty()) return tier1
+            if (tier1.isNotEmpty()) {
+                context?.let { ExperimentTracker.trackMatcherTier(it, "tier_1_and_word") }
+                return tier1
+            }
         }
 
         // Tier 2: Case-insensitive AND substring match
         val tier2 = reminders.filter { reminder ->
             rawQueryWords.all { qWord -> reminder.contains(qWord, ignoreCase = true) }
         }
-        if (tier2.isNotEmpty()) return tier2
+        if (tier2.isNotEmpty()) {
+            context?.let { ExperimentTracker.trackMatcherTier(it, "tier_2_and_substring") }
+            return tier2
+        }
 
         // Tier 3: Case-insensitive OR word match
         if (tokenizedQueryWords.isNotEmpty()) {
@@ -107,15 +117,22 @@ object ReminderMatcher {
                 val words = tokenize(reminder)
                 tokenizedQueryWords.any { qWord -> words.contains(qWord) }
             }
-            if (tier3.isNotEmpty()) return tier3
+            if (tier3.isNotEmpty()) {
+                context?.let { ExperimentTracker.trackMatcherTier(it, "tier_3_or_word") }
+                return tier3
+            }
         }
 
         // Tier 4: Case-insensitive OR substring match
         val tier4 = reminders.filter { reminder ->
             rawQueryWords.any { qWord -> reminder.contains(qWord, ignoreCase = true) }
         }
-        if (tier4.isNotEmpty()) return tier4
+        if (tier4.isNotEmpty()) {
+            context?.let { ExperimentTracker.trackMatcherTier(it, "tier_4_or_substring") }
+            return tier4
+        }
 
+        context?.let { ExperimentTracker.trackMatcherTier(it, "no_match") }
         return emptyList()
     }
 

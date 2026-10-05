@@ -517,6 +517,7 @@ class CreateReminderReceiver : BroadcastReceiver() {
                     val reminderText = results.getCharSequence(ReminderNotificationListenerService.KEY_TEXT_REPLY)?.toString()?.trim()
                     if (!reminderText.isNullOrEmpty()) {
                         com.bas080.notificationreminders.utils.AppLogger.log(context, "CreateReminderReceiver", "Created reminder from notification reply")
+                        com.bas080.notificationreminders.utils.ExperimentTracker.trackCreation(context, "notification_reply")
                         val prefs = context.getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
                         val savedSet = prefs.getStringSet(KEY_REMINDERS, emptySet())?.toMutableSet() ?: mutableSetOf()
                         savedSet.add(reminderText)
@@ -536,6 +537,7 @@ class CreateReminderReceiver : BroadcastReceiver() {
                 val reminderText = intent.getStringExtra(ReminderNotificationListenerService.EXTRA_REMINDER_TEXT)
                 if (!reminderText.isNullOrEmpty()) {
                     com.bas080.notificationreminders.utils.AppLogger.log(context, "CreateReminderReceiver", "Marked reminder done from notification action")
+                    com.bas080.notificationreminders.utils.ExperimentTracker.trackTaskLifecycle(context, "marked_done")
 
                     val prefs = context.getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
                     val savedSet = prefs.getStringSet(KEY_REMINDERS, emptySet())?.toMutableSet() ?: mutableSetOf()
@@ -570,9 +572,11 @@ class CreateReminderReceiver : BroadcastReceiver() {
 
                     val parseResult = parseSnoozeDuration(chosenDurationStr)
                     if (parseResult == null) {
+                        com.bas080.notificationreminders.utils.ExperimentTracker.trackSnoozeChoice(context, "custom_invalid")
                         Toast.makeText(context, R.string.toast_invalid_snooze_input, Toast.LENGTH_SHORT).show()
                         return
                     }
+                    com.bas080.notificationreminders.utils.ExperimentTracker.trackSnoozeChoice(context, "custom_valid")
 
                     val canonicalChoice = canonicalizeSnoozeChoice(chosenDurationStr)
                     if (canonicalChoice != null) {

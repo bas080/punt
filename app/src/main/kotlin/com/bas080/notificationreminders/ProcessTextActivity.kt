@@ -33,6 +33,7 @@ class ProcessTextActivity : AppCompatActivity() {
 
         if (!selectedText.isNullOrEmpty()) {
             AppLogger.log(this, "ProcessTextActivity", "Created reminder from system text selection/share")
+            com.bas080.notificationreminders.utils.ExperimentTracker.trackCreation(this, "text_selection")
             val prefs = getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
             val savedSet = prefs.getStringSet(KEY_REMINDERS, emptySet())?.toMutableSet() ?: mutableSetOf()
             savedSet.add(selectedText)

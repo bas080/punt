@@ -131,6 +131,7 @@ class CreateReminderActivity : AppCompatActivity() {
         val now = System.currentTimeMillis()
         val editor = prefs.edit().putStringSet(KEY_REMINDERS, savedSet)
 
+        com.bas080.notificationreminders.utils.ExperimentTracker.trackCreation(this, "create_intent")
         if (targetTimeMillis > now) {
             val trimmed = reminderString.trim().lowercase()
             ReminderNotificationListenerService.lastTriggeredMap["snooze_$trimmed"] = targetTimeMillis

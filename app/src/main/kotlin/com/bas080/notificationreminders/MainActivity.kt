@@ -48,6 +48,7 @@ const val HEADER_SNOOZED_SECTION_MARKER = "HEADER_SNOOZED_SECTION_MARKER"
 class MainActivity : AppCompatActivity() {
 
     companion object {
+        const val FRAME_SAMPLE_THRESHOLD = 100
         private const val PREFS_REMINDERS = "reminders_prefs"
         private const val KEY_REMINDERS = "key_reminders_list"
         private const val KEY_REMINDER_FILTER = "key_reminder_filter"
@@ -147,6 +148,76 @@ class MainActivity : AppCompatActivity() {
         setupKeyboardListener()
         checkAndShowCrashReportDialog()
         checkAndRequestPermissions()
+        setupFrameMetricsListener()
+    }
+
+    override fun onDestroy() {
+        teardownFrameMetricsListener()
+        super.onDestroy()
+    }
+
+    private var frameMetricsThread: android.os.HandlerThread? = null
+    private var frameMetricsListener: android.view.Window.OnFrameMetricsAvailableListener? = null
+    private var sampleFrameCount = 0
+    private var sampleDroppedFrameCount = 0
+    private var sampleMaxFrameTimeMs = 0L
+
+    private fun setupFrameMetricsListener() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            val thread = android.os.HandlerThread("FrameMetricsThread").apply { start() }
+            frameMetricsThread = thread
+            val handler = android.os.Handler(thread.looper)
+
+            val listener = android.view.Window.OnFrameMetricsAvailableListener { _, frameMetrics, _ ->
+                val durationNs = frameMetrics.getMetric(android.view.FrameMetrics.TOTAL_DURATION)
+                recordFrameMetric(durationNs)
+            }
+            frameMetricsListener = listener
+            try {
+                window.addOnFrameMetricsAvailableListener(listener, handler)
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    internal fun recordFrameMetric(durationNs: Long) {
+        val durationMs = durationNs / 1_000_000L
+        sampleFrameCount++
+        if (durationMs > 16) {
+            sampleDroppedFrameCount++
+        }
+        if (durationMs > sampleMaxFrameTimeMs) {
+            sampleMaxFrameTimeMs = durationMs
+        }
+
+        if (sampleFrameCount >= FRAME_SAMPLE_THRESHOLD) {
+            val total = sampleFrameCount
+            val dropped = sampleDroppedFrameCount
+            val maxMs = sampleMaxFrameTimeMs
+            sampleFrameCount = 0
+            sampleDroppedFrameCount = 0
+            sampleMaxFrameTimeMs = 0L
+
+            AppLogger.log(
+                this,
+                "Experiment:FrameDrop",
+                "Frame metrics summary over $total frames: $dropped dropped frame(s) (${String.format(Locale.US, "%.1f", dropped * 100.0 / total)}%), max frame duration: ${maxMs}ms"
+            )
+        }
+    }
+
+    private fun teardownFrameMetricsListener() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            frameMetricsListener?.let { listener ->
+                try {
+                    window.removeOnFrameMetricsAvailableListener(listener)
+                } catch (_: Exception) {
+                }
+            }
+            frameMetricsThread?.quitSafely()
+            frameMetricsThread = null
+            frameMetricsListener = null
+        }
     }
 
     private fun setupKeyboardListener() {
@@ -298,6 +369,7 @@ class MainActivity : AppCompatActivity() {
             searchRunnable?.let { searchHandler.removeCallbacks(it) }
             val text = binding.searchReminderInput.text.toString().trim()
             if (text.isNotEmpty()) {
+                com.bas080.notificationreminders.utils.ExperimentTracker.trackCreation(this, "app_input")
                 binding.searchReminderInput.setText("")
                 activeReminders.add(text)
                 currentSearchQuery = ""
@@ -1125,6 +1197,11 @@ class MainActivity : AppCompatActivity() {
 
     private fun applySnoozeDurationToTargets(targets: List<String>, durationChoice: String) {
         val parseResult = CreateReminderReceiver.parseSnoozeDuration(durationChoice)
+        val topChoices = ReminderNotificationListenerService.getTopSnoozeChoices(this).map { it.toString() }
+        val isPreset = topChoices.contains(durationChoice)
+        val choiceType = if (isPreset) "preset" else if (parseResult != null) "custom_valid" else "custom_invalid"
+        com.bas080.notificationreminders.utils.ExperimentTracker.trackSnoozeChoice(this, choiceType)
+
         if (parseResult == null) {
             AppLogger.log(this, "MainActivity", "Failed to snooze: invalid duration '$durationChoice'")
             Toast.makeText(this, R.string.toast_invalid_snooze_input, Toast.LENGTH_SHORT).show()
@@ -1168,6 +1245,7 @@ class MainActivity : AppCompatActivity() {
     private fun markReminderDone(reminderText: String) {
         val idx = activeReminders.indexOf(reminderText)
         if (idx != -1) {
+            com.bas080.notificationreminders.utils.ExperimentTracker.trackTaskLifecycle(this, "marked_done")
             val doneText = if (reminderText.contains("#done", ignoreCase = true)) {
                 reminderText
             } else {
@@ -1192,6 +1270,7 @@ class MainActivity : AppCompatActivity() {
     private fun undoMarkDone(doneReminderText: String) {
         val idx = activeReminders.indexOf(doneReminderText)
         if (idx != -1) {
+            com.bas080.notificationreminders.utils.ExperimentTracker.trackTaskLifecycle(this, "mark_done_undone")
             val cleanText = doneReminderText.replace(Regex("(?i)\\s*#done\\b"), "").trim()
             activeReminders[idx] = cleanText
             recentlyDoneReminders.remove(doneReminderText)
@@ -1208,6 +1287,7 @@ class MainActivity : AppCompatActivity() {
     private fun deleteReminder(reminderText: String) {
         val idx = activeReminders.indexOf(reminderText)
         if (idx != -1) {
+            com.bas080.notificationreminders.utils.ExperimentTracker.trackTaskLifecycle(this, "deleted")
             activeReminders.removeAt(idx)
             recentlyDoneReminders.remove(reminderText)
             val cleanTrimmed = getCleanTrimmed(reminderText)
@@ -1227,6 +1307,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun unpuntReminder(reminderText: String) {
+        com.bas080.notificationreminders.utils.ExperimentTracker.trackTaskLifecycle(this, "unpunted")
         val cleanTrimmed = getCleanTrimmed(reminderText)
         ReminderNotificationListenerService.lastTriggeredMap.remove("snooze_$cleanTrimmed")
         val prefs = getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
@@ -1316,10 +1397,19 @@ class MainActivity : AppCompatActivity() {
                     snoozeUntil > now
                 }
             }
-            com.bas080.notificationreminders.utils.ReminderMatcher.filterSearchQueryTiered(statusFiltered, currentSearchQuery)
+            com.bas080.notificationreminders.utils.ReminderMatcher.filterSearchQueryTiered(statusFiltered, currentSearchQuery, this)
         }
 
         val filtered = filterByFilterType(currentFilter)
+
+        if (currentSearchQuery.isNotBlank() || currentFilter != ReminderFilter.ALL) {
+            val allTags = extractAllTags()
+            val tagCount = allTags.count { currentSearchQuery.contains(it, ignoreCase = true) }
+            val tokenCount = currentSearchQuery.split(Regex("\\s+")).filter { it.isNotBlank() }.size
+            com.bas080.notificationreminders.utils.ExperimentTracker.trackSearchAndFilter(
+                this, currentFilter.name, tagCount, tokenCount, filtered.isNotEmpty()
+            )
+        }
 
         val activeItems = mutableListOf<String>()
         val snoozedItems = mutableListOf<Pair<String, Long>>()

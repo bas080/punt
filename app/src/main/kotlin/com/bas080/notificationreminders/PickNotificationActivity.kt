@@ -94,6 +94,7 @@ class PickNotificationActivity : AppCompatActivity() {
 
     private fun saveReminder(reminderText: String) {
         com.bas080.notificationreminders.utils.AppLogger.log(this, "PickNotificationActivity", "Selected notification as reminder")
+        com.bas080.notificationreminders.utils.ExperimentTracker.trackCreation(this, "pick_notification")
         val prefs = getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
         val savedSet = prefs.getStringSet(KEY_REMINDERS, emptySet())?.toMutableSet() ?: mutableSetOf()
         savedSet.add(reminderText)

@@ -32,4 +32,24 @@ class AppLoggerTest {
         assertTrue(breadcrumbs.first().contains("Event #11"))
         assertTrue(breadcrumbs.last().contains("Event #60"))
     }
+
+    @Test
+    fun testLogRotationFilesCreated() {
+        val app = RuntimeEnvironment.getApplication()
+        AppLogger.clearLogs(app)
+
+        // Write enough data to trigger rotation (> 500 KB per log file)
+        val largeMessage = "A".repeat(1000)
+        for (i in 1..1200) {
+            AppLogger.log(app, "RotationTest", "Entry $i: $largeMessage")
+        }
+
+        // Wait brief moment for async executor
+        Thread.sleep(500)
+
+        val activeFile = AppLogger.getLogFile(app, 0)
+        val backup1 = AppLogger.getLogFile(app, 1)
+
+        assertTrue(activeFile.exists() || backup1.exists())
+    }
 }

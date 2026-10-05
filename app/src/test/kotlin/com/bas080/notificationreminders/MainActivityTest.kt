@@ -1310,4 +1310,27 @@ class MainActivityTest {
         val updatedSet = prefs.getStringSet("key_reminders_list", emptySet()) ?: emptySet()
         assertTrue(updatedSet.contains("Original Task Updated"))
     }
+
+    @Test
+    fun testFrameMetricsSetupAndTeardown() {
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = controller.get()
+
+        val setupMethod = MainActivity::class.java.getDeclaredMethod("setupFrameMetricsListener")
+        setupMethod.isAccessible = true
+        setupMethod.invoke(activity)
+
+        // Record 100 frame metrics to trigger threshold summary
+        for (i in 1..100) {
+            val frameNs = if (i % 10 == 0) 30_000_000L else 12_000_000L
+            activity.recordFrameMetric(frameNs)
+        }
+
+        val breadcrumbs = com.bas080.notificationreminders.utils.AppLogger.getBreadcrumbs()
+        assertTrue(breadcrumbs.any { it.contains("Experiment:FrameDrop") && it.contains("10 dropped frame(s)") })
+
+        val teardownMethod = MainActivity::class.java.getDeclaredMethod("teardownFrameMetricsListener")
+        teardownMethod.isAccessible = true
+        teardownMethod.invoke(activity)
+    }
 }
