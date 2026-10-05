@@ -1254,6 +1254,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun loadReminders() {
+        com.bas080.notificationreminders.utils.TaskBackupManager.restoreIfEmpty(this)
         val prefs = getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
         val savedSet = prefs.getStringSet(KEY_REMINDERS, emptySet()) ?: emptySet()
         val savedFilterName = prefs.getString(KEY_REMINDER_FILTER, ReminderFilter.ALL.name)
@@ -1270,6 +1271,7 @@ class MainActivity : AppCompatActivity() {
         activeReminders.clear()
         activeReminders.addAll(savedSet)
         updateSummaryAndAdapter()
+        com.bas080.notificationreminders.utils.TaskBackupManager.backupTasks(this)
     }
 
     private fun saveRemindersToPrefs(updateStatusNotification: Boolean = true) {
@@ -1279,6 +1281,7 @@ class MainActivity : AppCompatActivity() {
             ReminderNotificationListenerService.instance?.showStatusNotification()
         }
         com.bas080.notificationreminders.providers.RemindersContentProvider.notifyChange(this)
+        com.bas080.notificationreminders.utils.TaskBackupManager.backupTasks(this)
     }
 
     private fun updateSummaryAndAdapter() {
@@ -1413,6 +1416,7 @@ class MainActivity : AppCompatActivity() {
     override fun onPause() {
         super.onPause()
         flushPendingReminderUpdate()
+        com.bas080.notificationreminders.utils.TaskBackupManager.backupTasks(this)
     }
 
     private fun checkAndShowCrashReportDialog() {
