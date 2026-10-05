@@ -50,22 +50,9 @@ class ScreenshotGeneratorAndroidTest {
         PickNotificationActivity.mockActiveNotifications = null
     }
 
-    @Test
-    fun generateEmulatorScreenshots() {
-        val context = ApplicationProvider.getApplicationContext<Context>()
+    private fun shouldGenerateScreenshots(): Boolean {
         val args = InstrumentationRegistry.getArguments()
-        val shouldGenerate = args.getString("generate.screenshots") == "true"
-        if (!shouldGenerate) {
-            println("Skipping emulator screenshot generation because generate.screenshots is not set.")
-            return
-        }
-
-        capture1Overview(context)
-        capture2Punted(context)
-        capture3FilterDialog(context)
-        capture4NotificationPicker(context)
-        capture5AboutAndLogs(context)
-        capture6KeyboardEditing(context)
+        return args.getString("generate.screenshots") == "true"
     }
 
     @Suppress("DEPRECATION")
@@ -89,7 +76,10 @@ class ScreenshotGeneratorAndroidTest {
         }
     }
 
-    private fun capture1Overview(context: Context) {
+    @Test
+    fun capture1Overview() {
+        if (!shouldGenerateScreenshots()) return
+        val context = ApplicationProvider.getApplicationContext<Context>()
         val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
         prefs.edit().clear().putStringSet(
             "key_reminders_list",
@@ -107,7 +97,10 @@ class ScreenshotGeneratorAndroidTest {
         }
     }
 
-    private fun capture2Punted(context: Context) {
+    @Test
+    fun capture2Punted() {
+        if (!shouldGenerateScreenshots()) return
+        val context = ApplicationProvider.getApplicationContext<Context>()
         val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
         val now = System.currentTimeMillis()
         prefs.edit().clear()
@@ -127,7 +120,10 @@ class ScreenshotGeneratorAndroidTest {
         }
     }
 
-    private fun capture3FilterDialog(context: Context) {
+    @Test
+    fun capture3FilterDialog() {
+        if (!shouldGenerateScreenshots()) return
+        val context = ApplicationProvider.getApplicationContext<Context>()
         val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
         prefs.edit().clear().putStringSet(
             "key_reminders_list",
@@ -146,7 +142,10 @@ class ScreenshotGeneratorAndroidTest {
         }
     }
 
-    private fun capture4NotificationPicker(context: Context) {
+    @Test
+    fun capture4NotificationPicker() {
+        if (!shouldGenerateScreenshots()) return
+        val context = ApplicationProvider.getApplicationContext<Context>()
         val sbn1 = createMockSbn(context, "com.whatsapp", "WhatsApp", "Meeting with design team at 2 PM")
         val sbn2 = createMockSbn(context, "com.android.calendar", "Calendar", "Doctor's Appointment at 4 PM")
         val sbn3 = createMockSbn(context, "com.google.android.gm", "Gmail", "Flight confirmation for Friday")
@@ -165,7 +164,10 @@ class ScreenshotGeneratorAndroidTest {
         }
     }
 
-    private fun capture5AboutAndLogs(context: Context) {
+    @Test
+    fun capture5AboutAndLogs() {
+        if (!shouldGenerateScreenshots()) return
+        val context = ApplicationProvider.getApplicationContext<Context>()
         AppLogger.clearLogs(context)
         AppLogger.log(context, "Application", "Application started successfully")
         AppLogger.log(context, "NotificationListener", "Listener connected and monitoring notifications")
@@ -184,7 +186,10 @@ class ScreenshotGeneratorAndroidTest {
         }
     }
 
-    private fun capture6KeyboardEditing(context: Context) {
+    @Test
+    fun capture6KeyboardEditing() {
+        if (!shouldGenerateScreenshots()) return
+        val context = ApplicationProvider.getApplicationContext<Context>()
         val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
         prefs.edit().clear().putStringSet(
             "key_reminders_list",
