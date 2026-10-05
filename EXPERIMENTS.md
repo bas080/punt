@@ -40,16 +40,11 @@ Metrics are tracked continuously without client-side threshold gating. Every exp
 - **Categories**: `preset`, `custom_valid`, `custom_invalid`.
 - **Format**: `- **Snooze Choice Patterns** (since YYYY-MM-DD): total=X (preset: A, custom_valid: B, custom_invalid: C)`
 
-### 5. Search & Filter Engagement
-- **Objective**: Analyze how users navigate and filter their tasks (state filters vs multi-tag filtering) and measure zero-result query frequency.
-- **Metrics Tracked**: State filter (`ALL`, `ACTIVE`, `SNOOZED`), tag filter count, token count, result indicator (`has_results` vs `zero_results`).
-- **Format**: `- **Search & Filter Usage** (since YYYY-MM-DD): total=X (state_ALL,tags_1,tokens_2,has_results: A; ...)`
-
-### 6. Task Lifecycle
+### 5. Task Lifecycle
 - **Objective**: Monitor task completion dynamics, undo frequency, deletion rates, and unpunting behavior.
 - **Categories**: `marked_done`, `mark_done_undone`, `deleted`, `unpunted`.
 - **Format**: `- **Task Lifecycle Events** (since YYYY-MM-DD): total=X (marked_done: A, mark_done_undone: B, ...)`
 
-### 7. Application Crashes
+### 6. Application Crashes
 - **Objective**: Track cumulative uncaught application crashes over time to evaluate app stability.
 - **Format**: `- **Application Crashes** (since YYYY-MM-DD): total=X`

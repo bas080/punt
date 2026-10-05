@@ -1332,15 +1332,6 @@ class MainActivity : AppCompatActivity() {
 
         val filtered = filterByFilterType(currentFilter)
 
-        if (currentSearchQuery.isNotBlank() || currentFilter != ReminderFilter.ALL) {
-            val allTags = extractAllTags()
-            val tagCount = allTags.count { currentSearchQuery.contains(it, ignoreCase = true) }
-            val tokenCount = currentSearchQuery.split(Regex("\\s+")).filter { it.isNotBlank() }.size
-            com.bas080.notificationreminders.utils.ExperimentTracker.trackSearchAndFilter(
-                this, currentFilter.name, tagCount, tokenCount, filtered.isNotEmpty()
-            )
-        }
-
         val activeItems = mutableListOf<String>()
         val snoozedItems = mutableListOf<Pair<String, Long>>()
 

@@ -107,34 +107,6 @@ object ExperimentTracker {
     }
 
     @Synchronized
-    fun trackSearchAndFilter(
-        context: Context,
-        filterState: String,
-        tagCount: Int,
-        tokenCount: Int,
-        hasResults: Boolean
-    ) {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val editor = prefs.edit()
-        if (!prefs.contains("start_date_search")) {
-            editor.putString("start_date_search", SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date()))
-        }
-        val resultKey = if (hasResults) "has_results" else "zero_results"
-        val queryKey = "state_$filterState,tags_$tagCount,tokens_$tokenCount,$resultKey"
-
-        val total = prefs.getInt("search_total_count", 0) + 1
-        val queryCount = prefs.getInt("search_query_$queryKey", 0) + 1
-
-        val savedQueryKeys = prefs.getStringSet("search_query_keys", emptySet())?.toMutableSet() ?: mutableSetOf()
-        savedQueryKeys.add(queryKey)
-
-        editor.putInt("search_total_count", total)
-            .putInt("search_query_$queryKey", queryCount)
-            .putStringSet("search_query_keys", savedQueryKeys)
-            .apply()
-    }
-
-    @Synchronized
     fun getFormattedExperimentMetrics(context: Context): String {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val sb = StringBuilder()
@@ -162,19 +134,6 @@ object ExperimentTracker {
             prefs, sb, "snooze", "Snooze Choice Patterns",
             listOf("preset", "custom_valid", "custom_invalid")
         )
-
-        val searchTotal = prefs.getInt("search_total_count", 0)
-        if (searchTotal > 0) {
-            val date = prefs.getString("start_date_search", "")
-            val savedKeys = prefs.getStringSet("search_query_keys", emptySet()) ?: emptySet()
-            val parts = savedKeys.mapNotNull { key ->
-                val cnt = prefs.getInt("search_query_$key", 0)
-                if (cnt > 0) "$key: $cnt" else null
-            }
-            sb.append("- **Search & Filter Usage** (since $date): ")
-                .append("total=$searchTotal (${parts.joinToString("; ")})\n")
-        }
-
         appendCategorySummary(
             prefs, sb, "lifecycle", "Task Lifecycle Events",
             listOf("marked_done", "mark_done_undone", "deleted", "unpunted")
