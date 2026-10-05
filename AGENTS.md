@@ -7,8 +7,6 @@
   - Build signed release APK: `./gradlew assembleRelease`
 - **Code Style & Conventions**:
   - Follow standard Kotlin coding conventions using ViewBinding for layout interactions.
-  - Package naming: `com.bas080.notificationreminders`.
-  - Avoid file-level `@file:Suppress(...)` annotations in new code files; refactor methods to maintain low complexity instead.
 - **Exception Handling & Logging**:
   - Wrap background service starts and Android system API calls in `try-catch` blocks, logging non-fatal errors via `AppLogger`.
   - Allow fatal/unrecoverable errors to propagate to `App`'s global uncaught exception handler.
@@ -17,7 +15,6 @@
   - Maintain a clean, high-contrast typography-driven UI relying on Android system colors (`?android:attr/colorBackground`, `?android:attr/textColorPrimary`) without heavy borders or graphic cards.
 - **Documentation & Workflow**:
   - Keep `README.md` high-level, user-focused, and non-technical.
-  - Fastlane metadata and store screenshots are managed automatically in release CI workflows; do not regenerate screenshots locally.
 - **Task tracking**:
   - Use dots as the persistent task tracker for this project.
   - Before starting work, run `dot ready` and choose an unblocked task. Use `dot show` and `dot tree` when you need context or dependencies.
