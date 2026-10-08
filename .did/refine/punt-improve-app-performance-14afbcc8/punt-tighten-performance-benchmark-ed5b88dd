@@ -1,0 +1,3 @@
+Tighten performance benchmark latency thresholds
+
+Tighten response latency thresholds in UiPerformanceBenchmarkTest and UiPerformanceAndroidTest
