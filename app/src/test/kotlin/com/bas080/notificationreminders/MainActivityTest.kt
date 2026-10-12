@@ -1373,7 +1373,7 @@ class MainActivityTest {
     }
 
     @Test
-    fun testPillTagSpanAppliedToRecurringTask() {
+    fun testRecurrenceTagSpanAppliedToRecurringTask() {
         val prefs = RuntimeEnvironment.getApplication().getSharedPreferences("reminders_prefs", android.content.Context.MODE_PRIVATE)
         prefs.edit().putStringSet("key_reminders_list", setOf("Water plants #every 1d")).apply()
 
@@ -1386,7 +1386,7 @@ class MainActivityTest {
         val text = holder.reminderInput.text
         assertTrue("Input text should be SPANNABLE", text is android.text.Spanned)
         val spanned = text as android.text.Spanned
-        val spans = spanned.getSpans(0, spanned.length, PillTagSpan::class.java)
+        val spans = spanned.getSpans(0, spanned.length, android.text.style.ForegroundColorSpan::class.java)
         assertEquals(1, spans.size)
     }
 }
