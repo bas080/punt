@@ -597,6 +597,9 @@ class CreateReminderReceiver : BroadcastReceiver() {
 
                     val prefs = context.getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
                     prefs.edit().putLong("snooze_$trimmed", snoozeUntil).apply()
+                    if (!chosenDurationStr.isNullOrBlank()) {
+                        ReminderNotificationListenerService.recordTaskSnoozeChoice(context, reminderText, chosenDurationStr)
+                    }
 
                     val notificationId = ReminderNotificationListenerService.getNotificationIdForReminder(reminderText)
                     val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager

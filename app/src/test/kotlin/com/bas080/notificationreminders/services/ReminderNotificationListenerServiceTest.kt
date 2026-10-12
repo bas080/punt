@@ -329,17 +329,6 @@ class ReminderNotificationListenerServiceTest {
         val context = RuntimeEnvironment.getApplication()
         val prefs = context.getSharedPreferences("snooze_freq_prefs", Context.MODE_PRIVATE)
 
-        // Set up 10 different choices with varying timestamps and counts:
-        // C1: ts 1000, count 1
-        // C2: ts 900, count 1
-        // C3: ts 800, count 1
-        // C4: ts 700, count 1
-        // C5: ts 100, count 50
-        // C6: ts 90, count 40
-        // C7: ts 80, count 30
-        // C8: ts 70, count 20
-        // C9: ts 60, count 10
-        // C10: ts 50, count 5
         prefs.edit()
             .putLong("10m", 1000L).putLong("count_10m", 1L) // Recent #1
             .putLong("20m", 900L).putLong("count_20m", 1L)   // Recent #2
@@ -355,33 +344,60 @@ class ReminderNotificationListenerServiceTest {
 
         val choices = ReminderNotificationListenerService.getTopSnoozeChoices(context).map { it.toString() }
 
-        // Top 4 recent: 10m, 20m, 30m, 2h
-        // Top 6 common: 3h, 5h, 12h, 1d, 2d, 3d
-        // Combined (10 items) sorted by duration: 10m, 20m, 30m, 2h, 3h, 5h, 12h, 1d, 2d, 3d (+ defaults if any missing)
+        assertEquals("Total choices should be capped at 7 items", 7, choices.size)
         assertTrue("Should contain 10m (recent)", choices.contains("10m"))
+        assertTrue("Should contain 15m (default)", choices.contains("15m"))
         assertTrue("Should contain 20m (recent)", choices.contains("20m"))
         assertTrue("Should contain 30m (recent)", choices.contains("30m"))
+        assertTrue("Should contain 1h (default)", choices.contains("1h"))
         assertTrue("Should contain 2h (recent)", choices.contains("2h"))
         assertTrue("Should contain 3h (common)", choices.contains("3h"))
-        assertTrue("Should contain 5h (common)", choices.contains("5h"))
-        assertTrue("Should contain 12h (common)", choices.contains("12h"))
-        assertTrue("Should contain 24h (common)", choices.contains("24h"))
-        assertTrue("Should contain 2d (common)", choices.contains("2d"))
-        assertTrue("Should contain 3d (common)", choices.contains("3d"))
 
-        // Verify sorted order (10m < 20m < 30m < 2h < 3h < 5h < 12h < 1d < 2d < 3d)
+        // Verify sorted order (10m < 15m < 20m < 30m < 1h < 2h < 3h)
         val index10m = choices.indexOf("10m")
+        val index15m = choices.indexOf("15m")
         val index20m = choices.indexOf("20m")
         val index30m = choices.indexOf("30m")
+        val index1h = choices.indexOf("1h")
         val index2h = choices.indexOf("2h")
         val index3h = choices.indexOf("3h")
-        val index5h = choices.indexOf("5h")
 
-        assertTrue("10m should come before 20m", index10m < index20m)
+        assertTrue("10m should come before 15m", index10m < index15m)
+        assertTrue("15m should come before 20m", index15m < index20m)
         assertTrue("20m should come before 30m", index20m < index30m)
-        assertTrue("30m should come before 2h", index30m < index2h)
+        assertTrue("30m should come before 1h", index30m < index1h)
+        assertTrue("1h should come before 2h", index1h < index2h)
         assertTrue("2h should come before 3h", index2h < index3h)
-        assertTrue("3h should come before 5h", index3h < index5h)
+    }
+
+    @Test
+    fun testTaskSpecificSnoozeChoicesAndGlobalFallbackWithCap() {
+        val context = RuntimeEnvironment.getApplication()
+        val reminder = "Buy groceries #done"
+
+        ReminderNotificationListenerService.recordTaskSnoozeChoice(context, reminder, "2h")
+        ReminderNotificationListenerService.recordTaskSnoozeChoice(context, reminder, "30m")
+
+        val choices = ReminderNotificationListenerService.getTopSnoozeChoices(context, reminder).map { it.toString() }
+
+        assertEquals("Total choices capped at 7 items", 7, choices.size)
+        assertEquals("30m (most recent task choice)", choices[0], "30m")
+        assertEquals("2h (second task choice)", choices[1], "2h")
+
+        // Check backward compatibility key
+        val remPrefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
+        assertEquals("30m", remPrefs.getString("last_choice_buy groceries", null))
+    }
+
+    @Test
+    fun testTaskSpecificSnoozeChoicesBackwardCompatibility() {
+        val context = RuntimeEnvironment.getApplication()
+        val remPrefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
+        remPrefs.edit().putString("last_choice_clean room", "3d").commit()
+
+        val choices = ReminderNotificationListenerService.getTopSnoozeChoices(context, "Clean room").map { it.toString() }
+
+        assertEquals("3d", choices[0])
     }
 
     @Test

@@ -40,26 +40,8 @@ class SnoozeDialogActivity : AppCompatActivity() {
     }
 
     private fun showSnoozeOptionsDialog(targets: List<String>) {
-        val prefs = getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
-        val topChoices = ReminderNotificationListenerService.getTopSnoozeChoices(this).map { it.toString() }
-
-        val choicesList = mutableListOf<String>()
-        if (targets.size == 1) {
-            val cleanTrimmed = targets[0].trim().lowercase()
-            val lastChoice = prefs.getString("last_choice_$cleanTrimmed", null)
-            if (!lastChoice.isNullOrBlank()) {
-                choicesList.add(lastChoice)
-                for (choice in topChoices) {
-                    if (choice != lastChoice) {
-                        choicesList.add(choice)
-                    }
-                }
-            } else {
-                choicesList.addAll(topChoices)
-            }
-        } else {
-            choicesList.addAll(topChoices)
-        }
+        val targetReminder = if (targets.size == 1) targets[0] else null
+        val choicesList = ReminderNotificationListenerService.getTopSnoozeChoices(this, targetReminder).map { it.toString() }
 
         val title = if (targets.size > 1) "Punt All Reminders" else "Punt Reminder"
 
@@ -165,7 +147,7 @@ class SnoozeDialogActivity : AppCompatActivity() {
             ReminderNotificationListenerService.lastTriggeredMap["snooze_$trimmed"] = snoozeUntil
             ReminderNotificationListenerService.activePostedReminders.remove(target)
             editor.putLong("snooze_$trimmed", snoozeUntil)
-            editor.putString("last_choice_$trimmed", durationChoice)
+            ReminderNotificationListenerService.recordTaskSnoozeChoice(this, target, durationChoice)
         }
         editor.apply()
 

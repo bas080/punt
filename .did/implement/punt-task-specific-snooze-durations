@@ -1,0 +1,5 @@
+Task-specific punt dialog duration history with fallback to global choices.
+- Prioritize task-specific punt duration history for single task punts (in MainActivity, SnoozeDialogActivity, and Notification quick actions).
+- Fall back to global choices from snooze_freq_prefs / default durations.
+- Deduplicate choices and cap total choices at 7 items.
+- Bulk punting ("Punt All") uses global choices.
