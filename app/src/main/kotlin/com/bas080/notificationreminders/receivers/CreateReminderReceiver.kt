@@ -244,6 +244,33 @@ class CreateReminderReceiver : BroadcastReceiver() {
             return null
         }
 
+        fun parseRecurrenceDuration(reminderText: String?, nowMillis: Long = System.currentTimeMillis()): Pair<Long, String>? {
+            if (reminderText.isNullOrBlank()) return null
+            val clean = reminderText.replace(Regex("(?i)\\s*#done\\b"), "").trim()
+            val regex = Regex("(?i)#(?:every|repeat)(?:\\(([^)]+)\\)|[:/]?\\s*([^#\n]+)?)")
+            val match = regex.find(clean) ?: return null
+
+            val rawDuration = when {
+                match.groupValues[1].isNotBlank() -> match.groupValues[1].trim()
+                match.groupValues[2].isNotBlank() -> match.groupValues[2].trim()
+                else -> return null
+            }
+
+            if (rawDuration.isEmpty()) return null
+
+            val directParse = parseSnoozeDuration(rawDuration, nowMillis)
+            if (directParse != null) return directParse
+
+            val words = rawDuration.split("\\s+".toRegex())
+            for (i in words.size - 1 downTo 1) {
+                val subCandidate = words.take(i).joinToString(" ")
+                val parseResult = parseSnoozeDuration(subCandidate, nowMillis)
+                if (parseResult != null) return parseResult
+            }
+
+            return null
+        }
+
         private fun parseWeekdaySnooze(raw: String, nowMillis: Long): Pair<Pair<Long, String>, String>? {
             val weekdayRegex = Regex("\\b(mon|monday|tue|tues|tuesday|wed|wednesday|thu|thur|thurs|thursday|fri|friday|sat|saturday|sun|sunday)\\b")
             val match = weekdayRegex.find(raw) ?: return null
@@ -540,30 +567,65 @@ class CreateReminderReceiver : BroadcastReceiver() {
                     com.bas080.notificationreminders.utils.AppLogger.log(context, "CreateReminderReceiver", "Marked reminder done from notification action")
                     com.bas080.notificationreminders.utils.ExperimentTracker.trackTaskLifecycle(context, "marked_done")
 
-                    val prefs = context.getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
-                    val savedSet = prefs.getStringSet(KEY_REMINDERS, emptySet())?.toMutableSet() ?: mutableSetOf()
+                    val recurringResult = parseRecurrenceDuration(reminderText)
+                    if (recurringResult != null) {
+                        val (snoozeMs, durationLabel) = recurringResult
+                        val snoozeUntil = System.currentTimeMillis() + snoozeMs
+                        val cleanText = reminderText.replace(Regex("(?i)\\s*#done\\b"), "").trim()
+                        val cleanTrimmed = cleanText.lowercase()
 
-                    if (savedSet.contains(reminderText)) {
-                        savedSet.remove(reminderText)
-                        val doneText = if (reminderText.contains("#done", ignoreCase = true)) {
-                            reminderText
+                        val prefs = context.getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
+                        val savedSet = prefs.getStringSet(KEY_REMINDERS, emptySet())?.toMutableSet() ?: mutableSetOf()
+
+                        if (savedSet.contains(reminderText)) {
+                            savedSet.remove(reminderText)
+                            savedSet.add(cleanText)
                         } else {
-                            "$reminderText #done"
+                            savedSet.add(cleanText)
                         }
-                        savedSet.add(doneText)
-                        prefs.edit().putStringSet(KEY_REMINDERS, savedSet).apply()
+                        prefs.edit()
+                            .putStringSet(KEY_REMINDERS, savedSet)
+                            .putLong("snooze_$cleanTrimmed", snoozeUntil)
+                            .apply()
+                        ReminderNotificationListenerService.lastTriggeredMap["snooze_$cleanTrimmed"] = snoozeUntil
+
+                        val notificationId = ReminderNotificationListenerService.getNotificationIdForReminder(reminderText)
+                        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                        notificationManager.cancel(notificationId)
+
+                        ReminderNotificationListenerService.instance?.showStatusNotification()
+                            ?: ReminderNotificationListenerService.startService(context)
+
+                        com.bas080.notificationreminders.providers.RemindersContentProvider.notifyChange(context)
+                        com.bas080.notificationreminders.utils.TaskBackupManager.backupTasks(context)
+                        val toastText = context.getString(R.string.toast_reminder_snoozed_duration, durationLabel)
+                        Toast.makeText(context, toastText, Toast.LENGTH_SHORT).show()
+                    } else {
+                        val prefs = context.getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
+                        val savedSet = prefs.getStringSet(KEY_REMINDERS, emptySet())?.toMutableSet() ?: mutableSetOf()
+
+                        if (savedSet.contains(reminderText)) {
+                            savedSet.remove(reminderText)
+                            val doneText = if (reminderText.contains("#done", ignoreCase = true)) {
+                                reminderText
+                            } else {
+                                "$reminderText #done"
+                            }
+                            savedSet.add(doneText)
+                            prefs.edit().putStringSet(KEY_REMINDERS, savedSet).apply()
+                        }
+
+                        val notificationId = ReminderNotificationListenerService.getNotificationIdForReminder(reminderText)
+                        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                        notificationManager.cancel(notificationId)
+
+                        ReminderNotificationListenerService.instance?.showStatusNotification()
+                            ?: ReminderNotificationListenerService.startService(context)
+
+                        com.bas080.notificationreminders.providers.RemindersContentProvider.notifyChange(context)
+                        com.bas080.notificationreminders.utils.TaskBackupManager.backupTasks(context)
+                        Toast.makeText(context, R.string.toast_reminder_done, Toast.LENGTH_SHORT).show()
                     }
-
-                    val notificationId = ReminderNotificationListenerService.getNotificationIdForReminder(reminderText)
-                    val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-                    notificationManager.cancel(notificationId)
-
-                    ReminderNotificationListenerService.instance?.showStatusNotification()
-                        ?: ReminderNotificationListenerService.startService(context)
-
-                    com.bas080.notificationreminders.providers.RemindersContentProvider.notifyChange(context)
-                    com.bas080.notificationreminders.utils.TaskBackupManager.backupTasks(context)
-                    Toast.makeText(context, R.string.toast_reminder_done, Toast.LENGTH_SHORT).show()
                 }
             }
             ReminderNotificationListenerService.ACTION_SNOOZE_REMINDER -> {

@@ -6,8 +6,10 @@ import android.widget.EditText
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
+import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.RecyclerView
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -1325,5 +1327,28 @@ class MainActivityTest {
 
         val metrics = com.bas080.notificationreminders.utils.ExperimentTracker.getFormattedExperimentMetrics(activity)
         assertTrue(metrics.contains("Reminder Edit Intervals") && metrics.contains("n=1"))
+    }
+
+    @Test
+    fun testMarkRecurringReminderDonePuntsTask() {
+        val prefs = RuntimeEnvironment.getApplication().getSharedPreferences("reminders_prefs", android.content.Context.MODE_PRIVATE)
+        prefs.edit().putStringSet("key_reminders_list", setOf("Water plants #every 1d")).apply()
+
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = controller.get()
+
+        val swipeHandler = activity.createSwipeHandler()
+        val holder = activity.findViewById<androidx.recyclerview.widget.RecyclerView>(R.id.reminders_list)
+            .findViewHolderForAdapterPosition(0)!!
+
+        swipeHandler.onSwiped(holder, ItemTouchHelper.RIGHT)
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        val savedSet = prefs.getStringSet("key_reminders_list", emptySet()) ?: emptySet()
+        assertTrue(savedSet.contains("Water plants #every 1d"))
+        assertFalse(savedSet.contains("Water plants #every 1d #done"))
+
+        val snoozeTime = prefs.getLong("snooze_water plants #every 1d", 0L)
+        assertTrue("Snooze timestamp should be set in future for recurring task", snoozeTime > System.currentTimeMillis())
     }
 }

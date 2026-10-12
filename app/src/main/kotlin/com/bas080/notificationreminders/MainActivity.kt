@@ -1167,24 +1167,51 @@ class MainActivity : AppCompatActivity() {
         val idx = activeReminders.indexOf(reminderText)
         if (idx != -1) {
             com.bas080.notificationreminders.utils.ExperimentTracker.trackTaskLifecycle(this, "marked_done")
-            val doneText = if (reminderText.contains("#done", ignoreCase = true)) {
-                reminderText
+            val recurringResult = CreateReminderReceiver.parseRecurrenceDuration(reminderText)
+            if (recurringResult != null) {
+                val (snoozeMs, durationLabel) = recurringResult
+                val snoozeUntil = System.currentTimeMillis() + snoozeMs
+                val cleanText = reminderText.replace(Regex("(?i)\\s*#done\\b"), "").trim()
+                val cleanTrimmed = cleanText.lowercase()
+
+                activeReminders[idx] = cleanText
+
+                val prefs = getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
+                prefs.edit()
+                    .putStringSet(KEY_REMINDERS, activeReminders.toSet())
+                    .putLong("snooze_$cleanTrimmed", snoozeUntil)
+                    .apply()
+                ReminderNotificationListenerService.lastTriggeredMap["snooze_$cleanTrimmed"] = snoozeUntil
+
+                val notificationId = ReminderNotificationListenerService.getNotificationIdForReminder(reminderText)
+                val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager
+                notificationManager?.cancel(notificationId)
+
+                ReminderNotificationListenerService.instance?.showStatusNotification()
+                updateSummaryAndAdapter()
+                AppLogger.log(this, "MainActivity", "Marked recurring reminder done and punted for $durationLabel")
+                val toastText = getString(R.string.toast_reminder_snoozed_duration, durationLabel)
+                Toast.makeText(this, toastText, Toast.LENGTH_SHORT).show()
             } else {
-                "$reminderText #done"
+                val doneText = if (reminderText.contains("#done", ignoreCase = true)) {
+                    reminderText
+                } else {
+                    "$reminderText #done"
+                }
+                activeReminders[idx] = doneText
+                recentlyDoneReminders.add(doneText)
+                val prefs = getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
+                prefs.edit().putStringSet(KEY_REMINDERS, activeReminders.toSet()).apply()
+
+                val notificationId = ReminderNotificationListenerService.getNotificationIdForReminder(reminderText)
+                val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager
+                notificationManager?.cancel(notificationId)
+
+                ReminderNotificationListenerService.instance?.showStatusNotification()
+                updateSummaryAndAdapter()
+                AppLogger.log(this, "MainActivity", "Marked reminder done")
+                Toast.makeText(this, R.string.toast_reminder_done, Toast.LENGTH_SHORT).show()
             }
-            activeReminders[idx] = doneText
-            recentlyDoneReminders.add(doneText)
-            val prefs = getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
-            prefs.edit().putStringSet(KEY_REMINDERS, activeReminders.toSet()).apply()
-
-            val notificationId = ReminderNotificationListenerService.getNotificationIdForReminder(reminderText)
-            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager
-            notificationManager?.cancel(notificationId)
-
-            ReminderNotificationListenerService.instance?.showStatusNotification()
-            updateSummaryAndAdapter()
-            AppLogger.log(this, "MainActivity", "Marked reminder done")
-            Toast.makeText(this, R.string.toast_reminder_done, Toast.LENGTH_SHORT).show()
         }
     }
 
