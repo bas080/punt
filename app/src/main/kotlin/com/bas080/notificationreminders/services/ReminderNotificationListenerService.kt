@@ -58,7 +58,51 @@ class ReminderNotificationListenerService : NotificationListenerService() {
             return if (hash == NOTIFICATION_ID || hash == SUMMARY_NOTIFICATION_ID) 1002 else if (hash == 0) 1003 else hash
         }
 
-        fun getTopSnoozeChoices(context: Context): Array<CharSequence> {
+        fun getTaskSnoozeChoices(context: Context, reminderText: String): List<String> {
+            if (reminderText.isBlank()) return emptyList()
+            val cleanTrimmed = reminderText.replace(Regex("(?i)\\s*#done\\b"), "").trim().lowercase()
+            val prefs = context.getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
+            val historyStr = prefs.getString("task_history_$cleanTrimmed", null)
+            if (!historyStr.isNullOrBlank()) {
+                return historyStr.split("|").filter { it.isNotBlank() }
+            }
+            val lastChoice = prefs.getString("last_choice_$cleanTrimmed", null)
+            if (!lastChoice.isNullOrBlank()) {
+                return listOf(lastChoice)
+            }
+            return emptyList()
+        }
+
+        fun recordTaskSnoozeChoice(context: Context, reminderText: String, durationChoice: String) {
+            if (reminderText.isBlank() || durationChoice.isBlank()) return
+            val cleanTrimmed = reminderText.replace(Regex("(?i)\\s*#done\\b"), "").trim().lowercase()
+            val prefs = context.getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
+
+            val existingHistoryStr = prefs.getString("task_history_$cleanTrimmed", null)
+            val historyList = if (!existingHistoryStr.isNullOrBlank()) {
+                existingHistoryStr.split("|").filter { it.isNotBlank() }.toMutableList()
+            } else {
+                val lastChoice = prefs.getString("last_choice_$cleanTrimmed", null)
+                if (!lastChoice.isNullOrBlank()) mutableListOf(lastChoice) else mutableListOf()
+            }
+
+            val canonicalChoice = CreateReminderReceiver.canonicalizeSnoozeChoice(durationChoice) ?: durationChoice
+
+            historyList.removeAll { item ->
+                item == durationChoice || (CreateReminderReceiver.canonicalizeSnoozeChoice(item) ?: item) == canonicalChoice
+            }
+            historyList.add(0, durationChoice)
+
+            val trimmedHistory = historyList.take(10)
+
+            prefs.edit()
+                .putString("task_history_$cleanTrimmed", trimmedHistory.joinToString("|"))
+                .putString("last_choice_$cleanTrimmed", durationChoice)
+                .apply()
+        }
+
+        @JvmOverloads
+        fun getTopSnoozeChoices(context: Context, targetReminder: String? = null): Array<CharSequence> {
             val defaultChoices = listOf("15m", "1h", "4h", "24h", "1w")
             val prefs = context.getSharedPreferences("snooze_freq_prefs", Context.MODE_PRIVATE)
             val allEntries = prefs.all
@@ -98,10 +142,35 @@ class ReminderNotificationListenerService : NotificationListenerService() {
                 .take(6)
                 .map { it.first }
 
+            val globalSortedChoices = mutableListOf<String>()
+            val globalAddedMs = mutableSetOf<Long>()
+
+            fun tryAddGlobal(choice: String) {
+                val canonical = CreateReminderReceiver.canonicalizeSnoozeChoice(choice) ?: choice
+                val durationMs = CreateReminderReceiver.parseSnoozeDuration(canonical, now)?.first
+                if (!globalSortedChoices.contains(canonical)) {
+                    if (durationMs != null && globalAddedMs.contains(durationMs)) {
+                        return
+                    }
+                    globalSortedChoices.add(canonical)
+                    if (durationMs != null) {
+                        globalAddedMs.add(durationMs)
+                    }
+                }
+            }
+
+            for (choice in topRecent) tryAddGlobal(choice)
+            for (choice in topCommon) tryAddGlobal(choice)
+            for (defaultChoice in defaultChoices) tryAddGlobal(defaultChoice)
+
+            globalSortedChoices.sortBy { choice ->
+                CreateReminderReceiver.parseSnoozeDuration(choice, now)?.first ?: Long.MAX_VALUE
+            }
+
             val combined = mutableListOf<String>()
             val addedDurationMs = mutableSetOf<Long>()
 
-            fun tryAdd(choice: String) {
+            fun tryAddCombined(choice: String) {
                 val canonical = CreateReminderReceiver.canonicalizeSnoozeChoice(choice) ?: choice
                 val durationMs = CreateReminderReceiver.parseSnoozeDuration(canonical, now)?.first
                 if (!combined.contains(canonical)) {
@@ -115,15 +184,19 @@ class ReminderNotificationListenerService : NotificationListenerService() {
                 }
             }
 
-            for (choice in topRecent) tryAdd(choice)
-            for (choice in topCommon) tryAdd(choice)
-            for (defaultChoice in defaultChoices) tryAdd(defaultChoice)
-
-            combined.sortBy { choice ->
-                CreateReminderReceiver.parseSnoozeDuration(choice, now)?.first ?: Long.MAX_VALUE
+            if (!targetReminder.isNullOrBlank()) {
+                val taskChoices = getTaskSnoozeChoices(context, targetReminder)
+                for (taskChoice in taskChoices) {
+                    tryAddCombined(taskChoice)
+                }
             }
 
-            return Array(combined.size) { combined[it] }
+            for (globalChoice in globalSortedChoices) {
+                tryAddCombined(globalChoice)
+            }
+
+            val capped = combined.take(7)
+            return Array(capped.size) { capped[it] }
         }
     }
 

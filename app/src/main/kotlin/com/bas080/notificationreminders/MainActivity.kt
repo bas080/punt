@@ -957,20 +957,7 @@ class MainActivity : AppCompatActivity() {
         }
         val isSnoozed = snoozeUntil > now
 
-        val lastChoice = prefs.getString("last_choice_$cleanTrimmed", null)
-        val topChoices = ReminderNotificationListenerService.getTopSnoozeChoices(this).map { it.toString() }
-
-        val choicesList = mutableListOf<String>()
-        if (!lastChoice.isNullOrBlank()) {
-            choicesList.add(lastChoice)
-            for (choice in topChoices) {
-                if (choice != lastChoice) {
-                    choicesList.add(choice)
-                }
-            }
-        } else {
-            choicesList.addAll(topChoices)
-        }
+        val choicesList = ReminderNotificationListenerService.getTopSnoozeChoices(this, reminderText).map { it.toString() }
 
         val density = resources.displayMetrics.density
         val padding = (24 * density).toInt()
@@ -1164,7 +1151,7 @@ class MainActivity : AppCompatActivity() {
             val cleanTrimmed = getCleanTrimmed(reminderText)
             ReminderNotificationListenerService.lastTriggeredMap["snooze_$cleanTrimmed"] = snoozeUntil
             editor.putLong("snooze_$cleanTrimmed", snoozeUntil)
-            editor.putString("last_choice_$cleanTrimmed", durationChoice)
+            ReminderNotificationListenerService.recordTaskSnoozeChoice(this, reminderText, durationChoice)
         }
         editor.apply()
 
