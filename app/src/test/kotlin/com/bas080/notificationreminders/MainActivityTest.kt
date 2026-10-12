@@ -7,6 +7,7 @@ import android.widget.ImageView
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.recyclerview.widget.ItemTouchHelper
+import com.bas080.notificationreminders.receivers.CreateReminderReceiver
 import androidx.recyclerview.widget.RecyclerView
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -1350,5 +1351,24 @@ class MainActivityTest {
 
         val snoozeTime = prefs.getLong("snooze_water plants #every 1d", 0L)
         assertTrue("Snooze timestamp should be set in future for recurring task", snoozeTime > System.currentTimeMillis())
+    }
+
+    @Test
+    fun testSwipePeekingIconForRecurringTask() {
+        val prefs = RuntimeEnvironment.getApplication().getSharedPreferences("reminders_prefs", android.content.Context.MODE_PRIVATE)
+        prefs.edit().putStringSet("key_reminders_list", setOf("Water plants #every 1d", "Buy milk")).apply()
+
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = controller.get()
+
+        val swipeHandler = activity.createSwipeHandler()
+        val recyclerView = activity.findViewById<androidx.recyclerview.widget.RecyclerView>(R.id.reminders_list)
+        val holder = recyclerView.findViewHolderForAdapterPosition(0)!!
+
+        val canvas = android.graphics.Canvas()
+        swipeHandler.onChildDraw(canvas, recyclerView, holder, 100f, 0f, ItemTouchHelper.ACTION_STATE_SWIPE, true)
+
+        val recurringResult = CreateReminderReceiver.parseRecurrenceDuration("Water plants #every 1d")
+        assertNotNull(recurringResult)
     }
 }
