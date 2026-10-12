@@ -244,11 +244,15 @@ class CreateReminderReceiver : BroadcastReceiver() {
             return null
         }
 
+        private val RECURRENCE_REGEX = Regex("(?i)#(?:every|repeat)(?:\\(([^)]+)\\)|[:/]?\\s*([^#\n]+)?)")
+
         fun parseRecurrenceDuration(reminderText: String?, nowMillis: Long = System.currentTimeMillis()): Pair<Long, String>? {
             if (reminderText.isNullOrBlank()) return null
+            if (!reminderText.contains("#every", ignoreCase = true) && !reminderText.contains("#repeat", ignoreCase = true)) {
+                return null
+            }
             val clean = reminderText.replace(Regex("(?i)\\s*#done\\b"), "").trim()
-            val regex = Regex("(?i)#(?:every|repeat)(?:\\(([^)]+)\\)|[:/]?\\s*([^#\n]+)?)")
-            val match = regex.find(clean) ?: return null
+            val match = RECURRENCE_REGEX.find(clean) ?: return null
 
             val rawDuration = when {
                 match.groupValues[1].isNotBlank() -> match.groupValues[1].trim()

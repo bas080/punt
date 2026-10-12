@@ -142,7 +142,6 @@ class MainActivity : AppCompatActivity() {
         setupRecyclerView()
         setupSwipeRefresh()
         setupSwipeGestures()
-        loadReminders()
 
         setupKeyboardListener()
         checkAndShowCrashReportDialog()
@@ -909,7 +908,14 @@ class MainActivity : AppCompatActivity() {
                         background.setBounds(itemView.left, itemView.top, itemView.left + dX.toInt(), itemView.bottom)
                         background.draw(c)
 
-                        icon = ContextCompat.getDrawable(this@MainActivity, R.drawable.ic_action_done)
+                        val isRecurring = if (position in displayedReminders.indices) {
+                            CreateReminderReceiver.parseRecurrenceDuration(displayedReminders[position]) != null
+                        } else false
+
+                        icon = ContextCompat.getDrawable(
+                            this@MainActivity,
+                            if (isRecurring) R.drawable.ic_action_repeat else R.drawable.ic_action_done
+                        )
                         icon?.let {
                             val vMargin = (itemView.height - it.intrinsicHeight) / 2
                             val top = itemView.top + vMargin
