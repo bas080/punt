@@ -1669,7 +1669,34 @@ class RemindersAdapter(
         val isSnoozed = snoozeUntil > now
 
         holder.reminderInput.hint = "Reminder"
-        holder.reminderInput.setText(reminderText)
+        val recurringResult = CreateReminderReceiver.parseRecurrenceDuration(reminderText)
+        if (recurringResult != null && !isDone) {
+            val spannable = android.text.SpannableStringBuilder(reminderText)
+            val tagMatch = Regex("(?i)#(?:every|repeat)(?:\\(([^)]+)\\)|[:/]?\\s*([^#\n]+)?)").find(reminderText)
+            if (tagMatch != null) {
+                val start = tagMatch.range.first
+                var end = tagMatch.range.last + 1
+                while (end > start && reminderText[end - 1].isWhitespace()) {
+                    end--
+                }
+                val density = context.resources.displayMetrics.density
+                val bgColor = ContextCompat.getColor(context, R.color.bg_dark)
+                val textColor = ContextCompat.getColor(context, R.color.accent)
+                val strokeColor = ContextCompat.getColor(context, R.color.divider_color)
+                val span = PillTagSpan(
+                    backgroundColor = bgColor,
+                    textColor = textColor,
+                    strokeColor = strokeColor,
+                    cornerRadiusPx = 6f * density,
+                    paddingHorizontalPx = 6f * density,
+                    paddingVerticalPx = 2f * density
+                )
+                spannable.setSpan(span, start, end, android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+            }
+            holder.reminderInput.setText(spannable, TextView.BufferType.SPANNABLE)
+        } else {
+            holder.reminderInput.setText(reminderText)
+        }
 
         if (isDone) {
             holder.reminderInput.setTextColor(ContextCompat.getColor(context, R.color.text_muted))
@@ -1725,4 +1752,64 @@ class RemindersAdapter(
     }
 
     override fun getItemCount(): Int = if (displayedReminders.isEmpty()) 0 else displayedReminders.size + 1
+}
+
+class PillTagSpan(
+    private val backgroundColor: Int,
+    private val textColor: Int,
+    private val strokeColor: Int,
+    private val cornerRadiusPx: Float,
+    private val paddingHorizontalPx: Float,
+    private val paddingVerticalPx: Float
+) : android.text.style.ReplacementSpan() {
+
+    override fun getSize(
+        paint: android.graphics.Paint,
+        text: CharSequence,
+        start: Int,
+        end: Int,
+        fm: android.graphics.Paint.FontMetricsInt?
+    ): Int {
+        val textWidth = paint.measureText(text, start, end)
+        return (textWidth + paddingHorizontalPx * 2).toInt()
+    }
+
+    override fun draw(
+        canvas: android.graphics.Canvas,
+        text: CharSequence,
+        start: Int,
+        end: Int,
+        x: Float,
+        top: Int,
+        y: Int,
+        bottom: Int,
+        paint: android.graphics.Paint
+    ) {
+        val textWidth = paint.measureText(text, start, end)
+        val rectLeft = x + 2f
+        val rectRight = x + textWidth + paddingHorizontalPx * 2 - 2f
+        val fm = paint.fontMetrics
+        val rectTop = y + fm.ascent - paddingVerticalPx
+        val rectBottom = y + fm.descent + paddingVerticalPx
+        val rect = android.graphics.RectF(rectLeft, rectTop, rectRight, rectBottom)
+
+        val originalColor = paint.color
+        val originalStyle = paint.style
+
+        paint.color = backgroundColor
+        paint.style = android.graphics.Paint.Style.FILL
+        canvas.drawRoundRect(rect, cornerRadiusPx, cornerRadiusPx, paint)
+
+        paint.color = strokeColor
+        paint.style = android.graphics.Paint.Style.STROKE
+        paint.strokeWidth = 2f
+        canvas.drawRoundRect(rect, cornerRadiusPx, cornerRadiusPx, paint)
+
+        paint.color = textColor
+        paint.style = android.graphics.Paint.Style.FILL
+        canvas.drawText(text, start, end, x + paddingHorizontalPx, y.toFloat(), paint)
+
+        paint.color = originalColor
+        paint.style = originalStyle
+    }
 }
