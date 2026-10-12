@@ -1371,4 +1371,22 @@ class MainActivityTest {
         val recurringResult = CreateReminderReceiver.parseRecurrenceDuration("Water plants #every 1d")
         assertNotNull(recurringResult)
     }
+
+    @Test
+    fun testPillTagSpanAppliedToRecurringTask() {
+        val prefs = RuntimeEnvironment.getApplication().getSharedPreferences("reminders_prefs", android.content.Context.MODE_PRIVATE)
+        prefs.edit().putStringSet("key_reminders_list", setOf("Water plants #every 1d")).apply()
+
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = controller.get()
+
+        val recyclerView = activity.findViewById<androidx.recyclerview.widget.RecyclerView>(R.id.reminders_list)
+        val holder = recyclerView.findViewHolderForAdapterPosition(0) as RemindersAdapter.ItemViewHolder
+
+        val text = holder.reminderInput.text
+        assertTrue("Input text should be SPANNABLE", text is android.text.Spanned)
+        val spanned = text as android.text.Spanned
+        val spans = spanned.getSpans(0, spanned.length, PillTagSpan::class.java)
+        assertEquals(1, spans.size)
+    }
 }
