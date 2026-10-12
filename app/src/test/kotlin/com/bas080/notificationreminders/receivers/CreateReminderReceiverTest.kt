@@ -6,6 +6,8 @@ import android.os.Bundle
 import androidx.core.app.RemoteInput
 import com.bas080.notificationreminders.services.ReminderNotificationListenerService
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -420,5 +422,53 @@ class CreateReminderReceiverTest {
         val context = RuntimeEnvironment.getApplication()
         val hint = CreateReminderReceiver.getSnoozeCustomHint(context)
         org.junit.Assert.assertTrue("Custom hint should start with 'e.g. 15m, 18:00, Mon, or '", hint.startsWith("e.g. 15m, 18:00, Mon, or "))
+    }
+
+    @Test
+    fun testParseRecurrenceDuration() {
+        val now = System.currentTimeMillis()
+
+        val parse1 = CreateReminderReceiver.parseRecurrenceDuration("Water plants #every 1d", now)
+        assertNotNull(parse1)
+        assertEquals(24 * 60 * 60 * 1000L, parse1!!.first)
+
+        val parse2 = CreateReminderReceiver.parseRecurrenceDuration("Take vitamins #every(12h)", now)
+        assertNotNull(parse2)
+        assertEquals(12 * 60 * 60 * 1000L, parse2!!.first)
+
+        val parse3 = CreateReminderReceiver.parseRecurrenceDuration("Clean kitchen #every:30m", now)
+        assertNotNull(parse3)
+        assertEquals(30 * 60 * 1000L, parse3!!.first)
+
+        val parse4 = CreateReminderReceiver.parseRecurrenceDuration("Check status #repeat 4h #work", now)
+        assertNotNull(parse4)
+        assertEquals(4 * 60 * 60 * 1000L, parse4!!.first)
+
+        val parse5 = CreateReminderReceiver.parseRecurrenceDuration("Buy groceries", now)
+        org.junit.Assert.assertNull(parse5)
+
+        val parse6 = CreateReminderReceiver.parseRecurrenceDuration("Message everyone tomorrow", now)
+        org.junit.Assert.assertNull(parse6)
+    }
+
+    @Test
+    fun testActionDoneReminderRecurring() {
+        val context = RuntimeEnvironment.getApplication()
+        val prefs = context.getSharedPreferences("reminders_prefs", android.content.Context.MODE_PRIVATE)
+        prefs.edit().putStringSet("key_reminders_list", setOf("Water plants #every 1d")).apply()
+
+        val receiver = CreateReminderReceiver()
+        val intent = Intent(ReminderNotificationListenerService.ACTION_DONE_REMINDER).apply {
+            putExtra(ReminderNotificationListenerService.EXTRA_REMINDER_TEXT, "Water plants #every 1d")
+        }
+
+        receiver.onReceive(context, intent)
+
+        val savedSet = prefs.getStringSet("key_reminders_list", emptySet()) ?: emptySet()
+        assertTrue(savedSet.contains("Water plants #every 1d"))
+        assertFalse(savedSet.contains("Water plants #every 1d #done"))
+
+        val snoozeTime = prefs.getLong("snooze_water plants #every 1d", 0L)
+        assertTrue("Snooze timestamp should be set in future", snoozeTime > System.currentTimeMillis())
     }
 }

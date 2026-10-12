@@ -9,6 +9,7 @@ import android.content.pm.PackageManager
 import android.provider.CalendarContract
 import androidx.core.content.ContextCompat
 import com.bas080.notificationreminders.MainActivity
+import com.bas080.notificationreminders.receivers.CreateReminderReceiver
 import com.bas080.notificationreminders.services.ReminderNotificationListenerService
 import java.util.TimeZone
 
@@ -272,7 +273,18 @@ object CalendarSyncManager {
 
             val cleanKey = MainActivity.getCleanTrimmed(reminder)
             if (syncedCalendarKeys.contains(cleanKey) && !calendarEvents.containsKey(cleanKey)) {
-                savedReminders[i] = "$reminder #done"
+                val recurringResult = CreateReminderReceiver.parseRecurrenceDuration(reminder, now)
+                if (recurringResult != null) {
+                    val snoozeMs: Long = recurringResult.first
+                    val snoozeUntil: Long = now + snoozeMs
+                    val cleanText = reminder.replace(Regex("(?i)\\s*#done\\b"), "").trim()
+                    val cleanTrimmed = cleanText.lowercase()
+                    savedReminders[i] = cleanText
+                    editor.putLong("snooze_$cleanTrimmed", snoozeUntil)
+                    ReminderNotificationListenerService.lastTriggeredMap["snooze_$cleanTrimmed"] = snoozeUntil
+                } else {
+                    savedReminders[i] = "$reminder #done"
+                }
                 modified = true
             } else if (calendarEvents.containsKey(cleanKey)) {
                 val calStart = calendarEvents[cleanKey] ?: 0L
