@@ -174,7 +174,8 @@ class MainActivityTest {
         val pillContainer = activity.findViewById<View>(R.id.fab_pill_menu_container)
         val btnNavAbout = activity.findViewById<TextView>(R.id.btn_nav_about)
         val btnNavReminders = activity.findViewById<TextView>(R.id.btn_nav_reminders)
-        val btnListExportPill = activity.findViewById<View>(R.id.btn_list_export_pill)
+        val btnFabPuntAll = activity.findViewById<View>(R.id.btn_fab_punt_all)
+        val btnFabShareMatching = activity.findViewById<View>(R.id.btn_fab_share_matching)
 
         assertNotNull(fabMenu)
         assertNotNull(pillContainer)
@@ -197,10 +198,12 @@ class MainActivityTest {
         assertEquals(View.GONE, pillContainer.visibility)
         assertEquals(View.VISIBLE, activity.findViewById<View>(R.id.reminders_container).visibility)
 
-        // Tapping bulk export pill collapses menu
+        // Tapping action pills collapses menu
         fabMenu.performClick()
         assertEquals(View.VISIBLE, pillContainer.visibility)
-        btnListExportPill.performClick()
+        assertNotNull(btnFabPuntAll)
+        assertNotNull(btnFabShareMatching)
+        btnFabShareMatching.performClick()
         assertEquals(View.GONE, pillContainer.visibility)
     }
 
@@ -284,8 +287,8 @@ class MainActivityTest {
         input.setText("#punt")
         shadowOf(android.os.Looper.getMainLooper()).idleFor(250, java.util.concurrent.TimeUnit.MILLISECONDS)
 
-        val btnListExport = activity.findViewById<ImageView>(R.id.btn_list_export)
-        assertNotNull(btnListExport)
+        val btnFabShareMatching = activity.findViewById<View>(R.id.btn_fab_share_matching)
+        assertNotNull(btnFabShareMatching)
 
         val showExportOptionsMethod = MainActivity::class.java.getDeclaredMethod("showExportOptionsDialog", List::class.java)
         showExportOptionsMethod.isAccessible = true
