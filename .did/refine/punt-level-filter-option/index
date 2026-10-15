@@ -1,0 +1,10 @@
+Level filter option for exact level, everything above, or everything below (#refine)
+
+Add task level tag filtering support (e.g. `#level(1)`, `#level(2)`, `#l1`, `#l2`) with options to filter reminders by:
+1. **Exact level**: Show reminders at the exact level (e.g. level 2 only).
+2. **Above level (>=)**: Show reminders at the selected level and everything above it (e.g. level 2 and higher priority/depth).
+3. **Below level (<=)**: Show reminders at the selected level and everything below it (e.g. level 2 and lower priority/depth).
+
+## Questions for @bas080
+1. Should level tags be written as `#level(1)` / `#level:1` / `#l1`, or parsed dynamically from task hierarchy / indentation?
+2. Should level filtering controls be added inside the Filter dialog (`btn_tags_filter`) alongside State Filter and Tags Filter?
