@@ -285,7 +285,6 @@ class MainActivity : AppCompatActivity() {
 
         binding.fabMenu.setOnTouchListener { _, event ->
             gestureDetector.onTouchEvent(event)
-            false
         }
 
         binding.remindersContainer.setOnClickListener {
