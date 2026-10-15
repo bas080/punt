@@ -170,9 +170,30 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupSwipeRefresh() {
+        binding.swipeRefreshLayout.setColorSchemeResources(R.color.accent)
         binding.swipeRefreshLayout.setOnRefreshListener {
-            recentlyDoneReminders.clear()
-            loadReminders()
+            val text = binding.searchReminderInput.text.toString().trim()
+            if (text.isNotEmpty()) {
+                com.bas080.notificationreminders.utils.ExperimentTracker.trackCreation(this, "app_input")
+                binding.searchReminderInput.setText("")
+                activeReminders.add(text)
+                currentSearchQuery = ""
+                currentFilter = ReminderFilter.ALL
+                getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
+                    .edit()
+                    .putString(KEY_SEARCH_QUERY, "")
+                    .putString(KEY_REMINDER_FILTER, ReminderFilter.ALL.name)
+                    .apply()
+                recentlyDoneReminders.clear()
+                saveRemindersToPrefs()
+                ReminderNotificationListenerService.instance?.postMatchNotification(text)
+                updateSummaryAndAdapter()
+                Toast.makeText(this, R.string.toast_reminder_created, Toast.LENGTH_SHORT).show()
+                binding.searchReminderInput.requestFocus()
+            } else {
+                recentlyDoneReminders.clear()
+                loadReminders()
+            }
             binding.swipeRefreshLayout.isRefreshing = false
         }
     }
@@ -314,10 +335,6 @@ class MainActivity : AppCompatActivity() {
             } else {
                 Toast.makeText(this, R.string.toast_reminder_create_failed_empty, Toast.LENGTH_SHORT).show()
             }
-        }
-
-        binding.btnAddReminder.setOnClickListener {
-            submitActionWithCancel()
         }
 
         binding.searchReminderInput.setOnEditorActionListener { _, actionId, _ ->
