@@ -78,6 +78,13 @@ class MainActivityTest {
 
         // Input text should be cleared and all 3 reminders displayed (+1 footer = 4 items in RecyclerView)
         assertEquals("Expected 4 items total in RecyclerView", 4, recyclerView.adapter!!.itemCount)
+
+        // Verify the newly created reminder is displayed at position 0 on the very first pull down
+        recyclerView.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED)
+        recyclerView.layout(0, 0, 1080, 1920)
+        val holder = recyclerView.findViewHolderForAdapterPosition(0) as? com.bas080.notificationreminders.RemindersAdapter.ItemViewHolder
+        assertNotNull("ViewHolder at position 0 should exist", holder)
+        assertEquals("milk", holder?.reminderInput?.text?.toString())
     }
 
     @Test
