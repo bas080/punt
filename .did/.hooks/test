@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Check that every file in .did/ (excluding .hooks and hidden files) has a .md extension
+non_md_files=()
+
+while IFS= read -r -d '' file; do
+  if [[ "$file" != *.md ]]; then
+    non_md_files+=("$file")
+  fi
+done < <(find .did -type f ! -path ".did/.hooks/*" ! -name ".*" -print0)
+
+if [ ${#non_md_files[@]} -ne 0 ]; then
+  echo "Error: The following files in .did/ do not have a .md extension:"
+  for file in "${non_md_files[@]}"; do
+    echo "  - $file"
+  done
+  exit 1
+else
+  echo "All files in .did/ are markdown (.md) files."
+  exit 0
+fi
