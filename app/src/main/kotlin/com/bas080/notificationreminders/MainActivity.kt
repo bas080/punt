@@ -13,7 +13,9 @@ import android.os.Bundle
 import android.provider.Settings
 import android.text.Editable
 import android.text.TextWatcher
+import android.view.GestureDetector
 import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
@@ -160,13 +162,17 @@ class MainActivity : AppCompatActivity() {
             val screenHeight = rootView.rootView.height
             val keypadHeight = screenHeight - rect.bottom
             val isKeyboardOpen = keypadHeight > screenHeight * 0.15
-            binding.headerNavigation.visibility = if (isKeyboardOpen) View.GONE else View.VISIBLE
+            binding.layoutFabContainer.visibility = if (isKeyboardOpen) View.GONE else View.VISIBLE
+            if (isKeyboardOpen) {
+                binding.fabPillMenuContainer.visibility = View.GONE
+            }
         }
 
         ViewCompat.setOnApplyWindowInsetsListener(rootView) { _, insets ->
             val isImeVisible = insets.isVisible(WindowInsetsCompat.Type.ime())
+            binding.layoutFabContainer.visibility = if (isImeVisible) View.GONE else View.VISIBLE
             if (isImeVisible) {
-                binding.headerNavigation.visibility = View.GONE
+                binding.fabPillMenuContainer.visibility = View.GONE
             }
             insets
         }
@@ -252,12 +258,58 @@ class MainActivity : AppCompatActivity() {
             clearFilterAndSearchAction()
         }
 
+        markAsButtonAccessibility(binding.fabMenu)
+        markAsButtonAccessibility(binding.btnListExportPill)
+
+        val toggleFabMenu = {
+            val isExpanded = binding.fabPillMenuContainer.visibility == View.VISIBLE
+            binding.fabPillMenuContainer.visibility = if (isExpanded) View.GONE else View.VISIBLE
+        }
+
+        val collapseFabMenu = {
+            binding.fabPillMenuContainer.visibility = View.GONE
+        }
+
+        binding.fabMenu.setOnClickListener {
+            toggleFabMenu()
+        }
+
+        val gestureDetector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onFling(e1: MotionEvent?, e2: MotionEvent, velocityX: Float, velocityY: Float): Boolean {
+                if (e1 != null && e1.y - e2.y > 50 && Math.abs(velocityY) > 100) {
+                    binding.fabPillMenuContainer.visibility = View.VISIBLE
+                    return true
+                }
+                return false
+            }
+        })
+
+        binding.fabMenu.setOnTouchListener { _, event ->
+            gestureDetector.onTouchEvent(event)
+            false
+        }
+
+        binding.remindersContainer.setOnClickListener {
+            collapseFabMenu()
+        }
+
+        binding.aboutContainer.setOnClickListener {
+            collapseFabMenu()
+        }
+
         binding.btnNavReminders.setOnClickListener {
+            collapseFabMenu()
             showRemindersView()
         }
 
         binding.btnNavAbout.setOnClickListener {
+            collapseFabMenu()
             showAboutView()
+        }
+
+        binding.btnListExportPill.setOnClickListener {
+            collapseFabMenu()
+            binding.btnListExport.performClick()
         }
 
         binding.btnFeedback.setOnClickListener {
@@ -321,7 +373,7 @@ class MainActivity : AppCompatActivity() {
             val text = binding.searchReminderInput.text.toString().trim()
             if (text.isNotEmpty()) {
                 com.bas080.notificationreminders.utils.ExperimentTracker.trackCreation(this, "app_input")
-                activeReminders.add(0, text)
+                activeReminders.add(text)
                 currentSearchQuery = ""
                 getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
                     .edit()

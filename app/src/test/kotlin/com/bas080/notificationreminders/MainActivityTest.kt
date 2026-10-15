@@ -166,6 +166,45 @@ class MainActivityTest {
     }
 
     @Test
+    fun testFloatingHamburgerFabTogglesVerticalPillMenuAndNavigates() {
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = controller.get()
+
+        val fabMenu = activity.findViewById<ImageView>(R.id.fab_menu)
+        val pillContainer = activity.findViewById<View>(R.id.fab_pill_menu_container)
+        val btnNavAbout = activity.findViewById<TextView>(R.id.btn_nav_about)
+        val btnNavReminders = activity.findViewById<TextView>(R.id.btn_nav_reminders)
+        val btnListExportPill = activity.findViewById<View>(R.id.btn_list_export_pill)
+
+        assertNotNull(fabMenu)
+        assertNotNull(pillContainer)
+        assertEquals(View.GONE, pillContainer.visibility)
+
+        // Tapping FAB expands vertical pill container
+        fabMenu.performClick()
+        assertEquals(View.VISIBLE, pillContainer.visibility)
+
+        // Tapping About pill navigates to About view and collapses pill container
+        btnNavAbout.performClick()
+        assertEquals(View.GONE, pillContainer.visibility)
+        assertEquals(View.VISIBLE, activity.findViewById<View>(R.id.about_container).visibility)
+        assertEquals(View.GONE, activity.findViewById<View>(R.id.reminders_container).visibility)
+
+        // Expanding again and tapping Tasks pill navigates back to Tasks
+        fabMenu.performClick()
+        assertEquals(View.VISIBLE, pillContainer.visibility)
+        btnNavReminders.performClick()
+        assertEquals(View.GONE, pillContainer.visibility)
+        assertEquals(View.VISIBLE, activity.findViewById<View>(R.id.reminders_container).visibility)
+
+        // Tapping bulk export pill collapses menu
+        fabMenu.performClick()
+        assertEquals(View.VISIBLE, pillContainer.visibility)
+        btnListExportPill.performClick()
+        assertEquals(View.GONE, pillContainer.visibility)
+    }
+
+    @Test
     fun testAboutViewDisplaysVersionAndFeedbackLaunchesIntent() {
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
@@ -1108,13 +1147,13 @@ class MainActivityTest {
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
 
-        val headerNav = activity.findViewById<View>(R.id.header_navigation)
+        val fabContainer = activity.findViewById<View>(R.id.layout_fab_container)
         val recyclerView = activity.findViewById<RecyclerView>(R.id.reminders_list)
-        assertNotNull(headerNav)
+        assertNotNull(fabContainer)
         assertNotNull(recyclerView)
 
         // Navigation is VISIBLE
-        assertEquals(View.VISIBLE, headerNav.visibility)
+        assertEquals(View.VISIBLE, fabContainer.visibility)
 
         // Scroll down list to position 5
         recyclerView.scrollToPosition(5)
@@ -1124,7 +1163,7 @@ class MainActivityTest {
         recyclerView.scrollBy(0, 50)
         shadowOf(android.os.Looper.getMainLooper()).idle()
 
-        assertEquals("Bottom navigation bar should remain VISIBLE on scroll", View.VISIBLE, headerNav.visibility)
+        assertEquals("Floating navigation container should remain VISIBLE on scroll", View.VISIBLE, fabContainer.visibility)
     }
 
     @Test
