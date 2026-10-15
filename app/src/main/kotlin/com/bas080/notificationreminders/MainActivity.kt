@@ -1680,7 +1680,7 @@ class RemindersAdapter(
                 while (end > start && reminderText[end - 1].isWhitespace()) {
                     end--
                 }
-                val textColor = ContextCompat.getColor(context, R.color.accent_subtle)
+                val textColor = ContextCompat.getColor(context, R.color.text_secondary)
                 val span = android.text.style.ForegroundColorSpan(textColor)
                 spannable.setSpan(span, start, end, android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
             }

@@ -1,0 +1,16 @@
+Pull-down (pull-to-refresh) task creation from top query/input box
+
+When performing a pull-down gesture on the main reminders list:
+1. If top input box contains non-blank text:
+   - Convert text into a new saved reminder (saved to storage & backup).
+   - Clear top search input box (`search_reminder_input.setText("")`) and reset search query filter so all active items are visible.
+   - Set focus to top input box (`search_reminder_input.requestFocus()`) without forcibly popping up the soft keyboard.
+   - Clear recently completed `#done` items and reload list.
+   - DiffUtil animates the new item card smoothly sliding into position 0 at the top of the list as the pull-to-refresh indicator completes.
+2. If top input box is empty or whitespace-only:
+   - Perform standard pull-to-refresh (clears recently completed `#done` items and reloads list).
+   - Maintain focus state without changing keyboard or focus.
+
+## Visual & Animation Polish
+- `SwipeRefreshLayout` styled with Punt's accent cyan color scheme (`setColorSchemeResources(R.color.accent)`).
+- Smooth `DiffUtil` list insertion animation as the refresh spinner dismisses.
