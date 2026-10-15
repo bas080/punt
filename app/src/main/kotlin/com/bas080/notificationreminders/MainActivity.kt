@@ -96,6 +96,9 @@ class MainActivity : AppCompatActivity() {
     private var currentSearchQuery = ""
     private val recentlyDoneReminders = mutableSetOf<String>()
 
+    private val searchHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private var searchRunnable: Runnable? = null
+
     private val editReminderHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private var pendingEditRunnable: Runnable? = null
     private var pendingOldText: String? = null
@@ -172,11 +175,11 @@ class MainActivity : AppCompatActivity() {
     private fun setupSwipeRefresh() {
         binding.swipeRefreshLayout.setColorSchemeResources(R.color.accent)
         binding.swipeRefreshLayout.setOnRefreshListener {
+            searchRunnable?.let { searchHandler.removeCallbacks(it) }
             val text = binding.searchReminderInput.text.toString().trim()
             if (text.isNotEmpty()) {
                 com.bas080.notificationreminders.utils.ExperimentTracker.trackCreation(this, "app_input")
-                binding.searchReminderInput.setText("")
-                activeReminders.add(0, text)
+                activeReminders.add(text)
                 currentSearchQuery = ""
                 currentFilter = ReminderFilter.ALL
                 getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
@@ -187,6 +190,7 @@ class MainActivity : AppCompatActivity() {
                 recentlyDoneReminders.clear()
                 saveRemindersToPrefs()
                 ReminderNotificationListenerService.instance?.postMatchNotification(text)
+                binding.searchReminderInput.setText("")
                 updateSummaryAndAdapter()
                 Toast.makeText(this, R.string.toast_reminder_created, Toast.LENGTH_SHORT).show()
                 binding.searchReminderInput.requestFocus()
@@ -312,15 +316,11 @@ class MainActivity : AppCompatActivity() {
             binding.searchReminderInput.maxLines = if (hasFocus) Int.MAX_VALUE else 4
         }
 
-        val searchHandler = android.os.Handler(android.os.Looper.getMainLooper())
-        var searchRunnable: Runnable? = null
-
         val submitActionWithCancel = {
             searchRunnable?.let { searchHandler.removeCallbacks(it) }
             val text = binding.searchReminderInput.text.toString().trim()
             if (text.isNotEmpty()) {
                 com.bas080.notificationreminders.utils.ExperimentTracker.trackCreation(this, "app_input")
-                binding.searchReminderInput.setText("")
                 activeReminders.add(0, text)
                 currentSearchQuery = ""
                 getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
@@ -330,6 +330,7 @@ class MainActivity : AppCompatActivity() {
                 recentlyDoneReminders.clear()
                 saveRemindersToPrefs()
                 ReminderNotificationListenerService.instance?.postMatchNotification(text)
+                binding.searchReminderInput.setText("")
                 updateSummaryAndAdapter()
                 Toast.makeText(this, R.string.toast_reminder_created, Toast.LENGTH_SHORT).show()
             } else {
