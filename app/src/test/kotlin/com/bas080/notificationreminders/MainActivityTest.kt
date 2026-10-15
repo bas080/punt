@@ -12,6 +12,7 @@ import androidx.recyclerview.widget.RecyclerView
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -33,23 +34,21 @@ class MainActivityTest {
     }
 
     @Test
-    fun testAddReminderShowsSuccessToast() {
+    fun testAddReminderShowsSuccessToastOnImeAction() {
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
 
         val input = activity.findViewById<EditText>(R.id.search_reminder_input)
-        val btnAdd = activity.findViewById<ImageView>(R.id.btn_add_reminder)
         assertNotNull(input)
-        assertNotNull(btnAdd)
 
         input.setText("Buy Groceries")
-        btnAdd.performClick()
+        input.onEditorAction(android.view.inputmethod.EditorInfo.IME_ACTION_DONE)
 
         assertEquals("Reminder created", ShadowToast.getTextOfLatestToast())
     }
 
     @Test
-    fun testInputFiltersRemindersInRealTimeAndAddsOnButtonClick() {
+    fun testPullDownToCreateReminderFromTopInput() {
         val context = RuntimeEnvironment.getApplication()
         val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
         prefs.edit().clear().putStringSet("key_reminders_list", setOf("Buy milk", "Clean garage")).commit()
@@ -59,37 +58,59 @@ class MainActivityTest {
 
         val recyclerView = activity.findViewById<RecyclerView>(R.id.reminders_list)
         val input = activity.findViewById<EditText>(R.id.search_reminder_input)
-        val btnAdd = activity.findViewById<ImageView>(R.id.btn_add_reminder)
+        val swipeRefresh = activity.findViewById<androidx.swiperefreshlayout.widget.SwipeRefreshLayout>(R.id.swipe_refresh_layout)
 
         // Typing "milk" should filter displayed items to 1 reminder ("Buy milk")
         input.setText("milk")
         shadowOf(android.os.Looper.getMainLooper()).idleFor(250, java.util.concurrent.TimeUnit.MILLISECONDS)
-        // 1 matched ("Buy milk") + 1 footer = 2 items in RecyclerView
         assertEquals("Expected 2 items when filtered", 2, recyclerView.adapter!!.itemCount)
 
-        // Clicking '+' button should add "milk" as a new reminder and clear search query
-        btnAdd.performClick()
+        // Pulling down (swipe to refresh) should convert "milk" into a new reminder and clear search query
+        val listenerField = androidx.swiperefreshlayout.widget.SwipeRefreshLayout::class.java.getDeclaredField("mListener")
+        listenerField.isAccessible = true
+        val onRefreshListener = listenerField.get(swipeRefresh) as? androidx.swiperefreshlayout.widget.SwipeRefreshLayout.OnRefreshListener
+        assertNotNull("SwipeRefreshLayout mListener should be set", onRefreshListener)
+        onRefreshListener!!.onRefresh()
         shadowOf(android.os.Looper.getMainLooper()).idle()
+
         assertEquals("Reminder created", ShadowToast.getTextOfLatestToast())
+        assertEquals("", input.text.toString())
 
         // Input text should be cleared and all 3 reminders displayed (+1 footer = 4 items in RecyclerView)
         assertEquals("Expected 4 items total in RecyclerView", 4, recyclerView.adapter!!.itemCount)
     }
 
     @Test
-    fun testAddReminderEmptyShowsFailureToast() {
+    fun testAddReminderEmptyShowsFailureToastOnImeAction() {
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
 
         val input = activity.findViewById<EditText>(R.id.search_reminder_input)
-        val btnAdd = activity.findViewById<ImageView>(R.id.btn_add_reminder)
         assertNotNull(input)
-        assertNotNull(btnAdd)
 
         input.setText("   ")
-        btnAdd.performClick()
+        input.onEditorAction(android.view.inputmethod.EditorInfo.IME_ACTION_DONE)
 
         assertEquals("Failed to create reminder: Text cannot be empty", ShadowToast.getTextOfLatestToast())
+    }
+
+    @Test
+    fun testPullDownWithEmptyInputRefreshesListWithoutCreatingReminder() {
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = controller.get()
+
+        val input = activity.findViewById<EditText>(R.id.search_reminder_input)
+        val swipeRefresh = activity.findViewById<androidx.swiperefreshlayout.widget.SwipeRefreshLayout>(R.id.swipe_refresh_layout)
+
+        input.setText("   ")
+        val listenerField = androidx.swiperefreshlayout.widget.SwipeRefreshLayout::class.java.getDeclaredField("mListener")
+        listenerField.isAccessible = true
+        val onRefreshListener = listenerField.get(swipeRefresh) as? androidx.swiperefreshlayout.widget.SwipeRefreshLayout.OnRefreshListener
+        assertNotNull(onRefreshListener)
+        onRefreshListener!!.onRefresh()
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        assertNull("No creation toast expected on empty pull down", ShadowToast.getTextOfLatestToast())
     }
 
     @Test
@@ -183,9 +204,8 @@ class MainActivityTest {
         val activity = controller.get()
 
         val input = activity.findViewById<EditText>(R.id.search_reminder_input)
-        val btnAdd = activity.findViewById<ImageView>(R.id.btn_add_reminder)
         input.setText("Buy milk")
-        btnAdd.performClick()
+        input.onEditorAction(android.view.inputmethod.EditorInfo.IME_ACTION_DONE)
 
         val btnExport = activity.findViewById<TextView>(R.id.btn_export_markdown)
         assertNotNull(btnExport)

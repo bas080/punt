@@ -29,21 +29,6 @@
             android:paddingHorizontal="12dp"
             android:layout_marginBottom="8dp">
 
-            <!-- Filter Icon Button -->
-            <ImageView
-                android:id="@+id/btn_tags_filter"
-                android:layout_width="32dp"
-                android:layout_height="32dp"
-                android:src="@drawable/ic_action_filter"
-                app:tint="@color/accent"
-                android:contentDescription="Filter reminders"
-                android:scaleType="centerInside"
-                android:padding="4dp"
-                android:layout_marginEnd="4dp"
-                android:clickable="true"
-                android:focusable="true"
-                android:background="?attr/selectableItemBackgroundBorderless" />
-
             <EditText
                 android:id="@+id/search_reminder_input"
                 android:layout_width="0dp"
@@ -61,15 +46,17 @@
                 android:paddingHorizontal="4dp"
                 android:background="@null" />
 
+            <!-- Filter Icon Button -->
             <ImageView
-                android:id="@+id/btn_add_reminder"
+                android:id="@+id/btn_tags_filter"
                 android:layout_width="32dp"
                 android:layout_height="32dp"
-                android:src="@drawable/ic_action_add"
+                android:src="@drawable/ic_action_filter"
                 app:tint="@color/accent"
-                android:contentDescription="@string/add_reminder"
+                android:contentDescription="Filter reminders"
                 android:scaleType="centerInside"
                 android:padding="4dp"
+                android:layout_marginStart="4dp"
                 android:clickable="true"
                 android:focusable="true"
                 android:background="?attr/selectableItemBackgroundBorderless" />

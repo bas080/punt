@@ -79,10 +79,8 @@ class UiPerformanceAndroidTest {
         try {
             prepareActivity(scenario)
 
-            onView(withId(R.id.search_reminder_input)).perform(typeText("Benchmark Reminder Item"))
-
             val elapsedNs = measureNanoTime {
-                onView(withId(R.id.btn_add_reminder)).perform(click())
+                onView(withId(R.id.search_reminder_input)).perform(typeText("Benchmark Reminder Item"), pressImeActionButton())
             }
 
             val elapsedMs = elapsedNs / 1_000_000.0
