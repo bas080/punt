@@ -176,7 +176,7 @@ class MainActivity : AppCompatActivity() {
             if (text.isNotEmpty()) {
                 com.bas080.notificationreminders.utils.ExperimentTracker.trackCreation(this, "app_input")
                 binding.searchReminderInput.setText("")
-                activeReminders.add(text)
+                activeReminders.add(0, text)
                 currentSearchQuery = ""
                 currentFilter = ReminderFilter.ALL
                 getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
@@ -321,7 +321,7 @@ class MainActivity : AppCompatActivity() {
             if (text.isNotEmpty()) {
                 com.bas080.notificationreminders.utils.ExperimentTracker.trackCreation(this, "app_input")
                 binding.searchReminderInput.setText("")
-                activeReminders.add(text)
+                activeReminders.add(0, text)
                 currentSearchQuery = ""
                 getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
                     .edit()
