@@ -346,7 +346,8 @@
             android:layout_gravity="bottom|end"
             android:orientation="vertical"
             android:gravity="end"
-            android:padding="8dp">
+            android:padding="16dp"
+            android:layout_marginBottom="20dp">
 
             <!-- Vertical Upward Expanded Pill Stack -->
             <LinearLayout
@@ -390,9 +391,41 @@
                     android:background="@drawable/bg_pill"
                     android:layout_marginBottom="8dp" />
 
-                <!-- Bulk Action Pill: Share / Export -->
+                <!-- Action Pill: Punt All -->
                 <LinearLayout
-                    android:id="@+id/btn_list_export_pill"
+                    android:id="@+id/btn_fab_punt_all"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:orientation="horizontal"
+                    android:gravity="center"
+                    android:paddingHorizontal="14dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:background="@drawable/bg_pill_action"
+                    android:layout_marginBottom="8dp">
+
+                    <ImageView
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
+                        android:src="@drawable/ic_action_snooze"
+                        app:tint="@color/accent"
+                        android:contentDescription="Punt All"
+                        android:scaleType="centerInside"
+                        android:layout_marginEnd="6dp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Punt All"
+                        android:textSize="13sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/accent" />
+
+                </LinearLayout>
+
+                <!-- Action Pill: Share Matching -->
+                <LinearLayout
+                    android:id="@+id/btn_fab_share_matching"
                     android:layout_width="wrap_content"
                     android:layout_height="36dp"
                     android:orientation="horizontal"
@@ -403,19 +436,18 @@
                     android:background="@drawable/bg_pill_action">
 
                     <ImageView
-                        android:id="@+id/btn_list_export"
                         android:layout_width="18dp"
                         android:layout_height="18dp"
-                        android:src="@drawable/ic_action_bulk"
+                        android:src="@drawable/ic_action_share"
                         app:tint="@color/accent"
-                        android:contentDescription="Bulk actions"
+                        android:contentDescription="Share Matching"
                         android:scaleType="centerInside"
                         android:layout_marginEnd="6dp" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Share / Export"
+                        android:text="Share Matching"
                         android:textSize="13sp"
                         android:textStyle="bold"
                         android:textColor="@color/accent" />
@@ -434,6 +466,8 @@
                 android:contentDescription="Navigation menu"
                 android:scaleType="centerInside"
                 android:padding="12dp"
+                android:elevation="6dp"
+                android:translationZ="6dp"
                 android:clickable="true"
                 android:focusable="true"
                 android:background="@drawable/bg_fab_circle" />

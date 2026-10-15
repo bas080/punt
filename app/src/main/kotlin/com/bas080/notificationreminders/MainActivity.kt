@@ -213,7 +213,6 @@ class MainActivity : AppCompatActivity() {
         markAsButtonAccessibility(binding.btnNavAbout)
         markAsButtonAccessibility(binding.btnClearLogs)
         markAsButtonAccessibility(binding.btnExportMarkdown)
-        markAsButtonAccessibility(binding.btnListExport)
         markAsButtonAccessibility(binding.btnImportMarkdown)
         markAsButtonAccessibility(binding.btnDonate)
         markAsButtonAccessibility(binding.btnToggleCalendarSync)
@@ -251,7 +250,6 @@ class MainActivity : AppCompatActivity() {
                 Toast.makeText(this, "Unable to open donation link", Toast.LENGTH_SHORT).show()
             }
         }
-        binding.btnListExport.setColorFilter(ContextCompat.getColor(this, R.color.accent))
         markAsButtonAccessibility(binding.btnEmptyClearFilter)
 
         binding.btnEmptyClearFilter.setOnClickListener {
@@ -259,7 +257,8 @@ class MainActivity : AppCompatActivity() {
         }
 
         markAsButtonAccessibility(binding.fabMenu)
-        markAsButtonAccessibility(binding.btnListExportPill)
+        markAsButtonAccessibility(binding.btnFabPuntAll)
+        markAsButtonAccessibility(binding.btnFabShareMatching)
 
         val toggleFabMenu = {
             val isExpanded = binding.fabPillMenuContainer.visibility == View.VISIBLE
@@ -307,9 +306,20 @@ class MainActivity : AppCompatActivity() {
             showAboutView()
         }
 
-        binding.btnListExportPill.setOnClickListener {
+        binding.btnFabPuntAll.setOnClickListener {
             collapseFabMenu()
-            binding.btnListExport.performClick()
+            val activeList = displayedReminders.filter {
+                it != HEADER_SNOOZED_SECTION_MARKER && !it.contains("#done", ignoreCase = true)
+            }
+            showBulkSnoozeDialog(activeList)
+        }
+
+        binding.btnFabShareMatching.setOnClickListener {
+            collapseFabMenu()
+            val activeList = displayedReminders.filter {
+                it != HEADER_SNOOZED_SECTION_MARKER && !it.contains("#done", ignoreCase = true)
+            }
+            showExportOptionsDialog(activeList)
         }
 
         binding.btnFeedback.setOnClickListener {
@@ -327,30 +337,6 @@ class MainActivity : AppCompatActivity() {
 
         binding.btnExportMarkdown.setOnClickListener {
             showExportOptionsDialog(activeReminders)
-        }
-
-        binding.btnListExport.setOnClickListener { view ->
-            val popup = androidx.appcompat.widget.PopupMenu(this, view)
-            popup.menu.add("Punt All")
-            popup.menu.add("Share All")
-            popup.setOnMenuItemClickListener { item ->
-                when (item.title) {
-                    "Punt All" -> {
-                        val activeList = displayedReminders.filter {
-                            it != HEADER_SNOOZED_SECTION_MARKER && !it.contains("#done", ignoreCase = true)
-                        }
-                        showBulkSnoozeDialog(activeList)
-                        true
-                    }
-                    "Share All" -> {
-                        val matchedList = displayedReminders.filter { it != HEADER_SNOOZED_SECTION_MARKER }
-                        showExportOptionsDialog(matchedList)
-                        true
-                    }
-                    else -> false
-                }
-            }
-            popup.show()
         }
 
         binding.btnImportMarkdown.setOnClickListener {
