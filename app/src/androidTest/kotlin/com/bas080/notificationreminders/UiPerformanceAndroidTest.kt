@@ -7,7 +7,7 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.action.ViewActions.click
-import androidx.test.espresso.action.ViewActions.swipeDown
+import androidx.test.espresso.action.ViewActions.pressImeActionButton
 import androidx.test.espresso.action.ViewActions.typeText
 import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.espresso.matcher.ViewMatchers.withText
@@ -83,7 +83,7 @@ class UiPerformanceAndroidTest {
             onView(withId(R.id.search_reminder_input)).perform(typeText("Benchmark Reminder Item"))
 
             val elapsedNs = measureNanoTime {
-                onView(withId(R.id.swipe_refresh_layout)).perform(swipeDown())
+                onView(withId(R.id.search_reminder_input)).perform(pressImeActionButton())
             }
 
             val elapsedMs = elapsedNs / 1_000_000.0
