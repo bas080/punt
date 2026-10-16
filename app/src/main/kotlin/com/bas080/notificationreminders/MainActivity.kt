@@ -1468,13 +1468,23 @@ class MainActivity : AppCompatActivity() {
 
         if (displayedReminders.isEmpty()) {
             binding.layoutEmptyReminders.visibility = View.VISIBLE
-            if (hasFilterOrSearch) {
-                binding.txtEmptyReminders.text = "No matching reminders found."
-                binding.btnEmptyClearFilter.visibility = View.VISIBLE
-            } else {
-                binding.txtEmptyReminders.setText(R.string.no_reminders)
-                binding.btnEmptyClearFilter.visibility = View.GONE
+            binding.btnEmptyClearFilter.visibility = if (hasFilterOrSearch) View.VISIBLE else View.GONE
+
+            val instructions = "Pull down to create task\nSwipe right on task to mark done\nSwipe left on task to punt\nUse #every 1d for recurring tasks"
+            val spannable = android.text.SpannableStringBuilder(instructions)
+            val tagMatch = Regex("#every 1d").find(instructions)
+            if (tagMatch != null) {
+                val start = tagMatch.range.first
+                val end = tagMatch.range.last + 1
+                val textColor = ContextCompat.getColor(this, R.color.text_secondary)
+                spannable.setSpan(
+                    android.text.style.ForegroundColorSpan(textColor),
+                    start,
+                    end,
+                    android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                )
             }
+            binding.txtEmptyReminders.text = spannable
         } else {
             binding.layoutEmptyReminders.visibility = View.GONE
         }

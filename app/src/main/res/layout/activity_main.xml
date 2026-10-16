@@ -92,36 +92,35 @@
                     android:id="@+id/layout_empty_reminders"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_gravity="center_horizontal"
+                    android:layout_gravity="start"
                     android:layout_marginTop="120dp"
+                    android:paddingHorizontal="16dp"
                     android:orientation="vertical"
-                    android:gravity="center"
+                    android:gravity="start"
                     android:visibility="gone">
-
-                    <TextView
-                        android:id="@+id/txt_empty_reminders"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:gravity="center"
-                        android:text="@string/no_reminders"
-                        android:textColor="@color/text_muted"
-                        android:textSize="14sp" />
 
                     <TextView
                         android:id="@+id/btn_empty_clear_filter"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="12dp"
-                        android:text="Clear filter &amp; show all"
+                        android:layout_marginBottom="12dp"
+                        android:text="Clear filter"
                         android:textColor="@color/accent"
-                        android:textSize="13sp"
+                        android:textSize="14sp"
                         android:textStyle="bold"
-                        android:paddingVertical="6dp"
-                        android:paddingHorizontal="12dp"
                         android:clickable="true"
                         android:focusable="true"
                         android:background="?attr/selectableItemBackground"
                         android:visibility="gone" />
+
+                    <TextView
+                        android:id="@+id/txt_empty_reminders"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:gravity="start"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="14sp"
+                        android:lineSpacingExtra="6dp" />
 
                 </LinearLayout>
 
