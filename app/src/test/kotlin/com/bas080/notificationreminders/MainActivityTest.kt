@@ -1,6 +1,8 @@
 package com.bas080.notificationreminders
 
 import android.content.Context
+import android.os.SystemClock
+import android.view.MotionEvent
 import android.view.View
 import android.widget.EditText
 import android.widget.ImageView
@@ -209,6 +211,35 @@ class MainActivityTest {
         assertNotNull(btnFabShareMatching)
         btnFabShareMatching.performClick()
         assertEquals(View.GONE, pillContainer.visibility)
+    }
+
+    @Test
+    fun testDraggableFabAndResetPosition() {
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = controller.get()
+
+        val fabMenu = activity.findViewById<ImageView>(R.id.fab_menu)
+        val btnResetFabPosition = activity.findViewById<TextView>(R.id.btn_reset_fab_position)
+        assertNotNull(fabMenu)
+        assertNotNull(btnResetFabPosition)
+
+        val downTime = SystemClock.uptimeMillis()
+        fabMenu.dispatchTouchEvent(MotionEvent.obtain(downTime, downTime, MotionEvent.ACTION_DOWN, 100f, 100f, 0))
+
+        shadowOf(android.os.Looper.getMainLooper()).idleFor(600, java.util.concurrent.TimeUnit.MILLISECONDS)
+
+        fabMenu.dispatchTouchEvent(MotionEvent.obtain(downTime, downTime + 200, MotionEvent.ACTION_MOVE, 200f, 200f, 0))
+        fabMenu.dispatchTouchEvent(MotionEvent.obtain(downTime, downTime + 300, MotionEvent.ACTION_UP, 200f, 200f, 0))
+
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        val prefs = activity.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
+
+        btnResetFabPosition.performClick()
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        assertEquals(-1f, prefs.getFloat("key_fab_rel_x", -1f), 0.001f)
+        assertEquals(-1f, prefs.getFloat("key_fab_rel_y", -1f), 0.001f)
     }
 
     @Test

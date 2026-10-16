@@ -226,6 +226,22 @@
                                 android:focusable="true"
                                 android:background="?attr/selectableItemBackground" />
 
+                            <TextView
+                                android:id="@+id/btn_reset_fab_position"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/reset_fab_position"
+                                android:textSize="12sp"
+                                android:textStyle="bold"
+                                android:textColor="@color/accent"
+                                android:letterSpacing="0.05"
+                                android:paddingVertical="6dp"
+                                android:paddingHorizontal="8dp"
+                                android:layout_marginStart="8dp"
+                                android:clickable="true"
+                                android:focusable="true"
+                                android:background="?attr/selectableItemBackground" />
+
                         </LinearLayout>
                     </HorizontalScrollView>
 
