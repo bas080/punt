@@ -726,6 +726,9 @@ class MainActivity : AppCompatActivity() {
         binding.remindersContainer.visibility = View.VISIBLE
         binding.aboutContainer.visibility = View.GONE
 
+        binding.btnFabPuntAll.visibility = View.VISIBLE
+        binding.btnFabShareMatching.visibility = View.VISIBLE
+
         binding.btnNavReminders.isSelected = true
         binding.btnNavReminders.setTypeface(null, android.graphics.Typeface.BOLD)
         binding.btnNavReminders.setTextColor(ContextCompat.getColor(this, R.color.bg_dark))
@@ -762,6 +765,9 @@ class MainActivity : AppCompatActivity() {
     private fun showAboutView() {
         binding.remindersContainer.visibility = View.GONE
         binding.aboutContainer.visibility = View.VISIBLE
+
+        binding.btnFabPuntAll.visibility = View.GONE
+        binding.btnFabShareMatching.visibility = View.GONE
 
         binding.btnNavReminders.isSelected = false
         binding.btnNavReminders.setTypeface(null, android.graphics.Typeface.BOLD)

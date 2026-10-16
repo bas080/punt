@@ -190,6 +190,8 @@ class MainActivityTest {
         assertEquals(View.GONE, pillContainer.visibility)
         assertEquals(View.VISIBLE, activity.findViewById<View>(R.id.about_container).visibility)
         assertEquals(View.GONE, activity.findViewById<View>(R.id.reminders_container).visibility)
+        assertEquals(View.GONE, btnFabPuntAll.visibility)
+        assertEquals(View.GONE, btnFabShareMatching.visibility)
 
         // Expanding again and tapping Tasks pill navigates back to Tasks
         fabMenu.performClick()
@@ -197,6 +199,8 @@ class MainActivityTest {
         btnNavReminders.performClick()
         assertEquals(View.GONE, pillContainer.visibility)
         assertEquals(View.VISIBLE, activity.findViewById<View>(R.id.reminders_container).visibility)
+        assertEquals(View.VISIBLE, btnFabPuntAll.visibility)
+        assertEquals(View.VISIBLE, btnFabShareMatching.visibility)
 
         // Tapping action pills collapses menu
         fabMenu.performClick()
