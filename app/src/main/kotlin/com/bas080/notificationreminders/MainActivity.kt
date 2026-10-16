@@ -13,9 +13,7 @@ import android.os.Bundle
 import android.provider.Settings
 import android.text.Editable
 import android.text.TextWatcher
-import android.view.GestureDetector
 import android.view.LayoutInflater
-import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
@@ -730,10 +728,10 @@ class MainActivity : AppCompatActivity() {
 
         binding.btnNavReminders.isSelected = true
         binding.btnNavReminders.setTypeface(null, android.graphics.Typeface.BOLD)
-        binding.btnNavReminders.setTextColor(ContextCompat.getColor(this, R.color.text_primary))
+        binding.btnNavReminders.setTextColor(ContextCompat.getColor(this, R.color.bg_dark))
         binding.btnNavAbout.isSelected = false
-        binding.btnNavAbout.setTypeface(null, android.graphics.Typeface.NORMAL)
-        binding.btnNavAbout.setTextColor(ContextCompat.getColor(this, R.color.text_secondary))
+        binding.btnNavAbout.setTypeface(null, android.graphics.Typeface.BOLD)
+        binding.btnNavAbout.setTextColor(ContextCompat.getColor(this, R.color.bg_dark))
     }
 
     private fun showCalendarPermissionSettingsDialog() {
@@ -766,11 +764,11 @@ class MainActivity : AppCompatActivity() {
         binding.aboutContainer.visibility = View.VISIBLE
 
         binding.btnNavReminders.isSelected = false
-        binding.btnNavReminders.setTypeface(null, android.graphics.Typeface.NORMAL)
-        binding.btnNavReminders.setTextColor(ContextCompat.getColor(this, R.color.text_secondary))
+        binding.btnNavReminders.setTypeface(null, android.graphics.Typeface.BOLD)
+        binding.btnNavReminders.setTextColor(ContextCompat.getColor(this, R.color.bg_dark))
         binding.btnNavAbout.isSelected = true
         binding.btnNavAbout.setTypeface(null, android.graphics.Typeface.BOLD)
-        binding.btnNavAbout.setTextColor(ContextCompat.getColor(this, R.color.text_primary))
+        binding.btnNavAbout.setTextColor(ContextCompat.getColor(this, R.color.bg_dark))
 
         try {
             val pInfo = packageManager.getPackageInfo(packageName, 0)
