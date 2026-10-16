@@ -411,7 +411,7 @@
                     android:translationZ="12dp"
                     android:clickable="true"
                     android:focusable="true"
-                    android:background="@drawable/bg_pill_action_inverted"
+                    android:background="@drawable/bg_pill_inverted"
                     android:layout_marginBottom="10dp">
 
                     <ImageView
@@ -445,7 +445,7 @@
                     android:translationZ="12dp"
                     android:clickable="true"
                     android:focusable="true"
-                    android:background="@drawable/bg_pill_action_inverted">
+                    android:background="@drawable/bg_pill_inverted">
 
                     <ImageView
                         android:layout_width="18dp"

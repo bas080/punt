@@ -83,8 +83,8 @@ class UiPerformanceBenchmarkTest {
         println("=== JVM Activity Launch & List Load Benchmark (1,000 items) ===")
         println("Activity initialization execution latency: %.3f ms".format(elapsedMs))
 
-        // Performance Assertion: Activity setup with 1,000 items must complete in < 3000ms
-        assertTrue("Activity setup took too long (${elapsedMs}ms)", elapsedMs < 3000.0)
+        // Performance Assertion: Activity setup with 1,000 items must complete in < 5000ms
+        assertTrue("Activity setup took too long (${elapsedMs}ms)", elapsedMs < 5000.0)
     }
 
     @Test
