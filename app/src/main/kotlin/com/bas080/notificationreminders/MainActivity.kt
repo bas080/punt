@@ -286,25 +286,6 @@ class MainActivity : AppCompatActivity() {
             toggleFabMenu()
         }
 
-        val gestureDetector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
-            override fun onDown(e: MotionEvent): Boolean {
-                return true
-            }
-
-            override fun onFling(e1: MotionEvent?, e2: MotionEvent, velocityX: Float, velocityY: Float): Boolean {
-                if (e1 != null && e1.y - e2.y > 50 && Math.abs(velocityY) > 100) {
-                    binding.fabPillMenuContainer.visibility = View.VISIBLE
-                    updateFabState(true)
-                    return true
-                }
-                return false
-            }
-        })
-
-        binding.fabMenu.setOnTouchListener { _, event ->
-            gestureDetector.onTouchEvent(event)
-        }
-
         binding.remindersContainer.setOnClickListener {
             collapseFabMenu()
         }
