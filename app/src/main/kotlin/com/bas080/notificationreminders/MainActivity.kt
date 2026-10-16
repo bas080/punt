@@ -53,6 +53,8 @@ class MainActivity : AppCompatActivity() {
         private const val KEY_REMINDER_FILTER = "key_reminder_filter"
         private const val KEY_SEARCH_QUERY = "key_search_query"
         private const val PREFS_SNOOZE_FREQ = "snooze_freq_prefs"
+        private const val KEY_FAB_REL_X = "key_fab_rel_x"
+        private const val KEY_FAB_REL_Y = "key_fab_rel_y"
 
         fun getCleanTrimmed(reminderText: String): String {
             return reminderText.replace(Regex("(?i)\\s*#done\\b"), "").trim().lowercase()
@@ -214,6 +216,7 @@ class MainActivity : AppCompatActivity() {
         markAsButtonAccessibility(binding.btnImportMarkdown)
         markAsButtonAccessibility(binding.btnDonate)
         markAsButtonAccessibility(binding.btnToggleCalendarSync)
+        markAsButtonAccessibility(binding.btnResetFabPosition)
         markAsButtonAccessibility(binding.btnFeedback)
         markAsButtonAccessibility(binding.btnTagsFilter)
 
@@ -247,6 +250,10 @@ class MainActivity : AppCompatActivity() {
             } catch (_: Exception) {
                 Toast.makeText(this, "Unable to open donation link", Toast.LENGTH_SHORT).show()
             }
+        }
+
+        binding.btnResetFabPosition.setOnClickListener {
+            resetFabPosition()
         }
         markAsButtonAccessibility(binding.btnEmptyClearFilter)
 
@@ -343,6 +350,156 @@ class MainActivity : AppCompatActivity() {
             showTagsSelectionDialog()
         }
 
+        setupDraggableFab()
+    }
+
+    private fun updatePillMenuDirection() {
+        val rootHeight = binding.root.height.takeIf { it > 0 } ?: return
+        val location = IntArray(2)
+        binding.fabMenu.getLocationOnScreen(location)
+        val fabCenterY = location[1] + binding.fabMenu.height / 2
+
+        val isTopHalf = fabCenterY < rootHeight / 2
+        binding.layoutFabContainer.removeView(binding.fabPillMenuContainer)
+        if (isTopHalf) {
+            binding.layoutFabContainer.addView(binding.fabPillMenuContainer)
+            val params = binding.fabPillMenuContainer.layoutParams as? android.widget.LinearLayout.LayoutParams
+            params?.topMargin = (14 * resources.displayMetrics.density).toInt()
+            params?.bottomMargin = 0
+            binding.fabPillMenuContainer.layoutParams = params
+        } else {
+            binding.layoutFabContainer.addView(binding.fabPillMenuContainer, 0)
+            val params = binding.fabPillMenuContainer.layoutParams as? android.widget.LinearLayout.LayoutParams
+            params?.bottomMargin = (14 * resources.displayMetrics.density).toInt()
+            params?.topMargin = 0
+            binding.fabPillMenuContainer.layoutParams = params
+        }
+    }
+
+    private fun setupDraggableFab() {
+        var startRawX = 0f
+        var startRawY = 0f
+        var initialTranslationX = 0f
+        var initialTranslationY = 0f
+        var isDragging = false
+        val longPressHandler = android.os.Handler(android.os.Looper.getMainLooper())
+        val touchSlop = android.view.ViewConfiguration.get(this).scaledTouchSlop
+
+        val longPressRunnable = Runnable {
+            isDragging = true
+            try {
+                binding.fabMenu.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+            } catch (_: Exception) {}
+            binding.fabMenu.animate().scaleX(1.15f).scaleY(1.15f).setDuration(100).start()
+        }
+
+        binding.fabMenu.setOnTouchListener { view, event ->
+            when (event.action) {
+                android.view.MotionEvent.ACTION_DOWN -> {
+                    startRawX = event.rawX
+                    startRawY = event.rawY
+                    initialTranslationX = binding.layoutFabContainer.translationX
+                    initialTranslationY = binding.layoutFabContainer.translationY
+                    isDragging = false
+                    longPressHandler.postDelayed(longPressRunnable, android.view.ViewConfiguration.getLongPressTimeout().toLong())
+                    true
+                }
+                android.view.MotionEvent.ACTION_MOVE -> {
+                    val dx = event.rawX - startRawX
+                    val dy = event.rawY - startRawY
+                    if (!isDragging && Math.hypot(dx.toDouble(), dy.toDouble()) > touchSlop) {
+                        longPressHandler.removeCallbacks(longPressRunnable)
+                    }
+                    if (isDragging) {
+                        binding.layoutFabContainer.translationX = initialTranslationX + dx
+                        binding.layoutFabContainer.translationY = initialTranslationY + dy
+                        updatePillMenuDirection()
+                    }
+                    true
+                }
+                android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
+                    longPressHandler.removeCallbacks(longPressRunnable)
+                    if (isDragging) {
+                        isDragging = false
+                        binding.fabMenu.animate().scaleX(1.0f).scaleY(1.0f).setDuration(100).start()
+                        clampAndSaveFabPosition()
+                    } else {
+                        view.performClick()
+                    }
+                    true
+                }
+                else -> false
+            }
+        }
+
+        restoreFabPosition()
+    }
+
+    private fun clampAndSaveFabPosition() {
+        val rootWidth = binding.root.width.toFloat().takeIf { it > 0f } ?: return
+        val rootHeight = binding.root.height.toFloat().takeIf { it > 0f } ?: return
+
+        val container = binding.layoutFabContainer
+        val location = IntArray(2)
+        container.getLocationOnScreen(location)
+        val centerX = location[0] + container.width / 2f
+        val centerY = location[1] + container.height / 2f
+
+        val relX = (centerX / rootWidth).coerceIn(0.05f, 0.95f)
+        val relY = (centerY / rootHeight).coerceIn(0.05f, 0.95f)
+
+        getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
+            .edit()
+            .putFloat(KEY_FAB_REL_X, relX)
+            .putFloat(KEY_FAB_REL_Y, relY)
+            .apply()
+
+        updatePillMenuDirection()
+    }
+
+    private fun restoreFabPosition() {
+        binding.root.post {
+            val prefs = getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
+            val relX = prefs.getFloat(KEY_FAB_REL_X, -1f)
+            val relY = prefs.getFloat(KEY_FAB_REL_Y, -1f)
+
+            if (relX >= 0f && relY >= 0f) {
+                val rootWidth = binding.root.width.toFloat()
+                val rootHeight = binding.root.height.toFloat()
+                val container = binding.layoutFabContainer
+
+                val targetX = relX * rootWidth
+                val targetY = relY * rootHeight
+
+                val location = IntArray(2)
+                container.getLocationOnScreen(location)
+                val currentX = location[0] + container.width / 2f - container.translationX
+                val currentY = location[1] + container.height / 2f - container.translationY
+
+                container.translationX = targetX - currentX
+                container.translationY = targetY - currentY
+                updatePillMenuDirection()
+            }
+        }
+    }
+
+    private fun resetFabPosition() {
+        getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
+            .edit()
+            .remove(KEY_FAB_REL_X)
+            .remove(KEY_FAB_REL_Y)
+            .apply()
+
+        binding.layoutFabContainer.animate()
+            .translationX(0f)
+            .translationY(0f)
+            .setDuration(200)
+            .withEndAction {
+                updatePillMenuDirection()
+            }
+            .start()
+
+        Toast.makeText(this, "FAB position reset", Toast.LENGTH_SHORT).show()
     }
 
     private fun setupSearchInput() {
