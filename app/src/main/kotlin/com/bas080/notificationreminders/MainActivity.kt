@@ -260,13 +260,26 @@ class MainActivity : AppCompatActivity() {
         markAsButtonAccessibility(binding.btnFabPuntAll)
         markAsButtonAccessibility(binding.btnFabShareMatching)
 
+        val updateFabState = { isExpanded: Boolean ->
+            if (isExpanded) {
+                binding.fabMenu.setBackgroundResource(R.drawable.bg_fab_circle)
+                binding.fabMenu.setColorFilter(ContextCompat.getColor(this, R.color.bg_dark))
+            } else {
+                binding.fabMenu.setBackgroundResource(R.drawable.bg_fab_circle_normal)
+                binding.fabMenu.setColorFilter(ContextCompat.getColor(this, R.color.text_primary))
+            }
+        }
+
         val toggleFabMenu = {
-            val isExpanded = binding.fabPillMenuContainer.visibility == View.VISIBLE
-            binding.fabPillMenuContainer.visibility = if (isExpanded) View.GONE else View.VISIBLE
+            val isCurrentlyExpanded = binding.fabPillMenuContainer.visibility == View.VISIBLE
+            val willBeExpanded = !isCurrentlyExpanded
+            binding.fabPillMenuContainer.visibility = if (willBeExpanded) View.VISIBLE else View.GONE
+            updateFabState(willBeExpanded)
         }
 
         val collapseFabMenu = {
             binding.fabPillMenuContainer.visibility = View.GONE
+            updateFabState(false)
         }
 
         binding.fabMenu.setOnClickListener {
@@ -274,9 +287,14 @@ class MainActivity : AppCompatActivity() {
         }
 
         val gestureDetector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onDown(e: MotionEvent): Boolean {
+                return true
+            }
+
             override fun onFling(e1: MotionEvent?, e2: MotionEvent, velocityX: Float, velocityY: Float): Boolean {
                 if (e1 != null && e1.y - e2.y > 50 && Math.abs(velocityY) > 100) {
                     binding.fabPillMenuContainer.visibility = View.VISIBLE
+                    updateFabState(true)
                     return true
                 }
                 return false

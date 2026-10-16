@@ -372,13 +372,13 @@
                     android:text="@string/nav_reminders"
                     android:textSize="14sp"
                     android:textStyle="bold"
-                    android:textColor="@color/text_primary"
+                    android:textColor="@color/bg_dark"
                     android:paddingHorizontal="20dp"
                     android:elevation="12dp"
                     android:translationZ="12dp"
                     android:clickable="true"
                     android:focusable="true"
-                    android:background="@drawable/bg_pill"
+                    android:background="@drawable/bg_pill_inverted"
                     android:layout_marginBottom="10dp" />
 
                 <!-- Navigation Pill: About -->
@@ -390,13 +390,13 @@
                     android:text="@string/nav_about"
                     android:textSize="14sp"
                     android:textStyle="bold"
-                    android:textColor="@color/text_primary"
+                    android:textColor="@color/bg_dark"
                     android:paddingHorizontal="20dp"
                     android:elevation="12dp"
                     android:translationZ="12dp"
                     android:clickable="true"
                     android:focusable="true"
-                    android:background="@drawable/bg_pill"
+                    android:background="@drawable/bg_pill_inverted"
                     android:layout_marginBottom="10dp" />
 
                 <!-- Action Pill: Punt -->
@@ -411,14 +411,14 @@
                     android:translationZ="12dp"
                     android:clickable="true"
                     android:focusable="true"
-                    android:background="@drawable/bg_pill_action"
+                    android:background="@drawable/bg_pill_action_inverted"
                     android:layout_marginBottom="10dp">
 
                     <ImageView
                         android:layout_width="18dp"
                         android:layout_height="18dp"
                         android:src="@drawable/ic_action_snooze"
-                        app:tint="@color/accent"
+                        app:tint="@color/bg_dark"
                         android:contentDescription="Punt"
                         android:scaleType="centerInside"
                         android:layout_marginEnd="8dp" />
@@ -429,7 +429,7 @@
                         android:text="Punt"
                         android:textSize="14sp"
                         android:textStyle="bold"
-                        android:textColor="@color/accent" />
+                        android:textColor="@color/bg_dark" />
 
                 </LinearLayout>
 
@@ -445,13 +445,13 @@
                     android:translationZ="12dp"
                     android:clickable="true"
                     android:focusable="true"
-                    android:background="@drawable/bg_pill_action">
+                    android:background="@drawable/bg_pill_action_inverted">
 
                     <ImageView
                         android:layout_width="18dp"
                         android:layout_height="18dp"
                         android:src="@drawable/ic_action_share"
-                        app:tint="@color/accent"
+                        app:tint="@color/bg_dark"
                         android:contentDescription="Share"
                         android:scaleType="centerInside"
                         android:layout_marginEnd="8dp" />
@@ -462,7 +462,7 @@
                         android:text="Share"
                         android:textSize="14sp"
                         android:textStyle="bold"
-                        android:textColor="@color/accent" />
+                        android:textColor="@color/bg_dark" />
 
                 </LinearLayout>
 
@@ -482,7 +482,7 @@
                 android:translationZ="12dp"
                 android:clickable="true"
                 android:focusable="true"
-                android:background="@drawable/bg_fab_circle" />
+                android:background="@drawable/bg_fab_circle_normal" />
 
         </LinearLayout>
 
