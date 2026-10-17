@@ -354,29 +354,50 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updatePillMenuDirection() {
+        val rootWidth = binding.root.width.takeIf { it > 0 } ?: return
         val rootHeight = binding.root.height.takeIf { it > 0 } ?: return
+
         val location = IntArray(2)
         binding.fabMenu.getLocationOnScreen(location)
+        val fabCenterX = location[0] + binding.fabMenu.width / 2
         val fabCenterY = location[1] + binding.fabMenu.height / 2
 
         val isTopHalf = fabCenterY < rootHeight / 2
-        binding.layoutFabContainer.removeView(binding.fabPillMenuContainer)
+        val isLeftHalf = fabCenterX < rootWidth / 2
+
+        val density = resources.displayMetrics.density
+        val margin14 = (14 * density).toInt()
+
+        val params = binding.fabPillMenuContainer.layoutParams as? android.widget.RelativeLayout.LayoutParams ?: return
+        params.removeRule(android.widget.RelativeLayout.ABOVE)
+        params.removeRule(android.widget.RelativeLayout.BELOW)
+        params.removeRule(android.widget.RelativeLayout.ALIGN_START)
+        params.removeRule(android.widget.RelativeLayout.ALIGN_END)
+
         if (isTopHalf) {
-            binding.layoutFabContainer.addView(binding.fabPillMenuContainer)
-            val params = binding.fabPillMenuContainer.layoutParams as? android.widget.LinearLayout.LayoutParams
-            params?.topMargin = (14 * resources.displayMetrics.density).toInt()
-            params?.bottomMargin = 0
-            binding.fabPillMenuContainer.layoutParams = params
+            params.addRule(android.widget.RelativeLayout.BELOW, R.id.fab_menu)
+            params.topMargin = margin14
+            params.bottomMargin = 0
         } else {
-            binding.layoutFabContainer.addView(binding.fabPillMenuContainer, 0)
-            val params = binding.fabPillMenuContainer.layoutParams as? android.widget.LinearLayout.LayoutParams
-            params?.bottomMargin = (14 * resources.displayMetrics.density).toInt()
-            params?.topMargin = 0
-            binding.fabPillMenuContainer.layoutParams = params
+            params.addRule(android.widget.RelativeLayout.ABOVE, R.id.fab_menu)
+            params.bottomMargin = margin14
+            params.topMargin = 0
         }
+
+        if (isLeftHalf) {
+            params.addRule(android.widget.RelativeLayout.ALIGN_START, R.id.fab_menu)
+            binding.fabPillMenuContainer.gravity = android.view.Gravity.START
+        } else {
+            params.addRule(android.widget.RelativeLayout.ALIGN_END, R.id.fab_menu)
+            binding.fabPillMenuContainer.gravity = android.view.Gravity.END
+        }
+
+        binding.fabPillMenuContainer.layoutParams = params
     }
 
     private fun setupDraggableFab() {
+        binding.layoutFabContainer.bringToFront()
+
         var startRawX = 0f
         var startRawY = 0f
         var initialTranslationX = 0f
@@ -394,6 +415,11 @@ class MainActivity : AppCompatActivity() {
         }
 
         binding.fabMenu.setOnTouchListener { view, event ->
+            if (binding.fabPillMenuContainer.visibility == View.VISIBLE) {
+                longPressHandler.removeCallbacks(longPressRunnable)
+                return@setOnTouchListener false
+            }
+
             when (event.action) {
                 android.view.MotionEvent.ACTION_DOWN -> {
                     startRawX = event.rawX
