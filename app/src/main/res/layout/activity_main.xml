@@ -7,19 +7,25 @@
     android:orientation="vertical"
     android:background="@color/bg_dark"
     android:padding="16dp"
+    android:clipChildren="false"
+    android:clipToPadding="false"
     tools:context=".MainActivity">
 
     <!-- Main Content Frame Container -->
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1">
+        android:layout_weight="1"
+        android:clipChildren="false"
+        android:clipToPadding="false">
 
         <!-- Reminders Main Content View -->
         <LinearLayout
             android:id="@+id/reminders_container"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
+            android:clipChildren="false"
+            android:clipToPadding="false"
             android:orientation="vertical">
 
             <!-- Fixed Top Search/Add Input Card -->
@@ -133,6 +139,8 @@
             android:id="@+id/about_container"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
+            android:clipChildren="false"
+            android:clipToPadding="false"
             android:orientation="vertical"
             android:visibility="gone">
 
@@ -354,23 +362,41 @@
         </LinearLayout>
 
         <!-- Floating Bottom-Right Hamburger FAB Menu Overlay Container -->
-        <LinearLayout
+        <RelativeLayout
             android:id="@+id/layout_fab_container"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="bottom|end"
-            android:orientation="vertical"
-            android:gravity="end"
             android:clipToPadding="false"
             android:clipChildren="false"
             android:paddingEnd="16dp"
             android:paddingBottom="32dp">
+
+            <!-- Floating Action Button (FAB) -->
+            <ImageView
+                android:id="@+id/fab_menu"
+                android:layout_width="56dp"
+                android:layout_height="56dp"
+                android:layout_alignParentBottom="true"
+                android:layout_alignParentEnd="true"
+                android:src="@drawable/ic_action_menu"
+                app:tint="@color/text_primary"
+                android:contentDescription="Navigation menu"
+                android:scaleType="centerInside"
+                android:padding="14dp"
+                android:elevation="12dp"
+                android:translationZ="12dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="@drawable/bg_fab_circle_normal" />
 
             <!-- Vertical Upward Expanded Pill Stack -->
             <LinearLayout
                 android:id="@+id/fab_pill_menu_container"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_above="@id/fab_menu"
+                android:layout_alignEnd="@id/fab_menu"
                 android:orientation="vertical"
                 android:gravity="end"
                 android:visibility="gone"
@@ -483,23 +509,7 @@
 
             </LinearLayout>
 
-            <!-- Floating Action Button (FAB) -->
-            <ImageView
-                android:id="@+id/fab_menu"
-                android:layout_width="56dp"
-                android:layout_height="56dp"
-                android:src="@drawable/ic_action_menu"
-                app:tint="@color/text_primary"
-                android:contentDescription="Navigation menu"
-                android:scaleType="centerInside"
-                android:padding="14dp"
-                android:elevation="12dp"
-                android:translationZ="12dp"
-                android:clickable="true"
-                android:focusable="true"
-                android:background="@drawable/bg_fab_circle_normal" />
-
-        </LinearLayout>
+        </RelativeLayout>
 
     </FrameLayout>
 
