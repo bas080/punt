@@ -50,6 +50,48 @@ class MainActivityTest {
     }
 
     @Test
+    fun testShiftEnterInsertsNewlineInSearchInput() {
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = controller.get()
+
+        val input = activity.findViewById<EditText>(R.id.search_reminder_input)
+        assertNotNull(input)
+
+        input.setText("Line 1")
+        input.setSelection(6)
+
+        val shiftEnterDown = android.view.KeyEvent(
+            0L, 0L, android.view.KeyEvent.ACTION_DOWN,
+            android.view.KeyEvent.KEYCODE_ENTER, 0,
+            android.view.KeyEvent.META_SHIFT_ON
+        )
+        input.dispatchKeyEvent(shiftEnterDown)
+
+        assertEquals("Line 1\n", input.text.toString())
+        assertNull("No creation toast expected on Shift+Enter", ShadowToast.getTextOfLatestToast())
+    }
+
+    @Test
+    fun testPlainEnterSubmitsTaskFromSearchInput() {
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = controller.get()
+
+        val input = activity.findViewById<EditText>(R.id.search_reminder_input)
+        assertNotNull(input)
+
+        input.setText("Task line 1\nTask line 2")
+
+        val enterDown = android.view.KeyEvent(
+            0L, 0L, android.view.KeyEvent.ACTION_DOWN,
+            android.view.KeyEvent.KEYCODE_ENTER, 0, 0
+        )
+        input.dispatchKeyEvent(enterDown)
+
+        assertEquals("Reminder created", ShadowToast.getTextOfLatestToast())
+        assertEquals("", input.text.toString())
+    }
+
+    @Test
     fun testPullDownToCreateReminderFromTopInput() {
         val context = RuntimeEnvironment.getApplication()
         val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
