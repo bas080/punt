@@ -591,8 +591,43 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        binding.searchReminderInput.setOnEditorActionListener { _, actionId, _ ->
-            if (actionId == EditorInfo.IME_ACTION_DONE || actionId == EditorInfo.IME_ACTION_UNSPECIFIED) {
+        binding.searchReminderInput.setOnKeyListener { _, keyCode, event ->
+            if (keyCode == android.view.KeyEvent.KEYCODE_ENTER && event.action == android.view.KeyEvent.ACTION_DOWN) {
+                if (event.isShiftPressed) {
+                    val start = binding.searchReminderInput.selectionStart
+                    val end = binding.searchReminderInput.selectionEnd
+                    if (start >= 0 && end >= 0) {
+                        binding.searchReminderInput.text.replace(Math.min(start, end), Math.max(start, end), "\n")
+                    } else {
+                        binding.searchReminderInput.append("\n")
+                    }
+                    true
+                } else {
+                    submitActionWithCancel()
+                    true
+                }
+            } else {
+                false
+            }
+        }
+
+        binding.searchReminderInput.setOnEditorActionListener { _, actionId, event ->
+            if (event != null && event.keyCode == android.view.KeyEvent.KEYCODE_ENTER) {
+                if (event.action == android.view.KeyEvent.ACTION_DOWN) {
+                    if (event.isShiftPressed) {
+                        val start = binding.searchReminderInput.selectionStart
+                        val end = binding.searchReminderInput.selectionEnd
+                        if (start >= 0 && end >= 0) {
+                            binding.searchReminderInput.text.replace(Math.min(start, end), Math.max(start, end), "\n")
+                        } else {
+                            binding.searchReminderInput.append("\n")
+                        }
+                    } else {
+                        submitActionWithCancel()
+                    }
+                }
+                true
+            } else if (actionId == EditorInfo.IME_ACTION_DONE) {
                 submitActionWithCancel()
                 true
             } else {
