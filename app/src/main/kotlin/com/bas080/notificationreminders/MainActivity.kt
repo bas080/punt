@@ -382,13 +382,18 @@ class MainActivity : AppCompatActivity() {
             params.topMargin = 0
         }
 
+        val targetGravity = if (isLeftHalf) android.view.Gravity.START else android.view.Gravity.END
         if (isLeftHalf) {
             params.addRule(android.widget.RelativeLayout.ALIGN_START, R.id.fab_menu)
-            binding.fabPillMenuContainer.gravity = android.view.Gravity.START
         } else {
             params.addRule(android.widget.RelativeLayout.ALIGN_END, R.id.fab_menu)
-            binding.fabPillMenuContainer.gravity = android.view.Gravity.END
         }
+
+        binding.fabPillMenuContainer.gravity = targetGravity
+        (binding.btnNavReminders.layoutParams as? android.widget.LinearLayout.LayoutParams)?.gravity = targetGravity
+        (binding.btnNavAbout.layoutParams as? android.widget.LinearLayout.LayoutParams)?.gravity = targetGravity
+        (binding.btnFabPuntAll.layoutParams as? android.widget.LinearLayout.LayoutParams)?.gravity = targetGravity
+        (binding.btnFabShareMatching.layoutParams as? android.widget.LinearLayout.LayoutParams)?.gravity = targetGravity
 
         binding.fabPillMenuContainer.layoutParams = params
     }
