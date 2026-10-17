@@ -366,28 +366,36 @@ class MainActivity : AppCompatActivity() {
         val density = resources.displayMetrics.density
         val margin14 = (14 * density).toInt()
 
-        val params = binding.fabPillMenuContainer.layoutParams as? android.widget.RelativeLayout.LayoutParams ?: return
-        params.removeRule(android.widget.RelativeLayout.ABOVE)
-        params.removeRule(android.widget.RelativeLayout.BELOW)
-        params.removeRule(android.widget.RelativeLayout.ALIGN_START)
-        params.removeRule(android.widget.RelativeLayout.ALIGN_END)
+        val fabParams = binding.fabMenu.layoutParams as? android.widget.RelativeLayout.LayoutParams ?: return
+        fabParams.removeRule(android.widget.RelativeLayout.ALIGN_PARENT_START)
+        fabParams.removeRule(android.widget.RelativeLayout.ALIGN_PARENT_END)
+
+        val pillParams = binding.fabPillMenuContainer.layoutParams as? android.widget.RelativeLayout.LayoutParams ?: return
+        pillParams.removeRule(android.widget.RelativeLayout.ABOVE)
+        pillParams.removeRule(android.widget.RelativeLayout.BELOW)
+        pillParams.removeRule(android.widget.RelativeLayout.ALIGN_START)
+        pillParams.removeRule(android.widget.RelativeLayout.ALIGN_END)
 
         if (isTopHalf) {
-            params.addRule(android.widget.RelativeLayout.BELOW, R.id.fab_menu)
-            params.topMargin = margin14
-            params.bottomMargin = 0
+            pillParams.addRule(android.widget.RelativeLayout.BELOW, R.id.fab_menu)
+            pillParams.topMargin = margin14
+            pillParams.bottomMargin = 0
         } else {
-            params.addRule(android.widget.RelativeLayout.ABOVE, R.id.fab_menu)
-            params.bottomMargin = margin14
-            params.topMargin = 0
+            pillParams.addRule(android.widget.RelativeLayout.ABOVE, R.id.fab_menu)
+            pillParams.bottomMargin = margin14
+            pillParams.topMargin = 0
         }
 
         val targetGravity = if (isLeftHalf) android.view.Gravity.START else android.view.Gravity.END
         if (isLeftHalf) {
-            params.addRule(android.widget.RelativeLayout.ALIGN_START, R.id.fab_menu)
+            fabParams.addRule(android.widget.RelativeLayout.ALIGN_PARENT_START)
+            pillParams.addRule(android.widget.RelativeLayout.ALIGN_START, R.id.fab_menu)
         } else {
-            params.addRule(android.widget.RelativeLayout.ALIGN_END, R.id.fab_menu)
+            fabParams.addRule(android.widget.RelativeLayout.ALIGN_PARENT_END)
+            pillParams.addRule(android.widget.RelativeLayout.ALIGN_END, R.id.fab_menu)
         }
+
+        binding.fabMenu.layoutParams = fabParams
 
         binding.fabPillMenuContainer.gravity = targetGravity
         (binding.btnNavReminders.layoutParams as? android.widget.LinearLayout.LayoutParams)?.gravity = targetGravity
@@ -395,7 +403,7 @@ class MainActivity : AppCompatActivity() {
         (binding.btnFabPuntAll.layoutParams as? android.widget.LinearLayout.LayoutParams)?.gravity = targetGravity
         (binding.btnFabShareMatching.layoutParams as? android.widget.LinearLayout.LayoutParams)?.gravity = targetGravity
 
-        binding.fabPillMenuContainer.layoutParams = params
+        binding.fabPillMenuContainer.layoutParams = pillParams
     }
 
     private fun setupDraggableFab() {
