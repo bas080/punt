@@ -162,7 +162,6 @@ class MainActivity : AppCompatActivity() {
             val screenHeight = rootView.rootView.height
             val keypadHeight = screenHeight - rect.bottom
             val isKeyboardOpen = keypadHeight > screenHeight * 0.15
-            binding.layoutFabContainer.visibility = if (isKeyboardOpen) View.GONE else View.VISIBLE
             if (isKeyboardOpen) {
                 binding.fabPillMenuContainer.visibility = View.GONE
             }
@@ -170,7 +169,6 @@ class MainActivity : AppCompatActivity() {
 
         ViewCompat.setOnApplyWindowInsetsListener(rootView) { _, insets ->
             val isImeVisible = insets.isVisible(WindowInsetsCompat.Type.ime())
-            binding.layoutFabContainer.visibility = if (isImeVisible) View.GONE else View.VISIBLE
             if (isImeVisible) {
                 binding.fabPillMenuContainer.visibility = View.GONE
             }
@@ -465,14 +463,21 @@ class MainActivity : AppCompatActivity() {
         val rootWidth = binding.root.width.toFloat().takeIf { it > 0f } ?: return
         val rootHeight = binding.root.height.toFloat().takeIf { it > 0f } ?: return
 
-        val container = binding.layoutFabContainer
-        val location = IntArray(2)
-        container.getLocationOnScreen(location)
-        val centerX = location[0] + container.width / 2f
-        val centerY = location[1] + container.height / 2f
+        val rootLoc = IntArray(2)
+        binding.root.getLocationOnScreen(rootLoc)
 
-        val relX = (centerX / rootWidth).coerceIn(0.05f, 0.95f)
-        val relY = (centerY / rootHeight).coerceIn(0.05f, 0.95f)
+        val container = binding.layoutFabContainer
+        val containerLoc = IntArray(2)
+        container.getLocationOnScreen(containerLoc)
+
+        val containerXInRoot = containerLoc[0] - rootLoc[0]
+        val containerYInRoot = containerLoc[1] - rootLoc[1]
+
+        val centerXInRoot = containerXInRoot + container.width / 2f
+        val centerYInRoot = containerYInRoot + container.height / 2f
+
+        val relX = (centerXInRoot / rootWidth).coerceIn(0.05f, 0.95f)
+        val relY = (centerYInRoot / rootHeight).coerceIn(0.05f, 0.95f)
 
         getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
             .edit()
@@ -485,25 +490,43 @@ class MainActivity : AppCompatActivity() {
 
     private fun restoreFabPosition() {
         binding.root.post {
+            val rootWidth = binding.root.width.toFloat().takeIf { it > 0f } ?: return@post
+            val rootHeight = binding.root.height.toFloat().takeIf { it > 0f } ?: return@post
+
             val prefs = getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
             val relX = prefs.getFloat(KEY_FAB_REL_X, -1f)
             val relY = prefs.getFloat(KEY_FAB_REL_Y, -1f)
 
             if (relX >= 0f && relY >= 0f) {
-                val rootWidth = binding.root.width.toFloat()
-                val rootHeight = binding.root.height.toFloat()
                 val container = binding.layoutFabContainer
+                val fab = binding.fabMenu
 
-                val targetX = relX * rootWidth
-                val targetY = relY * rootHeight
+                val rootLoc = IntArray(2)
+                binding.root.getLocationOnScreen(rootLoc)
 
-                val location = IntArray(2)
-                container.getLocationOnScreen(location)
-                val currentX = location[0] + container.width / 2f - container.translationX
-                val currentY = location[1] + container.height / 2f - container.translationY
+                val fabLoc = IntArray(2)
+                fab.getLocationOnScreen(fabLoc)
 
-                container.translationX = targetX - currentX
-                container.translationY = targetY - currentY
+                val currentFabXInRoot = (fabLoc[0] - rootLoc[0]) - container.translationX
+                val currentFabYInRoot = (fabLoc[1] - rootLoc[1]) - container.translationY
+
+                val targetCenterXInRoot = relX * rootWidth
+                val targetCenterYInRoot = relY * rootHeight
+
+                val targetFabXInRoot = targetCenterXInRoot - fab.width / 2f
+                val targetFabYInRoot = targetCenterYInRoot - fab.height / 2f
+
+                val pad = 16 * resources.displayMetrics.density
+                val minFabLeft = pad
+                val maxFabLeft = rootWidth - pad - fab.width
+                val minFabTop = pad
+                val maxFabTop = rootHeight - pad - fab.height
+
+                val clampedFabXInRoot = targetFabXInRoot.coerceIn(minFabLeft, maxFabLeft)
+                val clampedFabYInRoot = targetFabYInRoot.coerceIn(minFabTop, maxFabTop)
+
+                container.translationX = clampedFabXInRoot - currentFabXInRoot
+                container.translationY = clampedFabYInRoot - currentFabYInRoot
                 updatePillMenuDirection()
             }
         }
