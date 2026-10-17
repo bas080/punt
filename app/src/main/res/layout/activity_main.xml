@@ -7,416 +7,518 @@
     android:orientation="vertical"
     android:background="@color/bg_dark"
     android:padding="16dp"
+    android:clipChildren="false"
+    android:clipToPadding="false"
     tools:context=".MainActivity">
 
-    <!-- Reminders Main Content View -->
-    <LinearLayout
-        android:id="@+id/reminders_container"
+    <!-- Main Content Frame Container -->
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:orientation="vertical">
+        android:clipChildren="false"
+        android:clipToPadding="false">
 
-        <!-- Fixed Top Search/Add Input Card -->
+        <!-- Reminders Main Content View -->
         <LinearLayout
-            android:id="@+id/card_search_input"
+            android:id="@+id/reminders_container"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:background="@drawable/bg_card"
-            android:paddingVertical="10dp"
-            android:paddingHorizontal="12dp"
-            android:layout_marginBottom="8dp">
+            android:layout_height="match_parent"
+            android:clipChildren="false"
+            android:clipToPadding="false"
+            android:orientation="vertical">
 
-            <!-- Filter Icon Button -->
-            <ImageView
-                android:id="@+id/btn_tags_filter"
-                android:layout_width="32dp"
-                android:layout_height="32dp"
-                android:src="@drawable/ic_action_filter"
-                app:tint="@color/accent"
-                android:contentDescription="Filter reminders"
-                android:scaleType="centerInside"
-                android:padding="4dp"
-                android:layout_marginEnd="4dp"
-                android:clickable="true"
-                android:focusable="true"
-                android:background="?attr/selectableItemBackgroundBorderless" />
-
-            <EditText
-                android:id="@+id/search_reminder_input"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:hint="Add or search reminders..."
-                android:textColor="?android:attr/textColorPrimary"
-                android:textColorHint="?android:attr/textColorHint"
-                android:textSize="15sp"
-                android:inputType="textMultiLine|textCapSentences"
-                android:scrollHorizontally="false"
-                android:maxLines="4"
-                android:imeOptions="actionDone"
-                android:paddingVertical="4dp"
-                android:paddingHorizontal="4dp"
-                android:background="@null" />
-
-            <ImageView
-                android:id="@+id/btn_add_reminder"
-                android:layout_width="32dp"
-                android:layout_height="32dp"
-                android:src="@drawable/ic_action_add"
-                app:tint="@color/accent"
-                android:contentDescription="@string/add_reminder"
-                android:scaleType="centerInside"
-                android:padding="4dp"
-                android:clickable="true"
-                android:focusable="true"
-                android:background="?attr/selectableItemBackgroundBorderless" />
-
-        </LinearLayout>
-
-        <FrameLayout
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1">
-
-            <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
-                android:id="@+id/swipe_refresh_layout"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent">
-
-                <androidx.recyclerview.widget.RecyclerView
-                    android:id="@+id/reminders_list"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:scrollbars="vertical"
-                    android:fadeScrollbars="true"
-                    tools:listitem="@layout/item_reminder" />
-
-            </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
-
+            <!-- Fixed Top Search/Add Input Card -->
             <LinearLayout
-                android:id="@+id/layout_empty_reminders"
+                android:id="@+id/card_search_input"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_gravity="center_horizontal"
-                android:layout_marginTop="120dp"
-                android:orientation="vertical"
-                android:gravity="center"
-                android:visibility="gone">
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:background="@drawable/bg_card"
+                android:paddingVertical="10dp"
+                android:paddingHorizontal="12dp"
+                android:layout_marginBottom="8dp">
 
-                <TextView
-                    android:id="@+id/txt_empty_reminders"
-                    android:layout_width="wrap_content"
+                <EditText
+                    android:id="@+id/search_reminder_input"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:gravity="center"
-                    android:text="@string/no_reminders"
-                    android:textColor="@color/text_muted"
-                    android:textSize="14sp" />
+                    android:layout_weight="1"
+                    android:hint="Add or search reminders..."
+                    android:textColor="?android:attr/textColorPrimary"
+                    android:textColorHint="?android:attr/textColorHint"
+                    android:textSize="15sp"
+                    android:inputType="textMultiLine|textCapSentences"
+                    android:scrollHorizontally="false"
+                    android:maxLines="4"
+                    android:imeOptions="actionDone"
+                    android:paddingVertical="4dp"
+                    android:paddingHorizontal="4dp"
+                    android:background="@null" />
 
-                <TextView
-                    android:id="@+id/btn_empty_clear_filter"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:text="Clear filter &amp; show all"
-                    android:textColor="@color/accent"
-                    android:textSize="13sp"
-                    android:textStyle="bold"
-                    android:paddingVertical="6dp"
-                    android:paddingHorizontal="12dp"
+                <!-- Filter Icon Button -->
+                <ImageView
+                    android:id="@+id/btn_tags_filter"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:src="@drawable/ic_action_filter"
+                    app:tint="@color/accent"
+                    android:contentDescription="Filter reminders"
+                    android:scaleType="centerInside"
+                    android:padding="4dp"
+                    android:layout_marginStart="4dp"
                     android:clickable="true"
                     android:focusable="true"
-                    android:background="?attr/selectableItemBackground"
-                    android:visibility="gone" />
+                    android:background="?attr/selectableItemBackgroundBorderless" />
 
             </LinearLayout>
 
-        </FrameLayout>
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1">
 
-    </LinearLayout>
+                <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+                    android:id="@+id/swipe_refresh_layout"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent">
 
-    <!-- About Main Content View -->
-    <LinearLayout
-        android:id="@+id/about_container"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:orientation="vertical"
-        android:visibility="gone">
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/reminders_list"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:scrollbars="vertical"
+                        android:fadeScrollbars="true"
+                        tools:listitem="@layout/item_reminder" />
 
-        <!-- App Metadata & Actions Section -->
+                </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+
+                <LinearLayout
+                    android:id="@+id/layout_empty_reminders"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="start"
+                    android:layout_marginTop="120dp"
+                    android:paddingHorizontal="16dp"
+                    android:orientation="vertical"
+                    android:gravity="start"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:id="@+id/btn_empty_clear_filter"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="12dp"
+                        android:text="Clear filter"
+                        android:textColor="@color/accent"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:background="?attr/selectableItemBackground"
+                        android:visibility="gone" />
+
+                    <TextView
+                        android:id="@+id/txt_empty_reminders"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:gravity="start"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="14sp"
+                        android:lineSpacingExtra="6dp" />
+
+                </LinearLayout>
+
+            </FrameLayout>
+
+        </LinearLayout>
+
+        <!-- About Main Content View -->
         <LinearLayout
+            android:id="@+id/about_container"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="match_parent"
+            android:clipChildren="false"
+            android:clipToPadding="false"
             android:orientation="vertical"
-            android:background="@drawable/bg_card"
-            android:padding="16dp"
-            android:layout_marginBottom="16dp">
+            android:visibility="gone">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/app_name"
-                android:textSize="18sp"
-                android:textStyle="bold"
-                android:textColor="@color/text_primary" />
-
-            <TextView
-                android:id="@+id/txt_app_version"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Version 1.0"
-                android:textSize="13sp"
-                android:textColor="@color/text_secondary"
-                android:layout_marginTop="2dp"
-                android:layout_marginBottom="12dp" />
-
+            <!-- App Metadata & Actions Section -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical">
+                android:orientation="vertical"
+                android:background="@drawable/bg_card"
+                android:padding="16dp"
+                android:layout_marginBottom="16dp">
 
-                <HorizontalScrollView
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/app_name"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/text_primary" />
+
+                <TextView
+                    android:id="@+id/txt_app_version"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Version 1.0"
+                    android:textSize="13sp"
+                    android:textColor="@color/text_secondary"
+                    android:layout_marginTop="2dp"
+                    android:layout_marginBottom="12dp" />
+
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:scrollbars="none"
-                    android:layout_marginBottom="8dp">
+                    android:orientation="vertical">
 
-                    <LinearLayout
-                        android:layout_width="wrap_content"
+                    <HorizontalScrollView
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:orientation="horizontal">
+                        android:scrollbars="none"
+                        android:layout_marginBottom="8dp">
 
-                        <TextView
-                            android:id="@+id/btn_import_markdown"
+                        <LinearLayout
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="@string/import_markdown"
-                            android:textSize="12sp"
-                            android:textStyle="bold"
-                            android:textColor="@color/accent"
-                            android:letterSpacing="0.05"
-                            android:paddingVertical="6dp"
-                            android:paddingHorizontal="8dp"
-                            android:clickable="true"
-                            android:focusable="true"
-                            android:background="?attr/selectableItemBackground" />
+                            android:orientation="horizontal">
 
-                        <TextView
-                            android:id="@+id/btn_export_markdown"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/export_markdown"
-                            android:textSize="12sp"
-                            android:textStyle="bold"
-                            android:textColor="@color/accent"
-                            android:letterSpacing="0.05"
-                            android:paddingVertical="6dp"
-                            android:paddingHorizontal="8dp"
-                            android:layout_marginStart="8dp"
-                            android:clickable="true"
-                            android:focusable="true"
-                            android:background="?attr/selectableItemBackground" />
+                            <TextView
+                                android:id="@+id/btn_import_markdown"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/import_markdown"
+                                android:textSize="12sp"
+                                android:textStyle="bold"
+                                android:textColor="@color/accent"
+                                android:letterSpacing="0.05"
+                                android:paddingVertical="6dp"
+                                android:paddingHorizontal="8dp"
+                                android:clickable="true"
+                                android:focusable="true"
+                                android:background="?attr/selectableItemBackground" />
 
-                        <TextView
-                            android:id="@+id/btn_feedback"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/feedback"
-                            android:textSize="12sp"
-                            android:textStyle="bold"
-                            android:textColor="@color/accent"
-                            android:letterSpacing="0.05"
-                            android:paddingVertical="6dp"
-                            android:paddingHorizontal="8dp"
-                            android:layout_marginStart="8dp"
-                            android:clickable="true"
-                            android:focusable="true"
-                            android:background="?attr/selectableItemBackground" />
+                            <TextView
+                                android:id="@+id/btn_export_markdown"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/export_markdown"
+                                android:textSize="12sp"
+                                android:textStyle="bold"
+                                android:textColor="@color/accent"
+                                android:letterSpacing="0.05"
+                                android:paddingVertical="6dp"
+                                android:paddingHorizontal="8dp"
+                                android:layout_marginStart="8dp"
+                                android:clickable="true"
+                                android:focusable="true"
+                                android:background="?attr/selectableItemBackground" />
 
-                    </LinearLayout>
-                </HorizontalScrollView>
+                            <TextView
+                                android:id="@+id/btn_feedback"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/feedback"
+                                android:textSize="12sp"
+                                android:textStyle="bold"
+                                android:textColor="@color/accent"
+                                android:letterSpacing="0.05"
+                                android:paddingVertical="6dp"
+                                android:paddingHorizontal="8dp"
+                                android:layout_marginStart="8dp"
+                                android:clickable="true"
+                                android:focusable="true"
+                                android:background="?attr/selectableItemBackground" />
 
-                <HorizontalScrollView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:scrollbars="none">
+                            <TextView
+                                android:id="@+id/btn_reset_fab_position"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/reset_fab_position"
+                                android:textSize="12sp"
+                                android:textStyle="bold"
+                                android:textColor="@color/accent"
+                                android:letterSpacing="0.05"
+                                android:paddingVertical="6dp"
+                                android:paddingHorizontal="8dp"
+                                android:layout_marginStart="8dp"
+                                android:clickable="true"
+                                android:focusable="true"
+                                android:background="?attr/selectableItemBackground" />
 
-                    <LinearLayout
-                        android:layout_width="wrap_content"
+                        </LinearLayout>
+                    </HorizontalScrollView>
+
+                    <HorizontalScrollView
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:orientation="horizontal">
+                        android:scrollbars="none">
 
-                        <TextView
-                            android:id="@+id/btn_donate"
+                        <LinearLayout
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="@string/donate"
-                            android:textSize="12sp"
-                            android:textStyle="bold"
-                            android:textColor="@color/accent"
-                            android:letterSpacing="0.05"
-                            android:paddingVertical="6dp"
-                            android:paddingHorizontal="8dp"
-                            android:clickable="true"
-                            android:focusable="true"
-                            android:background="?attr/selectableItemBackground" />
+                            android:orientation="horizontal">
 
-                        <TextView
-                            android:id="@+id/btn_toggle_calendar_sync"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/calendar_sync_disabled"
-                            android:textSize="12sp"
-                            android:textStyle="bold"
-                            android:textColor="@color/accent"
-                            android:letterSpacing="0.05"
-                            android:paddingVertical="6dp"
-                            android:paddingHorizontal="8dp"
-                            android:layout_marginStart="8dp"
-                            android:clickable="true"
-                            android:focusable="true"
-                            android:background="?attr/selectableItemBackground" />
+                            <TextView
+                                android:id="@+id/btn_donate"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/donate"
+                                android:textSize="12sp"
+                                android:textStyle="bold"
+                                android:textColor="@color/accent"
+                                android:letterSpacing="0.05"
+                                android:paddingVertical="6dp"
+                                android:paddingHorizontal="8dp"
+                                android:clickable="true"
+                                android:focusable="true"
+                                android:background="?attr/selectableItemBackground" />
 
-                    </LinearLayout>
-                </HorizontalScrollView>
+                            <TextView
+                                android:id="@+id/btn_toggle_calendar_sync"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/calendar_sync_disabled"
+                                android:textSize="12sp"
+                                android:textStyle="bold"
+                                android:textColor="@color/accent"
+                                android:letterSpacing="0.05"
+                                android:paddingVertical="6dp"
+                                android:paddingHorizontal="8dp"
+                                android:layout_marginStart="8dp"
+                                android:clickable="true"
+                                android:focusable="true"
+                                android:background="?attr/selectableItemBackground" />
+
+                        </LinearLayout>
+                    </HorizontalScrollView>
+
+                </LinearLayout>
 
             </LinearLayout>
 
-        </LinearLayout>
-
-        <!-- Logs Section -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:layout_marginBottom="8dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="APPLICATION LOGS"
-                android:textSize="12sp"
-                android:textStyle="bold"
-                android:textColor="@color/text_secondary"
-                android:letterSpacing="0.05" />
-
-            <View
-                android:layout_width="0dp"
-                android:layout_height="1dp"
-                android:layout_weight="1" />
-
-            <TextView
-                android:id="@+id/btn_clear_logs"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/clear_logs"
-                android:textSize="11sp"
-                android:textStyle="bold"
-                android:textColor="@color/accent_danger"
-                android:letterSpacing="0.05"
-                android:paddingVertical="4dp"
-                android:paddingHorizontal="6dp"
-                android:clickable="true"
-                android:focusable="true"
-                android:background="?attr/selectableItemBackground" />
-
-        </LinearLayout>
-
-        <ScrollView
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:background="@drawable/bg_card"
-            android:padding="12dp">
-
-            <TextView
-                android:id="@+id/txt_logs"
+            <!-- Logs Section -->
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:textColor="@color/text_primary"
-                android:textSize="12sp"
-                android:fontFamily="monospace"
-                android:textIsSelectable="true"
-                android:lineSpacingExtra="3dp" />
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="8dp">
 
-        </ScrollView>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="APPLICATION LOGS"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/text_secondary"
+                    android:letterSpacing="0.05" />
 
-    </LinearLayout>
+                <View
+                    android:layout_width="0dp"
+                    android:layout_height="1dp"
+                    android:layout_weight="1" />
 
-    <!-- Modern Bottom Navigation Card -->
-    <LinearLayout
-        android:id="@+id/header_navigation"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:background="@drawable/bg_card"
-        android:paddingVertical="8dp"
-        android:paddingHorizontal="12dp"
-        android:layout_marginTop="8dp">
+                <TextView
+                    android:id="@+id/btn_clear_logs"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/clear_logs"
+                    android:textSize="11sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/accent_danger"
+                    android:letterSpacing="0.05"
+                    android:paddingVertical="4dp"
+                    android:paddingHorizontal="6dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:background="?attr/selectableItemBackground" />
 
-        <!-- Tab Navigation Segment Container -->
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:background="@drawable/bg_pill"
-            android:padding="2dp">
+            </LinearLayout>
 
-            <!-- Tab Navigation: Reminders -->
-            <TextView
-                android:id="@+id/btn_nav_reminders"
-                android:layout_width="wrap_content"
-                android:layout_height="36dp"
-                android:gravity="center"
-                android:text="@string/nav_reminders"
-                android:textSize="13sp"
-                android:textStyle="bold"
-                android:textColor="@color/text_primary"
-                android:paddingHorizontal="16dp"
-                android:clickable="true"
-                android:focusable="true"
-                android:background="@drawable/bg_nav_tab" />
+            <ScrollView
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_card"
+                android:padding="12dp">
 
-            <!-- Tab Navigation: About -->
-            <TextView
-                android:id="@+id/btn_nav_about"
-                android:layout_width="wrap_content"
-                android:layout_height="36dp"
-                android:gravity="center"
-                android:text="@string/nav_about"
-                android:textSize="13sp"
-                android:textStyle="normal"
-                android:textColor="@color/text_secondary"
-                android:paddingHorizontal="16dp"
-                android:clickable="true"
-                android:focusable="true"
-                android:background="@drawable/bg_nav_tab" />
+                <TextView
+                    android:id="@+id/txt_logs"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/text_primary"
+                    android:textSize="12sp"
+                    android:fontFamily="monospace"
+                    android:textIsSelectable="true"
+                    android:lineSpacingExtra="3dp" />
+
+            </ScrollView>
 
         </LinearLayout>
 
-        <View
-            android:layout_width="0dp"
-            android:layout_height="0dp"
-            android:layout_weight="1" />
+        <!-- Floating Bottom-Right Hamburger FAB Menu Overlay Container -->
+        <RelativeLayout
+            android:id="@+id/layout_fab_container"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|end"
+            android:clipToPadding="false"
+            android:clipChildren="false"
+            android:paddingEnd="16dp"
+            android:paddingBottom="32dp">
 
-        <!-- Bulk Action Button (Reminders List) -->
-        <ImageView
-            android:id="@+id/btn_list_export"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
-            android:src="@drawable/ic_action_bulk"
-            android:contentDescription="Bulk actions"
-            android:padding="4dp"
-            android:scaleType="centerInside"
-            android:clickable="true"
-            android:focusable="true"
-            android:background="?attr/selectableItemBackgroundBorderless" />
+            <!-- Floating Action Button (FAB) -->
+            <ImageView
+                android:id="@+id/fab_menu"
+                android:layout_width="56dp"
+                android:layout_height="56dp"
+                android:layout_alignParentBottom="true"
+                android:layout_alignParentEnd="true"
+                android:src="@drawable/ic_action_menu"
+                app:tint="@color/text_primary"
+                android:contentDescription="Navigation menu"
+                android:scaleType="centerInside"
+                android:padding="14dp"
+                android:elevation="12dp"
+                android:translationZ="12dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="@drawable/bg_fab_circle_normal" />
 
-    </LinearLayout>
+            <!-- Vertical Upward Expanded Pill Stack -->
+            <LinearLayout
+                android:id="@+id/fab_pill_menu_container"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_above="@id/fab_menu"
+                android:layout_alignEnd="@id/fab_menu"
+                android:orientation="vertical"
+                android:gravity="end"
+                android:visibility="gone"
+                android:clipToPadding="false"
+                android:clipChildren="false"
+                android:layout_marginBottom="14dp">
+
+                <!-- Navigation Pill: Tasks -->
+                <TextView
+                    android:id="@+id/btn_nav_reminders"
+                    android:layout_width="wrap_content"
+                    android:layout_height="40dp"
+                    android:gravity="center"
+                    android:text="@string/nav_reminders"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/bg_dark"
+                    android:paddingHorizontal="20dp"
+                    android:maxLines="1"
+                    android:singleLine="true"
+                    android:elevation="12dp"
+                    android:translationZ="12dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:background="@drawable/bg_pill_inverted"
+                    android:layout_marginBottom="10dp" />
+
+                <!-- Navigation Pill: About -->
+                <TextView
+                    android:id="@+id/btn_nav_about"
+                    android:layout_width="wrap_content"
+                    android:layout_height="40dp"
+                    android:gravity="center"
+                    android:text="@string/nav_about"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/bg_dark"
+                    android:paddingHorizontal="20dp"
+                    android:maxLines="1"
+                    android:singleLine="true"
+                    android:elevation="12dp"
+                    android:translationZ="12dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:background="@drawable/bg_pill_inverted"
+                    android:layout_marginBottom="10dp" />
+
+                <!-- Action Pill: Punt -->
+                <LinearLayout
+                    android:id="@+id/btn_fab_punt_all"
+                    android:layout_width="wrap_content"
+                    android:layout_height="40dp"
+                    android:orientation="horizontal"
+                    android:gravity="center"
+                    android:paddingHorizontal="18dp"
+                    android:elevation="12dp"
+                    android:translationZ="12dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:background="@drawable/bg_pill_inverted"
+                    android:layout_marginBottom="10dp">
+
+                    <ImageView
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
+                        android:src="@drawable/ic_action_snooze"
+                        app:tint="@color/bg_dark"
+                        android:contentDescription="Punt"
+                        android:scaleType="centerInside"
+                        android:layout_marginEnd="8dp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Punt"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:maxLines="1"
+                        android:singleLine="true"
+                        android:textColor="@color/bg_dark" />
+
+                </LinearLayout>
+
+                <!-- Action Pill: Share -->
+                <LinearLayout
+                    android:id="@+id/btn_fab_share_matching"
+                    android:layout_width="wrap_content"
+                    android:layout_height="40dp"
+                    android:orientation="horizontal"
+                    android:gravity="center"
+                    android:paddingHorizontal="18dp"
+                    android:elevation="12dp"
+                    android:translationZ="12dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:background="@drawable/bg_pill_inverted">
+
+                    <ImageView
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
+                        android:src="@drawable/ic_action_share"
+                        app:tint="@color/bg_dark"
+                        android:contentDescription="Share"
+                        android:scaleType="centerInside"
+                        android:layout_marginEnd="8dp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Share"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:maxLines="1"
+                        android:singleLine="true"
+                        android:textColor="@color/bg_dark" />
+
+                </LinearLayout>
+
+            </LinearLayout>
+
+        </RelativeLayout>
+
+    </FrameLayout>
 
 </LinearLayout>

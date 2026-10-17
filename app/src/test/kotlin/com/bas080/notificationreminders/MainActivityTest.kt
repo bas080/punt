@@ -1,6 +1,8 @@
 package com.bas080.notificationreminders
 
 import android.content.Context
+import android.os.SystemClock
+import android.view.MotionEvent
 import android.view.View
 import android.widget.EditText
 import android.widget.ImageView
@@ -12,6 +14,7 @@ import androidx.recyclerview.widget.RecyclerView
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -33,23 +36,63 @@ class MainActivityTest {
     }
 
     @Test
-    fun testAddReminderShowsSuccessToast() {
+    fun testAddReminderShowsSuccessToastOnImeAction() {
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
 
         val input = activity.findViewById<EditText>(R.id.search_reminder_input)
-        val btnAdd = activity.findViewById<ImageView>(R.id.btn_add_reminder)
         assertNotNull(input)
-        assertNotNull(btnAdd)
 
         input.setText("Buy Groceries")
-        btnAdd.performClick()
+        input.onEditorAction(android.view.inputmethod.EditorInfo.IME_ACTION_DONE)
 
         assertEquals("Reminder created", ShadowToast.getTextOfLatestToast())
     }
 
     @Test
-    fun testInputFiltersRemindersInRealTimeAndAddsOnButtonClick() {
+    fun testShiftEnterInsertsNewlineInSearchInput() {
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = controller.get()
+
+        val input = activity.findViewById<EditText>(R.id.search_reminder_input)
+        assertNotNull(input)
+
+        input.setText("Line 1")
+        input.setSelection(6)
+
+        val shiftEnterDown = android.view.KeyEvent(
+            0L, 0L, android.view.KeyEvent.ACTION_DOWN,
+            android.view.KeyEvent.KEYCODE_ENTER, 0,
+            android.view.KeyEvent.META_SHIFT_ON
+        )
+        input.dispatchKeyEvent(shiftEnterDown)
+
+        assertEquals("Line 1\n", input.text.toString())
+        assertNull("No creation toast expected on Shift+Enter", ShadowToast.getTextOfLatestToast())
+    }
+
+    @Test
+    fun testPlainEnterSubmitsTaskFromSearchInput() {
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = controller.get()
+
+        val input = activity.findViewById<EditText>(R.id.search_reminder_input)
+        assertNotNull(input)
+
+        input.setText("Task line 1\nTask line 2")
+
+        val enterDown = android.view.KeyEvent(
+            0L, 0L, android.view.KeyEvent.ACTION_DOWN,
+            android.view.KeyEvent.KEYCODE_ENTER, 0, 0
+        )
+        input.dispatchKeyEvent(enterDown)
+
+        assertEquals("Reminder created", ShadowToast.getTextOfLatestToast())
+        assertEquals("", input.text.toString())
+    }
+
+    @Test
+    fun testPullDownToCreateReminderFromTopInput() {
         val context = RuntimeEnvironment.getApplication()
         val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
         prefs.edit().clear().putStringSet("key_reminders_list", setOf("Buy milk", "Clean garage")).commit()
@@ -59,37 +102,66 @@ class MainActivityTest {
 
         val recyclerView = activity.findViewById<RecyclerView>(R.id.reminders_list)
         val input = activity.findViewById<EditText>(R.id.search_reminder_input)
-        val btnAdd = activity.findViewById<ImageView>(R.id.btn_add_reminder)
+        val swipeRefresh = activity.findViewById<androidx.swiperefreshlayout.widget.SwipeRefreshLayout>(R.id.swipe_refresh_layout)
 
         // Typing "milk" should filter displayed items to 1 reminder ("Buy milk")
         input.setText("milk")
         shadowOf(android.os.Looper.getMainLooper()).idleFor(250, java.util.concurrent.TimeUnit.MILLISECONDS)
-        // 1 matched ("Buy milk") + 1 footer = 2 items in RecyclerView
         assertEquals("Expected 2 items when filtered", 2, recyclerView.adapter!!.itemCount)
 
-        // Clicking '+' button should add "milk" as a new reminder and clear search query
-        btnAdd.performClick()
+        // Pulling down (swipe to refresh) should convert "milk" into a new reminder and clear search query
+        val listenerField = androidx.swiperefreshlayout.widget.SwipeRefreshLayout::class.java.getDeclaredField("mListener")
+        listenerField.isAccessible = true
+        val onRefreshListener = listenerField.get(swipeRefresh) as? androidx.swiperefreshlayout.widget.SwipeRefreshLayout.OnRefreshListener
+        assertNotNull("SwipeRefreshLayout mListener should be set", onRefreshListener)
+        onRefreshListener!!.onRefresh()
         shadowOf(android.os.Looper.getMainLooper()).idle()
+
         assertEquals("Reminder created", ShadowToast.getTextOfLatestToast())
+        assertEquals("", input.text.toString())
 
         // Input text should be cleared and all 3 reminders displayed (+1 footer = 4 items in RecyclerView)
         assertEquals("Expected 4 items total in RecyclerView", 4, recyclerView.adapter!!.itemCount)
+
+        // Verify the newly created reminder is displayed at position 0 on the very first pull down
+        recyclerView.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED)
+        recyclerView.layout(0, 0, 1080, 1920)
+        val holder = recyclerView.findViewHolderForAdapterPosition(0) as? com.bas080.notificationreminders.RemindersAdapter.ItemViewHolder
+        assertNotNull("ViewHolder at position 0 should exist", holder)
+        assertEquals("milk", holder?.reminderInput?.text?.toString())
     }
 
     @Test
-    fun testAddReminderEmptyShowsFailureToast() {
+    fun testAddReminderEmptyShowsFailureToastOnImeAction() {
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
 
         val input = activity.findViewById<EditText>(R.id.search_reminder_input)
-        val btnAdd = activity.findViewById<ImageView>(R.id.btn_add_reminder)
         assertNotNull(input)
-        assertNotNull(btnAdd)
 
         input.setText("   ")
-        btnAdd.performClick()
+        input.onEditorAction(android.view.inputmethod.EditorInfo.IME_ACTION_DONE)
 
         assertEquals("Failed to create reminder: Text cannot be empty", ShadowToast.getTextOfLatestToast())
+    }
+
+    @Test
+    fun testPullDownWithEmptyInputRefreshesListWithoutCreatingReminder() {
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = controller.get()
+
+        val input = activity.findViewById<EditText>(R.id.search_reminder_input)
+        val swipeRefresh = activity.findViewById<androidx.swiperefreshlayout.widget.SwipeRefreshLayout>(R.id.swipe_refresh_layout)
+
+        input.setText("   ")
+        val listenerField = androidx.swiperefreshlayout.widget.SwipeRefreshLayout::class.java.getDeclaredField("mListener")
+        listenerField.isAccessible = true
+        val onRefreshListener = listenerField.get(swipeRefresh) as? androidx.swiperefreshlayout.widget.SwipeRefreshLayout.OnRefreshListener
+        assertNotNull(onRefreshListener)
+        onRefreshListener!!.onRefresh()
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        assertNull("No creation toast expected on empty pull down", ShadowToast.getTextOfLatestToast())
     }
 
     @Test
@@ -138,6 +210,81 @@ class MainActivityTest {
     }
 
     @Test
+    fun testFloatingHamburgerFabTogglesVerticalPillMenuAndNavigates() {
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = controller.get()
+
+        val fabMenu = activity.findViewById<ImageView>(R.id.fab_menu)
+        val pillContainer = activity.findViewById<View>(R.id.fab_pill_menu_container)
+        val btnNavAbout = activity.findViewById<TextView>(R.id.btn_nav_about)
+        val btnNavReminders = activity.findViewById<TextView>(R.id.btn_nav_reminders)
+        val btnFabPuntAll = activity.findViewById<View>(R.id.btn_fab_punt_all)
+        val btnFabShareMatching = activity.findViewById<View>(R.id.btn_fab_share_matching)
+
+        assertNotNull(fabMenu)
+        assertNotNull(pillContainer)
+        assertEquals(View.GONE, pillContainer.visibility)
+
+        // Tapping FAB expands vertical pill container
+        fabMenu.performClick()
+        assertEquals(View.VISIBLE, pillContainer.visibility)
+
+        // Tapping About pill navigates to About view and collapses pill container
+        btnNavAbout.performClick()
+        assertEquals(View.GONE, pillContainer.visibility)
+        assertEquals(View.VISIBLE, activity.findViewById<View>(R.id.about_container).visibility)
+        assertEquals(View.GONE, activity.findViewById<View>(R.id.reminders_container).visibility)
+        assertEquals(View.GONE, btnFabPuntAll.visibility)
+        assertEquals(View.GONE, btnFabShareMatching.visibility)
+
+        // Expanding again and tapping Tasks pill navigates back to Tasks
+        fabMenu.performClick()
+        assertEquals(View.VISIBLE, pillContainer.visibility)
+        btnNavReminders.performClick()
+        assertEquals(View.GONE, pillContainer.visibility)
+        assertEquals(View.VISIBLE, activity.findViewById<View>(R.id.reminders_container).visibility)
+        assertEquals(View.VISIBLE, btnFabPuntAll.visibility)
+        assertEquals(View.VISIBLE, btnFabShareMatching.visibility)
+
+        // Tapping action pills collapses menu
+        fabMenu.performClick()
+        assertEquals(View.VISIBLE, pillContainer.visibility)
+        assertNotNull(btnFabPuntAll)
+        assertNotNull(btnFabShareMatching)
+        btnFabShareMatching.performClick()
+        assertEquals(View.GONE, pillContainer.visibility)
+    }
+
+    @Test
+    fun testDraggableFabAndResetPosition() {
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = controller.get()
+
+        val fabMenu = activity.findViewById<ImageView>(R.id.fab_menu)
+        val btnResetFabPosition = activity.findViewById<TextView>(R.id.btn_reset_fab_position)
+        assertNotNull(fabMenu)
+        assertNotNull(btnResetFabPosition)
+
+        val downTime = SystemClock.uptimeMillis()
+        fabMenu.dispatchTouchEvent(MotionEvent.obtain(downTime, downTime, MotionEvent.ACTION_DOWN, 100f, 100f, 0))
+
+        shadowOf(android.os.Looper.getMainLooper()).idleFor(600, java.util.concurrent.TimeUnit.MILLISECONDS)
+
+        fabMenu.dispatchTouchEvent(MotionEvent.obtain(downTime, downTime + 200, MotionEvent.ACTION_MOVE, 200f, 200f, 0))
+        fabMenu.dispatchTouchEvent(MotionEvent.obtain(downTime, downTime + 300, MotionEvent.ACTION_UP, 200f, 200f, 0))
+
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        val prefs = activity.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
+
+        btnResetFabPosition.performClick()
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        assertEquals(-1f, prefs.getFloat("key_fab_rel_x", -1f), 0.001f)
+        assertEquals(-1f, prefs.getFloat("key_fab_rel_y", -1f), 0.001f)
+    }
+
+    @Test
     fun testAboutViewDisplaysVersionAndFeedbackLaunchesIntent() {
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
@@ -183,9 +330,8 @@ class MainActivityTest {
         val activity = controller.get()
 
         val input = activity.findViewById<EditText>(R.id.search_reminder_input)
-        val btnAdd = activity.findViewById<ImageView>(R.id.btn_add_reminder)
         input.setText("Buy milk")
-        btnAdd.performClick()
+        input.onEditorAction(android.view.inputmethod.EditorInfo.IME_ACTION_DONE)
 
         val btnExport = activity.findViewById<TextView>(R.id.btn_export_markdown)
         assertNotNull(btnExport)
@@ -218,8 +364,8 @@ class MainActivityTest {
         input.setText("#punt")
         shadowOf(android.os.Looper.getMainLooper()).idleFor(250, java.util.concurrent.TimeUnit.MILLISECONDS)
 
-        val btnListExport = activity.findViewById<ImageView>(R.id.btn_list_export)
-        assertNotNull(btnListExport)
+        val btnFabShareMatching = activity.findViewById<View>(R.id.btn_fab_share_matching)
+        assertNotNull(btnFabShareMatching)
 
         val showExportOptionsMethod = MainActivity::class.java.getDeclaredMethod("showExportOptionsDialog", List::class.java)
         showExportOptionsMethod.isAccessible = true
@@ -749,8 +895,14 @@ class MainActivityTest {
         val activity = controller.get()
 
         val txtEmpty = activity.findViewById<TextView>(R.id.txt_empty_reminders)
+        val btnEmptyClearFilter = activity.findViewById<TextView>(R.id.btn_empty_clear_filter)
         assertNotNull(txtEmpty)
         assertEquals(View.VISIBLE, txtEmpty.visibility)
+        assertTrue(txtEmpty.text.toString().contains("Pull down to create task"))
+        assertTrue(txtEmpty.text.toString().contains("Swipe right on task to mark done"))
+        assertTrue(txtEmpty.text.toString().contains("Swipe left on task to punt"))
+        assertTrue(txtEmpty.text.toString().contains("Use #every 1d for recurring tasks"))
+        assertEquals(View.GONE, btnEmptyClearFilter.visibility)
     }
 
     @Test
@@ -1081,13 +1233,13 @@ class MainActivityTest {
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
 
-        val headerNav = activity.findViewById<View>(R.id.header_navigation)
+        val fabContainer = activity.findViewById<View>(R.id.layout_fab_container)
         val recyclerView = activity.findViewById<RecyclerView>(R.id.reminders_list)
-        assertNotNull(headerNav)
+        assertNotNull(fabContainer)
         assertNotNull(recyclerView)
 
         // Navigation is VISIBLE
-        assertEquals(View.VISIBLE, headerNav.visibility)
+        assertEquals(View.VISIBLE, fabContainer.visibility)
 
         // Scroll down list to position 5
         recyclerView.scrollToPosition(5)
@@ -1097,7 +1249,7 @@ class MainActivityTest {
         recyclerView.scrollBy(0, 50)
         shadowOf(android.os.Looper.getMainLooper()).idle()
 
-        assertEquals("Bottom navigation bar should remain VISIBLE on scroll", View.VISIBLE, headerNav.visibility)
+        assertEquals("Floating navigation container should remain VISIBLE on scroll", View.VISIBLE, fabContainer.visibility)
     }
 
     @Test

@@ -1,0 +1,10 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Clean center dot matching Punt app logo -->
+    <path
+        android:fillColor="?android:attr/textColorPrimary"
+        android:pathData="M 12,7.5 C 14.48,7.5 16.5,9.52 16.5,12 C 16.5,14.48 14.48,16.5 12,16.5 C 9.52,16.5 7.5,14.48 7.5,12 C 7.5,9.52 9.52,7.5 12,7.5 Z" />
+</vector>
