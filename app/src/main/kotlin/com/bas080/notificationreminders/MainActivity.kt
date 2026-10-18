@@ -273,16 +273,39 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        val applyFabPositionCorrection = { action: () -> Unit ->
+            val locBefore = IntArray(2)
+            binding.fabMenu.getLocationOnScreen(locBefore)
+            action()
+            updatePillMenuDirection()
+            binding.layoutFabContainer.post {
+                val locAfter = IntArray(2)
+                binding.fabMenu.getLocationOnScreen(locAfter)
+                val dx = locBefore[0] - locAfter[0]
+                val dy = locBefore[1] - locAfter[1]
+                if (dx != 0 || dy != 0) {
+                    binding.layoutFabContainer.translationX += dx
+                    binding.layoutFabContainer.translationY += dy
+                }
+            }
+        }
+
         val toggleFabMenu = {
             val isCurrentlyExpanded = binding.fabPillMenuContainer.visibility == View.VISIBLE
             val willBeExpanded = !isCurrentlyExpanded
-            binding.fabPillMenuContainer.visibility = if (willBeExpanded) View.VISIBLE else View.GONE
-            updateFabState(willBeExpanded)
+            applyFabPositionCorrection {
+                binding.fabPillMenuContainer.visibility = if (willBeExpanded) View.VISIBLE else View.GONE
+                updateFabState(willBeExpanded)
+            }
         }
 
         val collapseFabMenu = {
-            binding.fabPillMenuContainer.visibility = View.GONE
-            updateFabState(false)
+            if (binding.fabPillMenuContainer.visibility == View.VISIBLE) {
+                applyFabPositionCorrection {
+                    binding.fabPillMenuContainer.visibility = View.GONE
+                    updateFabState(false)
+                }
+            }
         }
 
         binding.fabMenu.setOnClickListener {
@@ -592,12 +615,17 @@ class MainActivity : AppCompatActivity() {
         }
 
         binding.searchReminderInput.setOnKeyListener { _, keyCode, event ->
-            if (keyCode == android.view.KeyEvent.KEYCODE_ENTER && event.action == android.view.KeyEvent.ACTION_DOWN) {
-                if (event.isShiftPressed) {
+            if ((keyCode == android.view.KeyEvent.KEYCODE_ENTER || keyCode == android.view.KeyEvent.KEYCODE_NUMPAD_ENTER)
+                && event.action == android.view.KeyEvent.ACTION_DOWN) {
+                val isShift = event.isShiftPressed || (event.metaState and android.view.KeyEvent.META_SHIFT_ON) != 0
+                if (isShift) {
                     val start = binding.searchReminderInput.selectionStart
                     val end = binding.searchReminderInput.selectionEnd
                     if (start >= 0 && end >= 0) {
-                        binding.searchReminderInput.text.replace(Math.min(start, end), Math.max(start, end), "\n")
+                        val min = Math.min(start, end)
+                        val max = Math.max(start, end)
+                        binding.searchReminderInput.text.replace(min, max, "\n")
+                        binding.searchReminderInput.setSelection(min + 1)
                     } else {
                         binding.searchReminderInput.append("\n")
                     }
@@ -612,22 +640,22 @@ class MainActivity : AppCompatActivity() {
         }
 
         binding.searchReminderInput.setOnEditorActionListener { _, actionId, event ->
-            if (event != null && event.keyCode == android.view.KeyEvent.KEYCODE_ENTER) {
-                if (event.action == android.view.KeyEvent.ACTION_DOWN) {
-                    if (event.isShiftPressed) {
-                        val start = binding.searchReminderInput.selectionStart
-                        val end = binding.searchReminderInput.selectionEnd
-                        if (start >= 0 && end >= 0) {
-                            binding.searchReminderInput.text.replace(Math.min(start, end), Math.max(start, end), "\n")
-                        } else {
-                            binding.searchReminderInput.append("\n")
-                        }
+            val isShift = event != null && (event.isShiftPressed || (event.metaState and android.view.KeyEvent.META_SHIFT_ON) != 0)
+            if (isShift) {
+                if (event?.action == android.view.KeyEvent.ACTION_DOWN) {
+                    val start = binding.searchReminderInput.selectionStart
+                    val end = binding.searchReminderInput.selectionEnd
+                    if (start >= 0 && end >= 0) {
+                        val min = Math.min(start, end)
+                        val max = Math.max(start, end)
+                        binding.searchReminderInput.text.replace(min, max, "\n")
+                        binding.searchReminderInput.setSelection(min + 1)
                     } else {
-                        submitActionWithCancel()
+                        binding.searchReminderInput.append("\n")
                     }
                 }
                 true
-            } else if (actionId == EditorInfo.IME_ACTION_DONE) {
+            } else if (actionId == EditorInfo.IME_ACTION_DONE || (event != null && (event.keyCode == android.view.KeyEvent.KEYCODE_ENTER || event.keyCode == android.view.KeyEvent.KEYCODE_NUMPAD_ENTER) && event.action == android.view.KeyEvent.ACTION_DOWN)) {
                 submitActionWithCancel()
                 true
             } else {
@@ -1724,7 +1752,7 @@ class MainActivity : AppCompatActivity() {
             binding.layoutEmptyReminders.visibility = View.VISIBLE
             binding.btnEmptyClearFilter.visibility = if (hasFilterOrSearch) View.VISIBLE else View.GONE
 
-            val instructions = "Pull down to create task\nSwipe right on task to mark done\nSwipe left on task to punt\nUse #every 1d for recurring tasks"
+            val instructions = "Pull down or press Enter to create task\nSwipe right on task to mark done\nSwipe left on task to punt\nUse #every 1d for recurring tasks"
             val spannable = android.text.SpannableStringBuilder(instructions)
             val tagMatch = Regex("#every 1d").find(instructions)
             if (tagMatch != null) {

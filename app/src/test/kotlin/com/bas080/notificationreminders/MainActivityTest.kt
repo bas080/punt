@@ -898,7 +898,7 @@ class MainActivityTest {
         val btnEmptyClearFilter = activity.findViewById<TextView>(R.id.btn_empty_clear_filter)
         assertNotNull(txtEmpty)
         assertEquals(View.VISIBLE, txtEmpty.visibility)
-        assertTrue(txtEmpty.text.toString().contains("Pull down to create task"))
+        assertTrue(txtEmpty.text.toString().contains("Pull down or press Enter to create task"))
         assertTrue(txtEmpty.text.toString().contains("Swipe right on task to mark done"))
         assertTrue(txtEmpty.text.toString().contains("Swipe left on task to punt"))
         assertTrue(txtEmpty.text.toString().contains("Use #every 1d for recurring tasks"))
