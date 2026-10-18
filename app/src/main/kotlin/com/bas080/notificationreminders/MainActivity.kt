@@ -273,38 +273,17 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        val applyFabPositionCorrection = { action: () -> Unit ->
-            val locBefore = IntArray(2)
-            binding.fabMenu.getLocationOnScreen(locBefore)
-            action()
-            updatePillMenuDirection()
-            binding.layoutFabContainer.post {
-                val locAfter = IntArray(2)
-                binding.fabMenu.getLocationOnScreen(locAfter)
-                val dx = locBefore[0] - locAfter[0]
-                val dy = locBefore[1] - locAfter[1]
-                if (dx != 0 || dy != 0) {
-                    binding.layoutFabContainer.translationX += dx
-                    binding.layoutFabContainer.translationY += dy
-                }
-            }
-        }
-
         val toggleFabMenu = {
             val isCurrentlyExpanded = binding.fabPillMenuContainer.visibility == View.VISIBLE
             val willBeExpanded = !isCurrentlyExpanded
-            applyFabPositionCorrection {
-                binding.fabPillMenuContainer.visibility = if (willBeExpanded) View.VISIBLE else View.GONE
-                updateFabState(willBeExpanded)
-            }
+            binding.fabPillMenuContainer.visibility = if (willBeExpanded) View.VISIBLE else View.GONE
+            updateFabState(willBeExpanded)
         }
 
         val collapseFabMenu = {
             if (binding.fabPillMenuContainer.visibility == View.VISIBLE) {
-                applyFabPositionCorrection {
-                    binding.fabPillMenuContainer.visibility = View.GONE
-                    updateFabState(false)
-                }
+                binding.fabPillMenuContainer.visibility = View.GONE
+                updateFabState(false)
             }
         }
 
@@ -427,6 +406,28 @@ class MainActivity : AppCompatActivity() {
         (binding.btnFabShareMatching.layoutParams as? android.widget.LinearLayout.LayoutParams)?.gravity = targetGravity
 
         binding.fabPillMenuContainer.layoutParams = pillParams
+
+        val containerParams = binding.layoutFabContainer.layoutParams as? android.widget.FrameLayout.LayoutParams
+        if (containerParams != null) {
+            val desiredGravity = android.view.Gravity.BOTTOM or (if (isLeftHalf) android.view.Gravity.START else android.view.Gravity.END)
+            if (containerParams.gravity != desiredGravity) {
+                val currentFabLoc = IntArray(2)
+                binding.fabMenu.getLocationOnScreen(currentFabLoc)
+
+                containerParams.gravity = desiredGravity
+                binding.layoutFabContainer.layoutParams = containerParams
+                binding.layoutFabContainer.requestLayout()
+
+                binding.layoutFabContainer.post {
+                    val newFabLoc = IntArray(2)
+                    binding.fabMenu.getLocationOnScreen(newFabLoc)
+                    val dx = currentFabLoc[0] - newFabLoc[0]
+                    val dy = currentFabLoc[1] - newFabLoc[1]
+                    binding.layoutFabContainer.translationX += dx
+                    binding.layoutFabContainer.translationY += dy
+                }
+            }
+        }
     }
 
     private fun setupDraggableFab() {
@@ -473,7 +474,6 @@ class MainActivity : AppCompatActivity() {
                     if (isDragging) {
                         binding.layoutFabContainer.translationX = initialTranslationX + dx
                         binding.layoutFabContainer.translationY = initialTranslationY + dy
-                        updatePillMenuDirection()
                     }
                     true
                 }
