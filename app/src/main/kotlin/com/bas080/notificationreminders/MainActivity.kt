@@ -55,6 +55,8 @@ class MainActivity : AppCompatActivity() {
         private const val PREFS_SNOOZE_FREQ = "snooze_freq_prefs"
         private const val KEY_FAB_REL_X = "key_fab_rel_x"
         private const val KEY_FAB_REL_Y = "key_fab_rel_y"
+        private const val KEY_FOCUS_PROFILES = "key_focus_profiles"
+        private const val KEY_ACTIVE_FOCUS_PROFILE = "key_active_focus_profile"
 
         fun getCleanTrimmed(reminderText: String): String {
             return reminderText.replace(Regex("(?i)\\s*#done\\b"), "").trim().lowercase()
@@ -96,6 +98,7 @@ class MainActivity : AppCompatActivity() {
 
     private var currentFilter = ReminderFilter.ALL
     private var currentSearchQuery = ""
+    private var activeFocusProfileName: String? = null
     private val recentlyDoneReminders = mutableSetOf<String>()
 
     private val searchHandler = android.os.Handler(android.os.Looper.getMainLooper())
@@ -259,7 +262,14 @@ class MainActivity : AppCompatActivity() {
             clearFilterAndSearchAction()
         }
 
+        markAsButtonAccessibility(binding.btnEmptyClearFocus)
+
+        binding.btnEmptyClearFocus.setOnClickListener {
+            clearFocusProfileAction()
+        }
+
         markAsButtonAccessibility(binding.fabMenu)
+        markAsButtonAccessibility(binding.btnFabFocusProfiles)
         markAsButtonAccessibility(binding.btnFabPuntAll)
         markAsButtonAccessibility(binding.btnFabShareMatching)
 
@@ -307,6 +317,11 @@ class MainActivity : AppCompatActivity() {
         binding.btnNavAbout.setOnClickListener {
             collapseFabMenu()
             showAboutView()
+        }
+
+        binding.btnFabFocusProfiles.setOnClickListener {
+            collapseFabMenu()
+            showFocusProfilesDialog()
         }
 
         binding.btnFabPuntAll.setOnClickListener {
@@ -402,6 +417,7 @@ class MainActivity : AppCompatActivity() {
         binding.fabPillMenuContainer.gravity = targetGravity
         (binding.btnNavReminders.layoutParams as? android.widget.LinearLayout.LayoutParams)?.gravity = targetGravity
         (binding.btnNavAbout.layoutParams as? android.widget.LinearLayout.LayoutParams)?.gravity = targetGravity
+        (binding.btnFabFocusProfiles.layoutParams as? android.widget.LinearLayout.LayoutParams)?.gravity = targetGravity
         (binding.btnFabPuntAll.layoutParams as? android.widget.LinearLayout.LayoutParams)?.gravity = targetGravity
         (binding.btnFabShareMatching.layoutParams as? android.widget.LinearLayout.LayoutParams)?.gravity = targetGravity
 
@@ -870,14 +886,35 @@ class MainActivity : AppCompatActivity() {
     private fun clearFilterAndSearchAction() {
         currentSearchQuery = ""
         currentFilter = ReminderFilter.ALL
+        activeFocusProfileName = null
         getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
             .edit()
             .putString(KEY_REMINDER_FILTER, currentFilter.name)
             .putString(KEY_SEARCH_QUERY, "")
+            .putString(KEY_ACTIVE_FOCUS_PROFILE, "")
             .apply()
         recentlyDoneReminders.clear()
         binding.searchReminderInput.setText("")
+        updateSearchInputHint()
         updateSummaryAndAdapter()
+    }
+
+    private fun clearFocusProfileAction() {
+        activeFocusProfileName = null
+        getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
+            .edit()
+            .putString(KEY_ACTIVE_FOCUS_PROFILE, "")
+            .apply()
+        updateSearchInputHint()
+        updateSummaryAndAdapter()
+    }
+
+    private fun updateSearchInputHint() {
+        if (!activeFocusProfileName.isNullOrBlank()) {
+            binding.searchReminderInput.hint = "Focus: $activeFocusProfileName"
+        } else {
+            binding.searchReminderInput.hint = "Add or search reminders..."
+        }
     }
 
     private fun showExportOptionsDialog(reminders: List<String>) {
@@ -1008,6 +1045,7 @@ class MainActivity : AppCompatActivity() {
         binding.remindersContainer.visibility = View.VISIBLE
         binding.aboutContainer.visibility = View.GONE
 
+        binding.btnFabFocusProfiles.visibility = View.VISIBLE
         binding.btnFabPuntAll.visibility = View.VISIBLE
         binding.btnFabShareMatching.visibility = View.VISIBLE
 
@@ -1048,6 +1086,7 @@ class MainActivity : AppCompatActivity() {
         binding.remindersContainer.visibility = View.GONE
         binding.aboutContainer.visibility = View.VISIBLE
 
+        binding.btnFabFocusProfiles.visibility = View.GONE
         binding.btnFabPuntAll.visibility = View.GONE
         binding.btnFabShareMatching.visibility = View.GONE
 
@@ -1626,6 +1665,8 @@ class MainActivity : AppCompatActivity() {
         }
         val savedQuery = prefs.getString(KEY_SEARCH_QUERY, "") ?: ""
         currentSearchQuery = savedQuery
+        activeFocusProfileName = prefs.getString(KEY_ACTIVE_FOCUS_PROFILE, null).takeIf { !it.isNullOrBlank() }
+        updateSearchInputHint()
         if (binding.searchReminderInput.text.toString() != savedQuery) {
             binding.searchReminderInput.setText(savedQuery)
         }
@@ -1664,7 +1705,17 @@ class MainActivity : AppCompatActivity() {
         val prefs = getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
         val now = System.currentTimeMillis()
 
-        val searchContainsDone = currentSearchQuery.contains("#done", ignoreCase = true)
+        val activeProfileQuery = activeFocusProfileName?.let { profileName ->
+            getSavedFocusProfiles().find { it.name.equals(profileName, ignoreCase = true) }?.query?.trim()
+        } ?: ""
+
+        val effectiveSearchQuery = when {
+            activeProfileQuery.isNotBlank() && currentSearchQuery.isNotBlank() -> "$activeProfileQuery $currentSearchQuery"
+            activeProfileQuery.isNotBlank() -> activeProfileQuery
+            else -> currentSearchQuery
+        }
+
+        val searchContainsDone = effectiveSearchQuery.contains("#done", ignoreCase = true)
 
         val filterByFilterType = { filterType: ReminderFilter ->
             val statusFiltered = when (filterType) {
@@ -1695,7 +1746,7 @@ class MainActivity : AppCompatActivity() {
                     snoozeUntil > now
                 }
             }
-            com.bas080.notificationreminders.utils.ReminderMatcher.filterSearchQueryTiered(statusFiltered, currentSearchQuery, this)
+            com.bas080.notificationreminders.utils.ReminderMatcher.filterSearchQueryTiered(statusFiltered, effectiveSearchQuery, this)
         }
 
         val filtered = filterByFilterType(currentFilter)
@@ -1751,6 +1802,12 @@ class MainActivity : AppCompatActivity() {
         if (displayedReminders.isEmpty()) {
             binding.layoutEmptyReminders.visibility = View.VISIBLE
             binding.btnEmptyClearFilter.visibility = if (hasFilterOrSearch) View.VISIBLE else View.GONE
+            if (!activeFocusProfileName.isNullOrBlank()) {
+                binding.btnEmptyClearFocus.visibility = View.VISIBLE
+                binding.btnEmptyClearFocus.text = "Clear focus ($activeFocusProfileName)"
+            } else {
+                binding.btnEmptyClearFocus.visibility = View.GONE
+            }
 
             val instructions = "Pull down or press Enter to create task\nSwipe right on task to mark done\nSwipe left on task to punt\nUse #every 1d for recurring tasks"
             val spannable = android.text.SpannableStringBuilder(instructions)
@@ -1841,6 +1898,221 @@ class MainActivity : AppCompatActivity() {
                 startActivity(intent)
             }
             .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    data class FocusProfile(val name: String, val query: String)
+
+    private fun getSavedFocusProfiles(): MutableList<FocusProfile> {
+        val prefs = getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
+        val jsonString = prefs.getString(KEY_FOCUS_PROFILES, null) ?: return mutableListOf()
+        return try {
+            val jsonArray = org.json.JSONArray(jsonString)
+            val list = mutableListOf<FocusProfile>()
+            for (i in 0 until jsonArray.length()) {
+                val obj = jsonArray.getJSONObject(i)
+                val name = obj.optString("name", "")
+                val query = obj.optString("query", "")
+                if (name.isNotBlank()) {
+                    list.add(FocusProfile(name, query))
+                }
+            }
+            list
+        } catch (_: Exception) {
+            mutableListOf()
+        }
+    }
+
+    private fun saveFocusProfiles(profiles: List<FocusProfile>) {
+        val prefs = getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
+        val jsonArray = org.json.JSONArray()
+        for (p in profiles) {
+            val obj = org.json.JSONObject()
+            obj.put("name", p.name)
+            obj.put("query", p.query)
+            jsonArray.put(obj)
+        }
+        prefs.edit().putString(KEY_FOCUS_PROFILES, jsonArray.toString()).apply()
+    }
+
+    fun showFocusProfilesDialog() {
+        val profiles = getSavedFocusProfiles()
+        val options = mutableListOf<String>()
+
+        val defaultLabel = if (activeFocusProfileName.isNullOrBlank()) "All / No Profile ✓" else "All / No Profile"
+        options.add(defaultLabel)
+
+        for (p in profiles) {
+            val isActive = p.name.equals(activeFocusProfileName, ignoreCase = true)
+            val queryPart = if (p.query.isNotBlank()) " (${p.query})" else ""
+            val checkMark = if (isActive) " ✓" else ""
+            options.add("${p.name}$queryPart$checkMark")
+        }
+
+        val textPrimaryColor = ContextCompat.getColor(this, R.color.text_primary)
+        val adapter = object : android.widget.ArrayAdapter<String>(
+            this,
+            android.R.layout.simple_list_item_1,
+            options
+        ) {
+            override fun getView(position: Int, convertView: android.view.View?, parent: android.view.ViewGroup): android.view.View {
+                val view = super.getView(position, convertView, parent)
+                if (view is android.widget.TextView) {
+                    view.setTextColor(textPrimaryColor)
+                }
+                return view
+            }
+        }
+
+        val listView = android.widget.ListView(this).apply {
+            this.adapter = adapter
+            divider = ContextCompat.getDrawable(this@MainActivity, R.drawable.dialog_divider)
+            dividerHeight = 1
+        }
+
+        val dialog = AlertDialog.Builder(this, R.style.Theme_Punt_Dialog)
+            .setTitle("Focus Profiles")
+            .setView(listView)
+            .setPositiveButton("New Profile") { _, _ ->
+                showCreateFocusProfileDialog()
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .create()
+
+        listView.setOnItemClickListener { _, _, position, _ ->
+            if (position == 0) {
+                clearFocusProfileAction()
+            } else {
+                val selectedProfile = profiles[position - 1]
+                activeFocusProfileName = selectedProfile.name
+                getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
+                    .edit()
+                    .putString(KEY_ACTIVE_FOCUS_PROFILE, selectedProfile.name)
+                    .apply()
+                updateSearchInputHint()
+                updateSummaryAndAdapter()
+            }
+            dialog.dismiss()
+        }
+
+        listView.setOnItemLongClickListener { _, _, position, _ ->
+            if (position > 0) {
+                dialog.dismiss()
+                val targetProfile = profiles[position - 1]
+                showEditOrDeleteFocusProfileOptions(targetProfile)
+                true
+            } else false
+        }
+
+        dialog.show()
+    }
+
+    fun showEditOrDeleteFocusProfileOptions(profile: FocusProfile) {
+        val options = arrayOf("Edit Profile", "Delete Profile")
+        val textPrimaryColor = ContextCompat.getColor(this, R.color.text_primary)
+        val adapter = object : android.widget.ArrayAdapter<String>(
+            this,
+            android.R.layout.simple_list_item_1,
+            options
+        ) {
+            override fun getView(position: Int, convertView: android.view.View?, parent: android.view.ViewGroup): android.view.View {
+                val view = super.getView(position, convertView, parent)
+                if (view is android.widget.TextView) {
+                    view.setTextColor(textPrimaryColor)
+                }
+                return view
+            }
+        }
+
+        AlertDialog.Builder(this, R.style.Theme_Punt_Dialog)
+            .setTitle(profile.name)
+            .setAdapter(adapter) { _, which ->
+                if (which == 0) {
+                    showCreateFocusProfileDialog(profile)
+                } else if (which == 1) {
+                    val profiles = getSavedFocusProfiles()
+                    profiles.removeAll { it.name.equals(profile.name, ignoreCase = true) }
+                    saveFocusProfiles(profiles)
+                    if (profile.name.equals(activeFocusProfileName, ignoreCase = true)) {
+                        clearFocusProfileAction()
+                    } else {
+                        showFocusProfilesDialog()
+                    }
+                }
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    fun showCreateFocusProfileDialog(editingProfile: FocusProfile? = null) {
+        val profiles = getSavedFocusProfiles()
+        val container = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            val padding = (16 * resources.displayMetrics.density).toInt()
+            setPadding(padding, padding, padding, padding)
+        }
+
+        val inputName = android.widget.EditText(this).apply {
+            hint = "Profile Name (e.g. Work, Fitness)"
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_primary))
+            setHintTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_secondary))
+            if (editingProfile != null) {
+                setText(editingProfile.name)
+            }
+        }
+
+        val currentText = binding.searchReminderInput.text.toString().trim()
+        val activeProfileQuery = profiles.find { it.name.equals(activeFocusProfileName, ignoreCase = true) }?.query?.trim() ?: ""
+        val defaultQuery = when {
+            editingProfile != null -> editingProfile.query
+            activeProfileQuery.isNotEmpty() && currentText.isNotEmpty() -> "$activeProfileQuery $currentText"
+            activeProfileQuery.isNotEmpty() -> activeProfileQuery
+            else -> currentText
+        }
+
+        val inputQuery = android.widget.EditText(this).apply {
+            hint = "Search Query (e.g. #work, #fitness)"
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_primary))
+            setHintTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_secondary))
+            setText(defaultQuery)
+        }
+
+        container.addView(inputName)
+        container.addView(inputQuery)
+
+        val title = if (editingProfile == null) "New Focus Profile" else "Edit Focus Profile"
+
+        AlertDialog.Builder(this, R.style.Theme_Punt_Dialog)
+            .setTitle(title)
+            .setView(container)
+            .setPositiveButton("Save") { _, _ ->
+                val name = inputName.text.toString().trim()
+                val query = inputQuery.text.toString().trim()
+
+                if (name.isBlank()) {
+                    android.widget.Toast.makeText(this, "Profile name cannot be empty", android.widget.Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+
+                if (editingProfile != null) {
+                    profiles.removeAll { it.name.equals(editingProfile.name, ignoreCase = true) }
+                } else {
+                    profiles.removeAll { it.name.equals(name, ignoreCase = true) }
+                }
+
+                profiles.add(FocusProfile(name, query))
+                saveFocusProfiles(profiles)
+
+                activeFocusProfileName = name
+                getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
+                    .edit()
+                    .putString(KEY_ACTIVE_FOCUS_PROFILE, name)
+                    .apply()
+
+                updateSearchInputHint()
+                updateSummaryAndAdapter()
+            }
+            .setNegativeButton(R.string.cancel, null)
             .show()
     }
 
