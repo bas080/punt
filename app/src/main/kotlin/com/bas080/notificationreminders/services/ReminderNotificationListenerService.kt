@@ -343,8 +343,29 @@ class ReminderNotificationListenerService : NotificationListenerService() {
             var activeCount = 0
             var snoozedCount = 0
 
+            val activeFocusProfileName = prefs.getString("key_active_focus_profile", null)
+            val focusProfilesJson = prefs.getString("key_focus_profiles", null)
+            var focusQuery: String? = null
+            if (!activeFocusProfileName.isNullOrBlank() && !focusProfilesJson.isNullOrBlank()) {
+                try {
+                    val jsonArray = org.json.JSONArray(focusProfilesJson)
+                    for (i in 0 until jsonArray.length()) {
+                        val obj = jsonArray.getJSONObject(i)
+                        if (obj.optString("name").equals(activeFocusProfileName, ignoreCase = true)) {
+                            focusQuery = obj.optString("query")
+                            break
+                        }
+                    }
+                } catch (e: org.json.JSONException) {
+                    com.bas080.notificationreminders.utils.AppLogger.log(this, "NotificationListener", "Error parsing focus profiles JSON: ${e.message}")
+                }
+            }
+
             for (reminder in savedReminders) {
                 if (reminder.contains("#done", ignoreCase = true)) {
+                    continue
+                }
+                if (!focusQuery.isNullOrBlank() && !reminder.contains(focusQuery, ignoreCase = true)) {
                     continue
                 }
                 val trimmed = reminder.trim()
@@ -360,7 +381,9 @@ class ReminderNotificationListenerService : NotificationListenerService() {
                 }
             }
 
-            val statusText = if (activeCount == 0 && snoozedCount == 0) {
+            val statusText = if (!activeFocusProfileName.isNullOrBlank()) {
+                getString(R.string.reminders_summary_focus, activeFocusProfileName, activeCount, snoozedCount)
+            } else if (activeCount == 0 && snoozedCount == 0) {
                 getString(R.string.no_active_reminders)
             } else {
                 getString(R.string.reminders_summary_combined, activeCount, snoozedCount)
