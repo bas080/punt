@@ -1733,13 +1733,7 @@ class MainActivity : AppCompatActivity() {
             getSavedFocusProfiles().find { it.name.equals(profileName, ignoreCase = true) }?.query?.trim()
         } ?: ""
 
-        val effectiveSearchQuery = when {
-            activeProfileQuery.isNotBlank() && currentSearchQuery.isNotBlank() -> "$activeProfileQuery $currentSearchQuery"
-            activeProfileQuery.isNotBlank() -> activeProfileQuery
-            else -> currentSearchQuery
-        }
-
-        val searchContainsDone = effectiveSearchQuery.contains("#done", ignoreCase = true)
+        val searchContainsDone = activeProfileQuery.contains("#done", ignoreCase = true) || currentSearchQuery.contains("#done", ignoreCase = true)
 
         val filterByFilterType = { filterType: ReminderFilter ->
             val statusFiltered = when (filterType) {
@@ -1770,7 +1764,18 @@ class MainActivity : AppCompatActivity() {
                     snoozeUntil > now
                 }
             }
-            com.bas080.notificationreminders.utils.ReminderMatcher.filterSearchQueryTiered(statusFiltered, effectiveSearchQuery, this)
+
+            val focusedFiltered = if (activeProfileQuery.isNotBlank()) {
+                com.bas080.notificationreminders.utils.ReminderMatcher.filterSearchQueryTiered(statusFiltered, activeProfileQuery, this)
+            } else {
+                statusFiltered
+            }
+
+            if (currentSearchQuery.isNotBlank()) {
+                com.bas080.notificationreminders.utils.ReminderMatcher.filterSearchQueryTiered(focusedFiltered, currentSearchQuery, this)
+            } else {
+                focusedFiltered
+            }
         }
 
         val filtered = filterByFilterType(currentFilter)

@@ -1754,4 +1754,61 @@ class MainActivityTest {
 
         assertEquals("Add or search reminders...", activity.findViewById<android.widget.EditText>(R.id.search_reminder_input).hint.toString())
     }
+
+    @Test
+    fun testTwoStageAllFocusSearchPipelineFiltering() {
+        val prefs = RuntimeEnvironment.getApplication().getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
+        prefs.edit().clear().commit()
+
+        val profilesJson = org.json.JSONArray().apply {
+            put(org.json.JSONObject().put("name", "Work").put("query", "#work"))
+        }.toString()
+
+        prefs.edit()
+            .putString("key_reminder_filter", ReminderFilter.ALL.name)
+            .putString("key_focus_profiles", profilesJson)
+            .putString("key_active_focus_profile", "Work")
+            .putBoolean("key_active_collapsed", false)
+            .putBoolean("key_punted_collapsed", false)
+            .commit()
+
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = controller.get()
+
+        val activeRemindersField = MainActivity::class.java.getDeclaredField("activeReminders")
+        activeRemindersField.isAccessible = true
+        @Suppress("UNCHECKED_CAST")
+        val activeReminders = activeRemindersField.get(activity) as MutableList<String>
+        activeReminders.clear()
+        activeReminders.addAll(listOf("Buy milk #work", "Gym session #fitness", "Write report #work"))
+
+        val updateSummaryAndAdapterMethod = MainActivity::class.java.getDeclaredMethod("updateSummaryAndAdapter")
+        updateSummaryAndAdapterMethod.isAccessible = true
+        updateSummaryAndAdapterMethod.invoke(activity)
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        val recyclerView = activity.findViewById<RecyclerView>(R.id.reminders_list)
+        val adapter = recyclerView.adapter as RemindersAdapter
+
+        // Focused on "Work": 2 work tasks + 1 footer = 3 items
+        assertEquals(3, adapter.itemCount)
+
+        // Type search query "report"
+        val searchInput = activity.findViewById<EditText>(R.id.search_reminder_input)
+        searchInput.setText("report")
+        org.robolectric.shadows.ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
+
+        // Search "report" on Work focus: 1 matching task ("Write report #work") + 1 footer = 2 items
+        assertEquals(2, adapter.itemCount)
+        val holder = recyclerView.findViewHolderForAdapterPosition(0) as RemindersAdapter.ItemViewHolder
+        assertTrue(holder.reminderInput.text.toString().contains("Write report #work"))
+
+        // Type search query "gym" (exists in #fitness task, but NOT in #work focus)
+        searchInput.setText("gym")
+        org.robolectric.shadows.ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
+
+        // Search "gym" on Work focus yields 0 matching tasks
+        assertEquals(0, adapter.itemCount)
+        assertEquals(View.VISIBLE, activity.findViewById<View>(R.id.layout_empty_reminders).visibility)
+    }
 }
