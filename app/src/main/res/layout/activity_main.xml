@@ -106,6 +106,20 @@
                     android:visibility="gone">
 
                     <TextView
+                        android:id="@+id/btn_empty_clear_focus"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="12dp"
+                        android:text="Clear focus"
+                        android:textColor="@color/accent"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:background="?attr/selectableItemBackground"
+                        android:visibility="gone" />
+
+                    <TextView
                         android:id="@+id/btn_empty_clear_filter"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
@@ -443,6 +457,42 @@
                     android:focusable="true"
                     android:background="@drawable/bg_pill_inverted"
                     android:layout_marginBottom="10dp" />
+
+                <!-- Action Pill: Focus -->
+                <LinearLayout
+                    android:id="@+id/btn_fab_focus_profiles"
+                    android:layout_width="wrap_content"
+                    android:layout_height="40dp"
+                    android:orientation="horizontal"
+                    android:gravity="center"
+                    android:paddingHorizontal="18dp"
+                    android:elevation="12dp"
+                    android:translationZ="12dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:background="@drawable/bg_pill_inverted"
+                    android:layout_marginBottom="10dp">
+
+                    <ImageView
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
+                        android:src="@drawable/ic_action_filter"
+                        app:tint="@color/bg_dark"
+                        android:contentDescription="Focus"
+                        android:scaleType="centerInside"
+                        android:layout_marginEnd="8dp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Focus"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:maxLines="1"
+                        android:singleLine="true"
+                        android:textColor="@color/bg_dark" />
+
+                </LinearLayout>
 
                 <!-- Action Pill: Punt -->
                 <LinearLayout
