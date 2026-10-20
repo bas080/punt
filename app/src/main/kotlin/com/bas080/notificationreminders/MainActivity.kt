@@ -41,8 +41,6 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
 
-enum class ReminderFilter { ALL, ACTIVE, SNOOZED }
-
 const val HEADER_ACTIVE_SECTION_MARKER = "HEADER_ACTIVE_SECTION_MARKER"
 const val HEADER_SNOOZED_SECTION_MARKER = "HEADER_SNOOZED_SECTION_MARKER"
 
@@ -58,7 +56,6 @@ class MainActivity : AppCompatActivity() {
     companion object {
         private const val PREFS_REMINDERS = "reminders_prefs"
         private const val KEY_REMINDERS = "key_reminders_list"
-        private const val KEY_REMINDER_FILTER = "key_reminder_filter"
         private const val KEY_SEARCH_QUERY = "key_search_query"
         private const val PREFS_SNOOZE_FREQ = "snooze_freq_prefs"
         private const val KEY_FOCUS_PROFILES = "key_focus_profiles"
@@ -104,7 +101,6 @@ class MainActivity : AppCompatActivity() {
     private val displayedReminders = mutableListOf<String>()
     private lateinit var adapter: RemindersAdapter
 
-    private var currentFilter = ReminderFilter.ALL
     private var currentSearchQuery = ""
     private var activeFocusProfileName: String? = null
     var isActiveCollapsed = false
@@ -198,11 +194,9 @@ class MainActivity : AppCompatActivity() {
                 com.bas080.notificationreminders.utils.ExperimentTracker.trackCreation(this, "app_input")
                 activeReminders.add(text)
                 currentSearchQuery = ""
-                currentFilter = ReminderFilter.ALL
                 getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
                     .edit()
                     .putString(KEY_SEARCH_QUERY, "")
-                    .putString(KEY_REMINDER_FILTER, ReminderFilter.ALL.name)
                     .apply()
                 recentlyDoneReminders.clear()
                 saveRemindersToPrefs()
@@ -235,7 +229,6 @@ class MainActivity : AppCompatActivity() {
         }
 
         markAsButtonAccessibility(binding.btnMenuFocusProfiles)
-        markAsButtonAccessibility(binding.btnMenuFilter)
         markAsButtonAccessibility(binding.btnMenuPuntAll)
         markAsButtonAccessibility(binding.btnMenuShareMatching)
         markAsButtonAccessibility(binding.btnMenuAbout)
@@ -260,11 +253,6 @@ class MainActivity : AppCompatActivity() {
         binding.btnMenuFocusProfiles.setOnClickListener {
             collapseMenu()
             showFocusProfilesDialog()
-        }
-
-        binding.btnMenuFilter.setOnClickListener {
-            collapseMenu()
-            showTagsSelectionDialog()
         }
 
         binding.btnMenuPuntAll.setOnClickListener {
@@ -609,195 +597,11 @@ class MainActivity : AppCompatActivity() {
         })
     }
 
-    private fun sendFeedbackEmail() {
-        val feedbackBody = StringBuilder().apply {
-            append("## Feedback\n\n")
-            append("[ Please type your feedback here ]\n\n")
-
-            append("### Device Info\n")
-            append(CrashReportActivity.getDiagnosticMetadata(this@MainActivity))
-            append("\n")
-
-            val logs = AppLogger.getLogs(this@MainActivity)
-            if (logs.isNotBlank()) {
-                append("### Application Logs\n")
-                append("```\n")
-                append(logs)
-                append("\n```\n")
-            }
-        }.toString()
-
-        val feedbackSubject = "Punt Feedback"
-        val mailtoUri = "mailto:bas080@hotmail.com?subject=${android.net.Uri.encode(feedbackSubject)}&body=${android.net.Uri.encode(feedbackBody)}"
-        val intent = Intent(Intent.ACTION_SENDTO).apply {
-            data = android.net.Uri.parse(mailtoUri)
-            putExtra(Intent.EXTRA_SUBJECT, feedbackSubject)
-            putExtra(Intent.EXTRA_TEXT, feedbackBody)
-        }
-        val chooserIntent = Intent.createChooser(intent, getString(R.string.feedback))
-        try {
-            startActivity(chooserIntent)
-        } catch (_: Exception) {
-            Toast.makeText(this, R.string.toast_no_email_app, Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    private fun extractAllTags(): List<String> {
-        val tagRegex = Regex("#[a-zA-Z0-9_]+")
-        val tagCounts = mutableMapOf<String, Int>()
-        for (reminder in activeReminders) {
-            tagRegex.findAll(reminder).forEach { match ->
-                val tag = match.value.lowercase()
-                tagCounts[tag] = (tagCounts[tag] ?: 0) + 1
-            }
-        }
-        return tagCounts.entries
-            .sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key })
-            .map { it.key }
-    }
-
-    private fun showTagsSelectionDialog() {
-        val density = resources.displayMetrics.density
-        val padding = (24 * density).toInt()
-
-        val layout = android.widget.LinearLayout(this).apply {
-            orientation = android.widget.LinearLayout.VERTICAL
-            setPadding(padding, padding / 2, padding, 0)
-        }
-
-        val stateLabel = TextView(this).apply {
-            text = "State Filter"
-            setTextAppearance(android.R.style.TextAppearance_Small)
-            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_secondary))
-            setPadding(0, 0, 0, (4 * density).toInt())
-        }
-        layout.addView(stateLabel)
-
-        val radioGroup = android.widget.RadioGroup(this).apply {
-            orientation = android.widget.LinearLayout.HORIZONTAL
-        }
-
-        val accentColor = ContextCompat.getColor(this, R.color.accent)
-        val textPrimaryColor = ContextCompat.getColor(this, R.color.text_primary)
-        val colorStateList = android.content.res.ColorStateList.valueOf(accentColor)
-
-        val rbAll = android.widget.RadioButton(this).apply {
-            id = View.generateViewId()
-            text = "All"
-            setTextColor(textPrimaryColor)
-            buttonTintList = colorStateList
-            isChecked = currentFilter == ReminderFilter.ALL
-        }
-        val rbActive = android.widget.RadioButton(this).apply {
-            id = View.generateViewId()
-            text = "Active"
-            setTextColor(textPrimaryColor)
-            buttonTintList = colorStateList
-            isChecked = currentFilter == ReminderFilter.ACTIVE
-        }
-        val rbPunted = android.widget.RadioButton(this).apply {
-            id = View.generateViewId()
-            text = "Punted"
-            setTextColor(textPrimaryColor)
-            buttonTintList = colorStateList
-            isChecked = currentFilter == ReminderFilter.SNOOZED
-        }
-
-        radioGroup.addView(rbAll)
-        radioGroup.addView(rbActive)
-        radioGroup.addView(rbPunted)
-        layout.addView(radioGroup)
-
-        val allTags = extractAllTags()
-        val checkedTagStates = BooleanArray(allTags.size) { i ->
-            currentSearchQuery.contains(allTags[i], ignoreCase = true)
-        }
-
-        if (allTags.isNotEmpty()) {
-            val tagsLabel = TextView(this).apply {
-                text = "Tags Filter"
-                setTextAppearance(android.R.style.TextAppearance_Small)
-                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_secondary))
-                setPadding(0, (12 * density).toInt(), 0, (4 * density).toInt())
-            }
-            layout.addView(tagsLabel)
-
-            val tagsListView = android.widget.ListView(this).apply {
-                choiceMode = android.widget.ListView.CHOICE_MODE_MULTIPLE
-                adapter = object : android.widget.ArrayAdapter<String>(
-                    this@MainActivity,
-                    android.R.layout.simple_list_item_multiple_choice,
-                    allTags.toTypedArray()
-                ) {
-                    override fun getView(position: Int, convertView: android.view.View?, parent: android.view.ViewGroup): android.view.View {
-                        val view = super.getView(position, convertView, parent)
-                        if (view is android.widget.CheckedTextView) {
-                            view.setTextColor(textPrimaryColor)
-                            view.checkMarkTintList = colorStateList
-                        }
-                        return view
-                    }
-                }
-                for (i in allTags.indices) {
-                    setItemChecked(i, checkedTagStates[i])
-                }
-                setOnItemClickListener { _, _, position, _ ->
-                    checkedTagStates[position] = isItemChecked(position)
-                }
-            }
-            layout.addView(tagsListView)
-        }
-
-        AlertDialog.Builder(this, R.style.Theme_Punt_Dialog)
-            .setTitle("Filter Reminders")
-            .setView(layout)
-            .setPositiveButton("Apply") { _, _ ->
-                currentFilter = when {
-                    rbActive.isChecked -> ReminderFilter.ACTIVE
-                    rbPunted.isChecked -> ReminderFilter.SNOOZED
-                    else -> ReminderFilter.ALL
-                }
-
-                var updatedQuery = currentSearchQuery
-                for (i in allTags.indices) {
-                    val tag = allTags[i]
-                    val isChecked = checkedTagStates[i]
-                    val containsTag = updatedQuery.contains(tag, ignoreCase = true)
-
-                    if (isChecked && !containsTag) {
-                        updatedQuery = if (updatedQuery.isBlank()) tag else "$updatedQuery $tag"
-                    } else if (!isChecked && containsTag) {
-                        updatedQuery = updatedQuery.replace(Regex("(?i)\\b${Regex.escape(tag)}\\b|${Regex.escape(tag)}"), "")
-                            .replace(Regex("\\s+"), " ")
-                            .trim()
-                    }
-                }
-
-                currentSearchQuery = updatedQuery
-                getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
-                    .edit()
-                    .putString(KEY_REMINDER_FILTER, currentFilter.name)
-                    .putString(KEY_SEARCH_QUERY, updatedQuery)
-                    .apply()
-
-                recentlyDoneReminders.clear()
-                binding.searchReminderInput.setText(updatedQuery)
-                updateSummaryAndAdapter()
-            }
-            .setNeutralButton("Clear") { _, _ ->
-                clearFilterAndSearchAction()
-            }
-            .setNegativeButton(R.string.cancel, null)
-            .show()
-    }
-
     private fun clearFilterAndSearchAction() {
         currentSearchQuery = ""
-        currentFilter = ReminderFilter.ALL
         activeFocusProfileName = null
         getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
             .edit()
-            .putString(KEY_REMINDER_FILTER, currentFilter.name)
             .putString(KEY_SEARCH_QUERY, "")
             .putString(KEY_ACTIVE_FOCUS_PROFILE, "")
             .apply()
@@ -1530,12 +1334,6 @@ class MainActivity : AppCompatActivity() {
         com.bas080.notificationreminders.utils.TaskBackupManager.restoreIfEmpty(this)
         val prefs = getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
         val savedSet = prefs.getStringSet(KEY_REMINDERS, emptySet()) ?: emptySet()
-        val savedFilterName = prefs.getString(KEY_REMINDER_FILTER, ReminderFilter.ALL.name)
-        currentFilter = try {
-            ReminderFilter.valueOf(savedFilterName ?: ReminderFilter.ALL.name)
-        } catch (_: Exception) {
-            ReminderFilter.ALL
-        }
         val savedQuery = prefs.getString(KEY_SEARCH_QUERY, "") ?: ""
         currentSearchQuery = savedQuery
         activeFocusProfileName = prefs.getString(KEY_ACTIVE_FOCUS_PROFILE, null).takeIf { !it.isNullOrBlank() }
@@ -1587,50 +1385,22 @@ class MainActivity : AppCompatActivity() {
 
         val searchContainsDone = activeProfileQuery.contains("#done", ignoreCase = true) || currentSearchQuery.contains("#done", ignoreCase = true)
 
-        val filterByFilterType = { filterType: ReminderFilter ->
-            val statusFiltered = when (filterType) {
-                ReminderFilter.ALL -> activeReminders.filter { reminder ->
-                    val isDone = reminder.contains("#done", ignoreCase = true)
-                    if (isDone) searchContainsDone || recentlyDoneReminders.contains(reminder) else true
-                }
-                ReminderFilter.ACTIVE -> activeReminders.filter { reminder ->
-                    val cleanTrimmed = getCleanTrimmed(reminder)
-                    val snoozeUntil = prefs.getLong("snooze_$cleanTrimmed", 0L).let {
-                        if (it > 0L) it else (ReminderNotificationListenerService.lastTriggeredMap["snooze_$cleanTrimmed"] ?: 0L)
-                    }
-                    val isDone = reminder.contains("#done", ignoreCase = true)
-                    if (isDone) {
-                        return@filter snoozeUntil <= now && (searchContainsDone || recentlyDoneReminders.contains(reminder))
-                    }
-                    snoozeUntil <= now
-                }
-                ReminderFilter.SNOOZED -> activeReminders.filter { reminder ->
-                    val cleanTrimmed = getCleanTrimmed(reminder)
-                    val snoozeUntil = prefs.getLong("snooze_$cleanTrimmed", 0L).let {
-                        if (it > 0L) it else (ReminderNotificationListenerService.lastTriggeredMap["snooze_$cleanTrimmed"] ?: 0L)
-                    }
-                    val isDone = reminder.contains("#done", ignoreCase = true)
-                    if (isDone) {
-                        return@filter snoozeUntil > now && (searchContainsDone || recentlyDoneReminders.contains(reminder))
-                    }
-                    snoozeUntil > now
-                }
-            }
-
-            val focusedFiltered = if (activeProfileQuery.isNotBlank()) {
-                com.bas080.notificationreminders.utils.ReminderMatcher.filterSearchQueryTiered(statusFiltered, activeProfileQuery, this)
-            } else {
-                statusFiltered
-            }
-
-            if (currentSearchQuery.isNotBlank()) {
-                com.bas080.notificationreminders.utils.ReminderMatcher.filterSearchQueryTiered(focusedFiltered, currentSearchQuery, this)
-            } else {
-                focusedFiltered
-            }
+        val statusFiltered = activeReminders.filter { reminder ->
+            val isDone = reminder.contains("#done", ignoreCase = true)
+            if (isDone) searchContainsDone || recentlyDoneReminders.contains(reminder) else true
         }
 
-        val filtered = filterByFilterType(currentFilter)
+        val focusedFiltered = if (activeProfileQuery.isNotBlank()) {
+            com.bas080.notificationreminders.utils.ReminderMatcher.filterSearchQueryTiered(statusFiltered, activeProfileQuery, this)
+        } else {
+            statusFiltered
+        }
+
+        val filtered = if (currentSearchQuery.isNotBlank()) {
+            com.bas080.notificationreminders.utils.ReminderMatcher.filterSearchQueryTiered(focusedFiltered, currentSearchQuery, this)
+        } else {
+            focusedFiltered
+        }
 
         val activeItems = mutableListOf<String>()
         val snoozedItems = mutableListOf<Pair<String, Long>>()
@@ -1659,12 +1429,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        if (currentFilter == ReminderFilter.ALL && snoozedItems.isNotEmpty()) {
-            sorted.add(HEADER_SNOOZED_SECTION_MARKER)
-            if (!isPuntedCollapsed) {
-                sorted.addAll(snoozedItems.map { it.first })
-            }
-        } else if (currentFilter == ReminderFilter.SNOOZED && snoozedItems.isNotEmpty()) {
+        if (snoozedItems.isNotEmpty()) {
             sorted.add(HEADER_SNOOZED_SECTION_MARKER)
             if (!isPuntedCollapsed) {
                 sorted.addAll(snoozedItems.map { it.first })
@@ -1700,7 +1465,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateSummary() {
-        val hasFilterOrSearch = currentSearchQuery.isNotBlank() || currentFilter != ReminderFilter.ALL
+        val hasFilterOrSearch = currentSearchQuery.isNotBlank()
 
         if (displayedReminders.isEmpty()) {
             binding.layoutEmptyReminders.visibility = View.VISIBLE

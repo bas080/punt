@@ -611,98 +611,6 @@ class MainActivityTest {
     }
 
     @Test
-    fun testFilterDialogClearButtonResetsStateFilterWhenFilterActive() {
-        val context = RuntimeEnvironment.getApplication()
-        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
-        val snoozeTime = System.currentTimeMillis() + 3600000L
-        prefs.edit().clear()
-            .putStringSet("key_reminders_list", setOf("Active Task", "Snoozed Task"))
-            .putLong("snooze_snoozed task", snoozeTime)
-            .putString("key_reminder_filter", ReminderFilter.SNOOZED.name)
-            .commit()
-
-        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
-        val activity = controller.get()
-
-        val btnMenuFilter = activity.findViewById<View>(R.id.btn_menu_filter)
-        assertNotNull(btnMenuFilter)
-
-        val showTagsMethod = MainActivity::class.java.getDeclaredMethod("showTagsSelectionDialog")
-        showTagsMethod.isAccessible = true
-        showTagsMethod.invoke(activity)
-
-        val dialog = ShadowAlertDialog.getLatestDialog() as? AlertDialog
-        assertNotNull(dialog)
-
-        val neutralBtn = dialog!!.getButton(AlertDialog.BUTTON_NEUTRAL)
-        assertNotNull(neutralBtn)
-        assertEquals("Clear", neutralBtn.text.toString())
-        neutralBtn.performClick()
-        shadowOf(android.os.Looper.getMainLooper()).idle()
-
-        val currentFilterName = prefs.getString("key_reminder_filter", null)
-        assertEquals(ReminderFilter.ALL.name, currentFilterName)
-    }
-
-    @Test
-    fun testNoResultsInActiveOrPuntedFilterPersistsFilterAndShowsEmptyStateClearButton() {
-        val context = RuntimeEnvironment.getApplication()
-        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
-        val snoozeTime = System.currentTimeMillis() + 3600000L
-        prefs.edit().clear()
-            .putStringSet("key_reminders_list", setOf("Only Punted Task"))
-            .putLong("snooze_only punted task", snoozeTime)
-            .putString("key_reminder_filter", ReminderFilter.ACTIVE.name)
-            .commit()
-
-        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
-        val activity = controller.get()
-
-        val recyclerView = activity.findViewById<RecyclerView>(R.id.reminders_list)
-        // Since no active items exist and filter is ACTIVE, 0 items matched (+ 0 footer = 0 items)
-        assertEquals(0, recyclerView.adapter!!.itemCount)
-
-        val btnEmptyClearFilter = activity.findViewById<TextView>(R.id.btn_empty_clear_filter)
-        assertNotNull(btnEmptyClearFilter)
-        assertEquals(View.VISIBLE, btnEmptyClearFilter.visibility)
-
-        // Filter choice should remain persisted in prefs
-        val currentFilterName = prefs.getString("key_reminder_filter", null)
-        assertEquals(ReminderFilter.ACTIVE.name, currentFilterName)
-
-        // Clicking clear filter button switches filter to ALL and resets search
-        btnEmptyClearFilter.performClick()
-        shadowOf(android.os.Looper.getMainLooper()).idle()
-
-        assertEquals(3, recyclerView.adapter!!.itemCount)
-        assertEquals(ReminderFilter.ALL.name, prefs.getString("key_reminder_filter", null))
-    }
-
-    @Test
-    fun testTagFilterSelectionDialogSortsMoreCommonTagsFirst() {
-        val context = RuntimeEnvironment.getApplication()
-        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
-        prefs.edit().clear()
-            .putStringSet("key_reminders_list", setOf(
-                "Task 1 #zebra",
-                "Task 2 #apple",
-                "Task 3 #zebra",
-                "Task 4 #banana"
-            ))
-            .commit()
-
-        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
-        val activity = controller.get()
-
-        val extractMethod = MainActivity::class.java.getDeclaredMethod("extractAllTags")
-        extractMethod.isAccessible = true
-        @Suppress("UNCHECKED_CAST")
-        val tags = extractMethod.invoke(activity) as List<String>
-
-        assertEquals(listOf("#zebra", "#apple", "#banana"), tags)
-    }
-
-    @Test
     fun testSearchQueryIsPersistedAndRestoredAcrossActivityRecreation() {
         val context = RuntimeEnvironment.getApplication()
         val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
@@ -723,87 +631,6 @@ class MainActivityTest {
 
         val input2 = activity2.findViewById<EditText>(R.id.search_reminder_input)
         assertEquals("milk", input2.text.toString())
-    }
-
-    @Test
-    fun testStateFilterIsPersistedAndRestoredAcrossActivityRecreation() {
-        val context = RuntimeEnvironment.getApplication()
-        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
-        prefs.edit().clear().putStringSet("key_reminders_list", setOf("Task 1", "Task 2")).commit()
-
-        val controller1 = Robolectric.buildActivity(MainActivity::class.java).setup()
-        val activity1 = controller1.get()
-
-        val showTagsMethod = MainActivity::class.java.getDeclaredMethod("showTagsSelectionDialog")
-        showTagsMethod.isAccessible = true
-        showTagsMethod.invoke(activity1)
-
-        val dialog = ShadowAlertDialog.getLatestDialog() as? AlertDialog
-        assertNotNull(dialog)
-
-        val positiveBtn = dialog!!.getButton(AlertDialog.BUTTON_POSITIVE)
-        positiveBtn.performClick()
-        shadowOf(android.os.Looper.getMainLooper()).idle()
-
-        val controller2 = Robolectric.buildActivity(MainActivity::class.java).setup()
-        val activity2 = controller2.get()
-        assertNotNull(activity2)
-
-        val restoredFilterName = prefs.getString("key_reminder_filter", null)
-        assertEquals(ReminderFilter.ALL.name, restoredFilterName)
-    }
-
-    @Test
-    fun testTagFilterSelectionDialog() {
-        val context = RuntimeEnvironment.getApplication()
-        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
-        prefs.edit().clear()
-            .putStringSet("key_reminders_list", setOf("Buy milk #groceries", "Finish report #work"))
-            .commit()
-
-        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
-        val activity = controller.get()
-
-        val showTagsMethod = MainActivity::class.java.getDeclaredMethod("showTagsSelectionDialog")
-        showTagsMethod.isAccessible = true
-        showTagsMethod.invoke(activity)
-
-        val dialog = ShadowAlertDialog.getLatestDialog() as? AlertDialog
-        assertNotNull("Filter selection dialog should be shown", dialog)
-
-        fun findRadioGroupInViewGroup(view: android.view.View?): android.widget.RadioGroup? {
-            if (view == null) return null
-            if (view is android.widget.RadioGroup) return view
-            if (view is android.view.ViewGroup) {
-                for (i in 0 until view.childCount) {
-                    val res = findRadioGroupInViewGroup(view.getChildAt(i))
-                    if (res != null) return res
-                }
-            }
-            return null
-        }
-
-        val radioGroup = findRadioGroupInViewGroup(dialog!!.findViewById(android.R.id.content) ?: dialog.window?.decorView)
-        assertNotNull(radioGroup)
-        val rbActive = radioGroup!!.getChildAt(1) as android.widget.RadioButton
-        rbActive.isChecked = true
-
-        dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
-        shadowOf(android.os.Looper.getMainLooper()).idle()
-
-        assertEquals(ReminderFilter.ACTIVE.name, prefs.getString("key_reminder_filter", null))
-
-        // Open again and test Punted radio button
-        showTagsMethod.invoke(activity)
-        val dialog2 = ShadowAlertDialog.getLatestDialog() as? AlertDialog
-        val radioGroup2 = findRadioGroupInViewGroup(dialog2!!.findViewById(android.R.id.content) ?: dialog2.window?.decorView)!!
-        val rbPunted = radioGroup2.getChildAt(2) as android.widget.RadioButton
-        rbPunted.isChecked = true
-
-        dialog2.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
-        shadowOf(android.os.Looper.getMainLooper()).idle()
-
-        assertEquals(ReminderFilter.SNOOZED.name, prefs.getString("key_reminder_filter", null))
     }
 
     @Test
@@ -1688,7 +1515,6 @@ class MainActivityTest {
         }.toString()
 
         prefs.edit()
-            .putString("key_reminder_filter", ReminderFilter.ALL.name)
             .putString("key_focus_profiles", profilesJson)
             .putString("key_active_focus_profile", "Work")
             .putBoolean("key_active_collapsed", false)
@@ -1766,19 +1592,5 @@ class MainActivityTest {
 
         // Collapsed both: 1 active header + 1 punted header + 1 footer = 3 items
         assertEquals(3, adapter.itemCount)
-    }
-
-    @Test
-    fun testSendFeedbackEmailLaunchesEmailChooser() {
-        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
-        val activity = controller.get()
-
-        val sendFeedbackEmailMethod = MainActivity::class.java.getDeclaredMethod("sendFeedbackEmail")
-        sendFeedbackEmailMethod.isAccessible = true
-        sendFeedbackEmailMethod.invoke(activity)
-
-        val nextStartedActivity = shadowOf(activity).nextStartedActivity
-        assertNotNull(nextStartedActivity)
-        assertEquals(android.content.Intent.ACTION_CHOOSER, nextStartedActivity.action)
     }
 }
