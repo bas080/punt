@@ -148,217 +148,6 @@
 
         </LinearLayout>
 
-        <!-- About Main Content View -->
-        <LinearLayout
-            android:id="@+id/about_container"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:clipChildren="false"
-            android:clipToPadding="false"
-            android:orientation="vertical"
-            android:visibility="gone">
-
-            <!-- App Metadata & Actions Section -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:background="@drawable/bg_card"
-                android:padding="16dp"
-                android:layout_marginBottom="16dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/app_name"
-                    android:textSize="18sp"
-                    android:textStyle="bold"
-                    android:textColor="@color/text_primary" />
-
-                <TextView
-                    android:id="@+id/txt_app_version"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Version 1.0"
-                    android:textSize="13sp"
-                    android:textColor="@color/text_secondary"
-                    android:layout_marginTop="2dp"
-                    android:layout_marginBottom="12dp" />
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical">
-
-                    <HorizontalScrollView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:scrollbars="none"
-                        android:layout_marginBottom="8dp">
-
-                        <LinearLayout
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:orientation="horizontal">
-
-                            <TextView
-                                android:id="@+id/btn_import_markdown"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@string/import_markdown"
-                                android:textSize="12sp"
-                                android:textStyle="bold"
-                                android:textColor="@color/accent"
-                                android:letterSpacing="0.05"
-                                android:paddingVertical="6dp"
-                                android:paddingHorizontal="8dp"
-                                android:clickable="true"
-                                android:focusable="true"
-                                android:background="?attr/selectableItemBackground" />
-
-                            <TextView
-                                android:id="@+id/btn_export_markdown"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@string/export_markdown"
-                                android:textSize="12sp"
-                                android:textStyle="bold"
-                                android:textColor="@color/accent"
-                                android:letterSpacing="0.05"
-                                android:paddingVertical="6dp"
-                                android:paddingHorizontal="8dp"
-                                android:layout_marginStart="8dp"
-                                android:clickable="true"
-                                android:focusable="true"
-                                android:background="?attr/selectableItemBackground" />
-
-                            <TextView
-                                android:id="@+id/btn_feedback"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@string/feedback"
-                                android:textSize="12sp"
-                                android:textStyle="bold"
-                                android:textColor="@color/accent"
-                                android:letterSpacing="0.05"
-                                android:paddingVertical="6dp"
-                                android:paddingHorizontal="8dp"
-                                android:layout_marginStart="8dp"
-                                android:clickable="true"
-                                android:focusable="true"
-                                android:background="?attr/selectableItemBackground" />
-
-                        </LinearLayout>
-                    </HorizontalScrollView>
-
-                    <HorizontalScrollView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:scrollbars="none">
-
-                        <LinearLayout
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:orientation="horizontal">
-
-                            <TextView
-                                android:id="@+id/btn_donate"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@string/donate"
-                                android:textSize="12sp"
-                                android:textStyle="bold"
-                                android:textColor="@color/accent"
-                                android:letterSpacing="0.05"
-                                android:paddingVertical="6dp"
-                                android:paddingHorizontal="8dp"
-                                android:clickable="true"
-                                android:focusable="true"
-                                android:background="?attr/selectableItemBackground" />
-
-                            <TextView
-                                android:id="@+id/btn_toggle_calendar_sync"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@string/calendar_sync_disabled"
-                                android:textSize="12sp"
-                                android:textStyle="bold"
-                                android:textColor="@color/accent"
-                                android:letterSpacing="0.05"
-                                android:paddingVertical="6dp"
-                                android:paddingHorizontal="8dp"
-                                android:layout_marginStart="8dp"
-                                android:clickable="true"
-                                android:focusable="true"
-                                android:background="?attr/selectableItemBackground" />
-
-                        </LinearLayout>
-                    </HorizontalScrollView>
-
-                </LinearLayout>
-
-            </LinearLayout>
-
-            <!-- Logs Section -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:layout_marginBottom="8dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="APPLICATION LOGS"
-                    android:textSize="12sp"
-                    android:textStyle="bold"
-                    android:textColor="@color/text_secondary"
-                    android:letterSpacing="0.05" />
-
-                <View
-                    android:layout_width="0dp"
-                    android:layout_height="1dp"
-                    android:layout_weight="1" />
-
-                <TextView
-                    android:id="@+id/btn_clear_logs"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/clear_logs"
-                    android:textSize="11sp"
-                    android:textStyle="bold"
-                    android:textColor="@color/accent_danger"
-                    android:letterSpacing="0.05"
-                    android:paddingVertical="4dp"
-                    android:paddingHorizontal="6dp"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:background="?attr/selectableItemBackground" />
-
-            </LinearLayout>
-
-            <ScrollView
-                android:layout_width="match_parent"
-                android:layout_height="0dp"
-                android:layout_weight="1"
-                android:background="@drawable/bg_card"
-                android:padding="12dp">
-
-                <TextView
-                    android:id="@+id/txt_logs"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:textColor="@color/text_primary"
-                    android:textSize="12sp"
-                    android:fontFamily="monospace"
-                    android:textIsSelectable="true"
-                    android:lineSpacingExtra="3dp" />
-
-            </ScrollView>
-
-        </LinearLayout>
-
         <!-- Top Menu Pill Overlay Container -->
         <LinearLayout
             android:id="@+id/menu_container"
@@ -391,7 +180,7 @@
                 <ImageView
                     android:layout_width="18dp"
                     android:layout_height="18dp"
-                    android:src="@drawable/ic_action_filter"
+                    android:src="@drawable/ic_action_search"
                     app:tint="@color/bg_dark"
                     android:contentDescription="Focus"
                     android:scaleType="centerInside"
@@ -493,7 +282,8 @@
                 android:translationZ="12dp"
                 android:clickable="true"
                 android:focusable="true"
-                android:background="@drawable/bg_pill_inverted">
+                android:background="@drawable/bg_pill_inverted"
+                android:layout_marginBottom="8dp">
 
                 <ImageView
                     android:layout_width="18dp"
@@ -508,6 +298,41 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Share"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:maxLines="1"
+                    android:singleLine="true"
+                    android:textColor="@color/bg_dark" />
+
+            </LinearLayout>
+
+            <!-- Action Pill: About -->
+            <LinearLayout
+                android:id="@+id/btn_menu_about"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:paddingHorizontal="18dp"
+                android:elevation="12dp"
+                android:translationZ="12dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="@drawable/bg_pill_inverted">
+
+                <ImageView
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:src="@drawable/ic_notification_reminder"
+                    app:tint="@color/bg_dark"
+                    android:contentDescription="About"
+                    android:scaleType="centerInside"
+                    android:layout_marginEnd="8dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="About"
                     android:textSize="14sp"
                     android:textStyle="bold"
                     android:maxLines="1"

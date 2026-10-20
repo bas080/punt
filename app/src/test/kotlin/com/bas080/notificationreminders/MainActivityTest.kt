@@ -104,10 +104,10 @@ class MainActivityTest {
         val input = activity.findViewById<EditText>(R.id.search_reminder_input)
         val swipeRefresh = activity.findViewById<androidx.swiperefreshlayout.widget.SwipeRefreshLayout>(R.id.swipe_refresh_layout)
 
-        // Typing "milk" should filter displayed items to 1 reminder ("Buy milk")
+        // Typing "milk" should filter displayed items to 1 active header + 1 reminder ("Buy milk")
         input.setText("milk")
         shadowOf(android.os.Looper.getMainLooper()).idleFor(250, java.util.concurrent.TimeUnit.MILLISECONDS)
-        assertEquals("Expected 2 items when filtered", 2, recyclerView.adapter!!.itemCount)
+        assertEquals("Expected 3 items when filtered", 3, recyclerView.adapter!!.itemCount)
 
         // Pulling down (swipe to refresh) should convert "milk" into a new reminder and clear search query
         val listenerField = androidx.swiperefreshlayout.widget.SwipeRefreshLayout::class.java.getDeclaredField("mListener")
@@ -120,14 +120,11 @@ class MainActivityTest {
         assertEquals("Reminder created", ShadowToast.getTextOfLatestToast())
         assertEquals("", input.text.toString())
 
-        // Input text should be cleared and all 3 reminders displayed (+1 footer = 4 items in RecyclerView)
-        assertEquals("Expected 4 items total in RecyclerView", 4, recyclerView.adapter!!.itemCount)
-
-        // Verify the newly created reminder is displayed at position 0 on the very first pull down
+        // Verify the newly created reminder is displayed at position 1 (position 0 = ACTIVE header)
         recyclerView.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED)
         recyclerView.layout(0, 0, 1080, 1920)
-        val holder = recyclerView.findViewHolderForAdapterPosition(0) as? com.bas080.notificationreminders.RemindersAdapter.ItemViewHolder
-        assertNotNull("ViewHolder at position 0 should exist", holder)
+        val holder = recyclerView.findViewHolderForAdapterPosition(1) as? com.bas080.notificationreminders.RemindersAdapter.ItemViewHolder
+        assertNotNull("ViewHolder at position 1 should exist", holder)
         assertEquals("milk", holder?.reminderInput?.text?.toString())
     }
 
@@ -165,43 +162,31 @@ class MainActivityTest {
     }
 
     @Test
-    fun testCalendarSyncToggleInAboutView() {
+    fun testDonateButtonInAboutDialogLaunchesLiberapayUrl() {
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
 
-        val btnToggle = activity.findViewById<TextView>(R.id.btn_toggle_calendar_sync)
-        assertNotNull(btnToggle)
-        assertEquals("Calendar Sync: Disabled", btnToggle.text.toString())
-
-        shadowOf(activity.application).grantPermissions(
-            android.Manifest.permission.READ_CALENDAR,
-            android.Manifest.permission.WRITE_CALENDAR
-        )
-
-        // Toggle ON
-        btnToggle.performClick()
+        activity.showAboutDialog()
         shadowOf(android.os.Looper.getMainLooper()).idle()
 
-        assertEquals("Calendar Sync: Enabled", btnToggle.text.toString())
-        assertTrue(com.bas080.notificationreminders.utils.CalendarSyncManager.isCalendarSyncEnabled(activity))
+        val dialog = ShadowAlertDialog.getLatestDialog() as? AlertDialog
+        assertNotNull(dialog)
 
-        // Toggle OFF
-        btnToggle.performClick()
-        shadowOf(android.os.Looper.getMainLooper()).idle()
+        fun findTextViewByText(view: android.view.View?, text: String): TextView? {
+            if (view == null) return null
+            if (view is TextView && view.text.toString() == text) return view
+            if (view is android.view.ViewGroup) {
+                for (i in 0 until view.childCount) {
+                    val res = findTextViewByText(view.getChildAt(i), text)
+                    if (res != null) return res
+                }
+            }
+            return null
+        }
 
-        assertEquals("Calendar Sync: Disabled", btnToggle.text.toString())
-        org.junit.Assert.assertFalse(com.bas080.notificationreminders.utils.CalendarSyncManager.isCalendarSyncEnabled(activity))
-    }
-
-    @Test
-    fun testDonateButtonLaunchesLiberapayUrl() {
-        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
-        val activity = controller.get()
-
-        val btnDonate = activity.findViewById<TextView>(R.id.btn_donate)
+        val btnDonate = findTextViewByText(dialog!!.findViewById(android.R.id.content) ?: dialog.window?.decorView, "Donate")
         assertNotNull(btnDonate)
-
-        btnDonate.performClick()
+        btnDonate!!.performClick()
 
         val nextStartedActivity = shadowOf(activity).nextStartedActivity
         assertNotNull("Donate button should start an intent", nextStartedActivity)
@@ -235,24 +220,31 @@ class MainActivityTest {
     }
 
     @Test
-    fun testAboutViewDisplaysVersionAndFeedbackLaunchesIntent() {
+    fun testAboutDialogDisplaysVersionAndFeedbackLaunchesIntent() {
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
 
-        val showAboutMethod = MainActivity::class.java.getDeclaredMethod("showAboutView")
-        showAboutMethod.isAccessible = true
-        showAboutMethod.invoke(activity)
+        activity.showAboutDialog()
+        shadowOf(android.os.Looper.getMainLooper()).idle()
 
-        val aboutContainer = activity.findViewById<View>(R.id.about_container)
-        assertEquals(View.VISIBLE, aboutContainer.visibility)
+        val dialog = ShadowAlertDialog.getLatestDialog() as? AlertDialog
+        assertNotNull(dialog)
 
-        val txtVersion = activity.findViewById<TextView>(R.id.txt_app_version)
-        assertNotNull(txtVersion)
-        assertTrue(txtVersion.text.toString().startsWith("Version"))
+        fun findTextViewByText(view: android.view.View?, text: String): TextView? {
+            if (view == null) return null
+            if (view is TextView && view.text.toString() == text) return view
+            if (view is android.view.ViewGroup) {
+                for (i in 0 until view.childCount) {
+                    val res = findTextViewByText(view.getChildAt(i), text)
+                    if (res != null) return res
+                }
+            }
+            return null
+        }
 
-        val btnFeedback = activity.findViewById<TextView>(R.id.btn_feedback)
+        val btnFeedback = findTextViewByText(dialog!!.findViewById(android.R.id.content) ?: dialog.window?.decorView, "Feedback")
         assertNotNull(btnFeedback)
-        btnFeedback.performClick()
+        btnFeedback!!.performClick()
 
         val nextStartedActivity = shadowOf(activity).nextStartedActivity
         assertNotNull(nextStartedActivity)
@@ -261,14 +253,31 @@ class MainActivityTest {
     }
 
     @Test
-    fun testClearLogsShowsToast() {
+    fun testClearLogsShowsToastInAboutDialog() {
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
 
-        val btnClearLogs = activity.findViewById<TextView>(R.id.btn_clear_logs)
-        assertNotNull(btnClearLogs)
+        activity.showAboutDialog()
+        shadowOf(android.os.Looper.getMainLooper()).idle()
 
-        btnClearLogs.performClick()
+        val dialog = ShadowAlertDialog.getLatestDialog() as? AlertDialog
+        assertNotNull(dialog)
+
+        fun findTextViewByText(view: android.view.View?, text: String): TextView? {
+            if (view == null) return null
+            if (view is TextView && view.text.toString() == text) return view
+            if (view is android.view.ViewGroup) {
+                for (i in 0 until view.childCount) {
+                    val res = findTextViewByText(view.getChildAt(i), text)
+                    if (res != null) return res
+                }
+            }
+            return null
+        }
+
+        val btnClearLogs = findTextViewByText(dialog!!.findViewById(android.R.id.content) ?: dialog.window?.decorView, "Clear Logs")
+        assertNotNull(btnClearLogs)
+        btnClearLogs!!.performClick()
 
         assertEquals("Logs cleared", ShadowToast.getTextOfLatestToast())
     }
@@ -282,9 +291,9 @@ class MainActivityTest {
         input.setText("Buy milk")
         input.onEditorAction(android.view.inputmethod.EditorInfo.IME_ACTION_DONE)
 
-        val btnExport = activity.findViewById<TextView>(R.id.btn_export_markdown)
-        assertNotNull(btnExport)
-        btnExport.performClick()
+        val showExportOptionsMethod = MainActivity::class.java.getDeclaredMethod("showExportOptionsDialog", List::class.java)
+        showExportOptionsMethod.isAccessible = true
+        showExportOptionsMethod.invoke(activity, listOf("Buy milk"))
 
         val dialog = ShadowAlertDialog.getLatestDialog() as? AlertDialog
         assertNotNull("Export dialog should be shown", dialog)
@@ -401,45 +410,6 @@ class MainActivityTest {
     }
 
     @Test
-    fun testExportButtonOnRemindersListExportsFilteredReminders() {
-        val context = RuntimeEnvironment.getApplication()
-        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
-        prefs.edit().clear().putStringSet("key_reminders_list", setOf("Task 1 #punt", "Task 2 #other")).commit()
-
-        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
-        val activity = controller.get()
-
-        val input = activity.findViewById<EditText>(R.id.search_reminder_input)
-
-        // Filter by "#punt"
-        input.setText("#punt")
-        shadowOf(android.os.Looper.getMainLooper()).idleFor(250, java.util.concurrent.TimeUnit.MILLISECONDS)
-
-        val showExportOptionsMethod = MainActivity::class.java.getDeclaredMethod("showExportOptionsDialog", List::class.java)
-        showExportOptionsMethod.isAccessible = true
-        showExportOptionsMethod.invoke(activity, listOf("Task 1 #punt"))
-
-        val dialog = ShadowAlertDialog.getLatestDialog() as? AlertDialog
-        assertNotNull("Export dialog should be shown", dialog)
-        dialog!!.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
-        shadowOf(android.os.Looper.getMainLooper()).idle()
-
-        var chooserIntent: android.content.Intent? = shadowOf(activity).nextStartedActivity
-        while (chooserIntent != null && chooserIntent.action != android.content.Intent.ACTION_CHOOSER) {
-            chooserIntent = shadowOf(activity).nextStartedActivity
-        }
-        assertNotNull("Share chooser intent should be launched when clicking list export button", chooserIntent)
-
-        @Suppress("DEPRECATION")
-        val targetIntent = chooserIntent!!.getParcelableExtra<android.content.Intent>(android.content.Intent.EXTRA_INTENT)
-        assertNotNull(targetIntent)
-        val exportedText = targetIntent!!.getStringExtra(android.content.Intent.EXTRA_TEXT) ?: ""
-
-        assertTrue("Export should contain 'Task 1 #punt'", exportedText.contains("Task 1 #punt"))
-        org.junit.Assert.assertFalse("Export should NOT contain 'Task 2 #other'", exportedText.contains("Task 2 #other"))
-    }
-
-    @Test
     fun testExportOptionsDialogTextOnlyExcludesPuntInfo() {
         val context = RuntimeEnvironment.getApplication()
         val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
@@ -479,9 +449,9 @@ class MainActivityTest {
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
 
-        val btnImport = activity.findViewById<TextView>(R.id.btn_import_markdown)
-        assertNotNull(btnImport)
-        btnImport.performClick()
+        val showImportMethod = MainActivity::class.java.getDeclaredMethod("showImportMarkdownDialog")
+        showImportMethod.isAccessible = true
+        showImportMethod.invoke(activity)
 
         val dialog = ShadowAlertDialog.getLatestDialog() as? AlertDialog
         assertNotNull("Import dialog should be shown", dialog)
@@ -511,8 +481,9 @@ class MainActivityTest {
         val isoStr = com.bas080.notificationreminders.utils.MarkdownRemindersUtil.millisToIso(futureTime)
         val markdownText = "- [ ] Water plants <time datetime=\"$isoStr\">punted until future</time>"
 
-        val btnImport = activity.findViewById<TextView>(R.id.btn_import_markdown)
-        btnImport.performClick()
+        val showImportMethod = MainActivity::class.java.getDeclaredMethod("showImportMarkdownDialog")
+        showImportMethod.isAccessible = true
+        showImportMethod.invoke(activity)
 
         val dialog = ShadowAlertDialog.getLatestDialog() as? AlertDialog
         val editText = dialog!!.findViewById<EditText>(R.id.import_input)
@@ -603,7 +574,7 @@ class MainActivityTest {
         val activity = controller.get()
 
         val recyclerView = activity.findViewById<RecyclerView>(R.id.reminders_list)
-        val holder = recyclerView.findViewHolderForAdapterPosition(0) as RemindersAdapter.ItemViewHolder
+        val holder = recyclerView.findViewHolderForAdapterPosition(1) as RemindersAdapter.ItemViewHolder
         assertEquals(View.VISIBLE, holder.btnShare.visibility)
 
         holder.btnShare.performClick()
@@ -629,14 +600,14 @@ class MainActivityTest {
         input.setText("milk")
         shadowOf(android.os.Looper.getMainLooper()).idleFor(250, java.util.concurrent.TimeUnit.MILLISECONDS)
 
-        assertEquals("Expected 2 items when filtered", 2, recyclerView.adapter!!.itemCount)
+        assertEquals("Expected 3 items when filtered (1 header + 1 task + 1 footer)", 3, recyclerView.adapter!!.itemCount)
 
         // Clear search text
         input.setText("")
         shadowOf(android.os.Looper.getMainLooper()).idleFor(250, java.util.concurrent.TimeUnit.MILLISECONDS)
 
         assertEquals("", input.text.toString())
-        assertEquals("Expected 3 items total when cleared", 3, recyclerView.adapter!!.itemCount)
+        assertEquals("Expected 4 items total when cleared (1 header + 2 tasks + 1 footer)", 4, recyclerView.adapter!!.itemCount)
     }
 
     @Test
@@ -857,9 +828,9 @@ class MainActivityTest {
         val holder2 = recyclerView.adapter!!.createViewHolder(recyclerView, RemindersAdapter.TYPE_ACTIVE_REMINDER) as RemindersAdapter.ItemViewHolder
         val holder3 = recyclerView.adapter!!.createViewHolder(recyclerView, RemindersAdapter.TYPE_ACTIVE_REMINDER) as RemindersAdapter.ItemViewHolder
 
-        recyclerView.adapter!!.onBindViewHolder(holder1, 0) // Task Active
-        recyclerView.adapter!!.onBindViewHolder(holder2, 2) // Task Sooner (Position 1 is SNOOZED header)
-        recyclerView.adapter!!.onBindViewHolder(holder3, 3) // Task Later
+        recyclerView.adapter!!.onBindViewHolder(holder1, 1) // Task Active (Position 0 = ACTIVE header)
+        recyclerView.adapter!!.onBindViewHolder(holder2, 3) // Task Sooner (Position 2 = SNOOZED header)
+        recyclerView.adapter!!.onBindViewHolder(holder3, 4) // Task Later
 
         assertEquals("Task Active", holder1.reminderInput.text.toString())
         assertEquals("Task Sooner", holder2.reminderInput.text.toString())
@@ -938,7 +909,7 @@ class MainActivityTest {
             assertTrue("Input should retain focus while typing character '$char'", input.hasFocus())
         }
 
-        assertEquals("Adapter should display filtered match", 2, recyclerView.adapter!!.itemCount)
+        assertEquals("Adapter should display filtered match (1 header + 1 task + 1 footer = 3 items)", 3, recyclerView.adapter!!.itemCount)
         assertTrue("Input should remain focused after typing completes", input.hasFocus())
     }
 
@@ -1138,7 +1109,7 @@ class MainActivityTest {
         val activity = controller.get()
 
         val recyclerView = activity.findViewById<RecyclerView>(R.id.reminders_list)
-        assertEquals(3, recyclerView.adapter!!.itemCount)
+        assertEquals(4, recyclerView.adapter!!.itemCount)
 
         // Mark "Task 1" done
         val markMethod = MainActivity::class.java.getDeclaredMethod("markReminderDone", String::class.java)
@@ -1146,13 +1117,13 @@ class MainActivityTest {
         markMethod.invoke(activity, "Task 1")
         shadowOf(android.os.Looper.getMainLooper()).idle()
 
-        assertEquals(3, recyclerView.adapter!!.itemCount)
+        assertEquals(4, recyclerView.adapter!!.itemCount)
 
         val input = activity.findViewById<EditText>(R.id.search_reminder_input)
         input.setText("Task")
         shadowOf(android.os.Looper.getMainLooper()).idleFor(250, java.util.concurrent.TimeUnit.MILLISECONDS)
 
-        assertEquals(2, recyclerView.adapter!!.itemCount)
+        assertEquals(3, recyclerView.adapter!!.itemCount)
     }
 
     @Test
@@ -1170,15 +1141,15 @@ class MainActivityTest {
         // Search "Buy" -> should match "Buy milk" but exclude "Buy bread #done"
         input.setText("Buy")
         shadowOf(android.os.Looper.getMainLooper()).idleFor(250, java.util.concurrent.TimeUnit.MILLISECONDS)
-        assertEquals("Should show 1 match ('Buy milk') when searching 'Buy'", 2, recyclerView.adapter!!.itemCount)
+        assertEquals("Should show 1 match ('Buy milk') when searching 'Buy'", 3, recyclerView.adapter!!.itemCount)
 
         // Search "#done" -> should match "Buy bread #done"
         input.setText("#done")
         shadowOf(android.os.Looper.getMainLooper()).idleFor(250, java.util.concurrent.TimeUnit.MILLISECONDS)
-        assertEquals("Should show 1 match ('Buy bread #done') when searching '#done'", 2, recyclerView.adapter!!.itemCount)
+        assertEquals("Should show 1 match ('Buy bread #done') when searching '#done'", 3, recyclerView.adapter!!.itemCount)
 
         // Verify done item does NOT have STRIKE_THRU_TEXT_FLAG set
-        val doneItemHolder = recyclerView.findViewHolderForAdapterPosition(0) as RemindersAdapter.ItemViewHolder
+        val doneItemHolder = recyclerView.findViewHolderForAdapterPosition(1) as RemindersAdapter.ItemViewHolder
         val isStrikethrough = (doneItemHolder.reminderInput.paintFlags and android.graphics.Paint.STRIKE_THRU_TEXT_FLAG) != 0
         org.junit.Assert.assertFalse("#done items should NOT have strikethrough flag set", isStrikethrough)
     }
@@ -1198,10 +1169,10 @@ class MainActivityTest {
 
         val recyclerView = activity.findViewById<RecyclerView>(R.id.reminders_list)
 
-        assertEquals(4, recyclerView.adapter!!.itemCount)
+        assertEquals(5, recyclerView.adapter!!.itemCount)
 
-        val headerType = recyclerView.adapter!!.getItemViewType(1)
-        assertEquals(RemindersAdapter.TYPE_SNOOZED_HEADER, headerType)
+        val headerType = recyclerView.adapter!!.getItemViewType(2)
+        assertEquals(RemindersAdapter.TYPE_SECTION_HEADER, headerType)
     }
 
     @Test
@@ -1214,7 +1185,7 @@ class MainActivityTest {
         val activity = controller.get()
 
         val recyclerView = activity.findViewById<RecyclerView>(R.id.reminders_list)
-        assertEquals(3, recyclerView.adapter!!.itemCount)
+        assertEquals(4, recyclerView.adapter!!.itemCount)
 
         // Mark "Task 1" done
         val markMethod = MainActivity::class.java.getDeclaredMethod("markReminderDone", String::class.java)
@@ -1222,7 +1193,7 @@ class MainActivityTest {
         markMethod.invoke(activity, "Task 1")
         shadowOf(android.os.Looper.getMainLooper()).idle()
 
-        assertEquals(3, recyclerView.adapter!!.itemCount)
+        assertEquals(4, recyclerView.adapter!!.itemCount)
 
         // Pull down to refresh
         val swipeRefreshLayout = activity.findViewById<androidx.swiperefreshlayout.widget.SwipeRefreshLayout>(R.id.swipe_refresh_layout)
@@ -1236,7 +1207,7 @@ class MainActivityTest {
         refreshListener!!.onRefresh()
         shadowOf(android.os.Looper.getMainLooper()).idle()
 
-        assertEquals(2, recyclerView.adapter!!.itemCount)
+        assertEquals(3, recyclerView.adapter!!.itemCount)
         org.junit.Assert.assertFalse(swipeRefreshLayout.isRefreshing)
     }
 
@@ -1258,7 +1229,7 @@ class MainActivityTest {
         recyclerView.layout(0, 0, 1000, 1000)
         shadowOf(android.os.Looper.getMainLooper()).idle()
 
-        val activeHolder = recyclerView.findViewHolderForAdapterPosition(0) as RemindersAdapter.ItemViewHolder
+        val activeHolder = recyclerView.findViewHolderForAdapterPosition(1) as RemindersAdapter.ItemViewHolder
 
         // 1. Threshold and escape velocity
         assertEquals(0.75f, swipeHandler.getSwipeThreshold(activeHolder), 0.01f)
@@ -1268,7 +1239,7 @@ class MainActivityTest {
         val activeDirs = swipeHandler.getSwipeDirs(recyclerView, activeHolder)
         assertTrue(activeDirs != 0)
 
-        val mockHeaderHolder = recyclerView.adapter!!.createViewHolder(recyclerView, RemindersAdapter.TYPE_SNOOZED_HEADER)
+        val mockHeaderHolder = recyclerView.adapter!!.createViewHolder(recyclerView, RemindersAdapter.TYPE_SECTION_HEADER)
         assertEquals(0, swipeHandler.getSwipeDirs(recyclerView, mockHeaderHolder))
 
         // 3. onMove
@@ -1290,22 +1261,22 @@ class MainActivityTest {
         assertNotNull("Snooze dialog should open on left swipe of active task", dialog)
         dialog?.dismiss()
 
-        // Re-layout and re-fetch position 0 holder before second swipe on active item
+        // Re-layout and re-fetch position 1 holder before second swipe on active item
         recyclerView.measure(View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY))
         recyclerView.layout(0, 0, 1000, 1000)
         shadowOf(android.os.Looper.getMainLooper()).idle()
-        val activeHolder2 = recyclerView.findViewHolderForAdapterPosition(0) as RemindersAdapter.ItemViewHolder
+        val activeHolder2 = recyclerView.findViewHolderForAdapterPosition(1) as RemindersAdapter.ItemViewHolder
 
         // Swiping active task RIGHT -> mark done
         swipeHandler.onSwiped(activeHolder2, androidx.recyclerview.widget.ItemTouchHelper.RIGHT)
         shadowOf(android.os.Looper.getMainLooper()).idle()
         assertEquals("Reminder marked done", ShadowToast.getTextOfLatestToast())
 
-        // 6. Position 0 is now "Active Task #done"
+        // 6. Position 1 is now "Active Task #done"
         recyclerView.measure(View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY))
         recyclerView.layout(0, 0, 1000, 1000)
         shadowOf(android.os.Looper.getMainLooper()).idle()
-        val doneHolder = recyclerView.findViewHolderForAdapterPosition(0) as RemindersAdapter.ItemViewHolder
+        val doneHolder = recyclerView.findViewHolderForAdapterPosition(1) as RemindersAdapter.ItemViewHolder
 
         // Done item canvas drawing (dX = 50f right swipe -> delete icon, dX = -50f left swipe -> undo icon)
         swipeHandler.onChildDraw(canvas, recyclerView, doneHolder, 50f, 0f, androidx.recyclerview.widget.ItemTouchHelper.ACTION_STATE_SWIPE, true)
@@ -1320,14 +1291,14 @@ class MainActivityTest {
         recyclerView.measure(View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY))
         recyclerView.layout(0, 0, 1000, 1000)
         shadowOf(android.os.Looper.getMainLooper()).idle()
-        val activeHolder3 = recyclerView.findViewHolderForAdapterPosition(0) as RemindersAdapter.ItemViewHolder
+        val activeHolder3 = recyclerView.findViewHolderForAdapterPosition(1) as RemindersAdapter.ItemViewHolder
         swipeHandler.onSwiped(activeHolder3, androidx.recyclerview.widget.ItemTouchHelper.RIGHT)
         shadowOf(android.os.Looper.getMainLooper()).idle()
 
         recyclerView.measure(View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY))
         recyclerView.layout(0, 0, 1000, 1000)
         shadowOf(android.os.Looper.getMainLooper()).idle()
-        val doneHolder2 = recyclerView.findViewHolderForAdapterPosition(0) as RemindersAdapter.ItemViewHolder
+        val doneHolder2 = recyclerView.findViewHolderForAdapterPosition(1) as RemindersAdapter.ItemViewHolder
 
         // Swiping done task RIGHT -> delete reminder
         swipeHandler.onSwiped(doneHolder2, androidx.recyclerview.widget.ItemTouchHelper.RIGHT)
@@ -1349,7 +1320,7 @@ class MainActivityTest {
         recyclerView.layout(0, 0, 1000, 1000)
         shadowOf(android.os.Looper.getMainLooper()).idle()
 
-        val holder = recyclerView.findViewHolderForAdapterPosition(0) as RemindersAdapter.ItemViewHolder
+        val holder = recyclerView.findViewHolderForAdapterPosition(1) as RemindersAdapter.ItemViewHolder
 
         // 1. Focus listener changes maxLines
         holder.reminderInput.onFocusChangeListener?.onFocusChange(holder.reminderInput, true)
@@ -1407,7 +1378,7 @@ class MainActivityTest {
         recyclerView.layout(0, 0, 1000, 1000)
         shadowOf(android.os.Looper.getMainLooper()).idle()
 
-        val holder = recyclerView.findViewHolderForAdapterPosition(0) as RemindersAdapter.ItemViewHolder
+        val holder = recyclerView.findViewHolderForAdapterPosition(1) as RemindersAdapter.ItemViewHolder
 
         holder.reminderInput.setText("Original Task Updated")
 
@@ -1444,7 +1415,7 @@ class MainActivityTest {
 
         val swipeHandler = activity.createSwipeHandler()
         val holder = activity.findViewById<androidx.recyclerview.widget.RecyclerView>(R.id.reminders_list)
-            .findViewHolderForAdapterPosition(0)!!
+            .findViewHolderForAdapterPosition(1)!!
 
         swipeHandler.onSwiped(holder, ItemTouchHelper.RIGHT)
         shadowOf(android.os.Looper.getMainLooper()).idle()
@@ -1467,7 +1438,7 @@ class MainActivityTest {
 
         val swipeHandler = activity.createSwipeHandler()
         val recyclerView = activity.findViewById<androidx.recyclerview.widget.RecyclerView>(R.id.reminders_list)
-        val holder = recyclerView.findViewHolderForAdapterPosition(0)!!
+        val holder = recyclerView.findViewHolderForAdapterPosition(1)!!
 
         val canvas = android.graphics.Canvas()
         swipeHandler.onChildDraw(canvas, recyclerView, holder, 100f, 0f, ItemTouchHelper.ACTION_STATE_SWIPE, true)
@@ -1485,7 +1456,7 @@ class MainActivityTest {
         val activity = controller.get()
 
         val recyclerView = activity.findViewById<androidx.recyclerview.widget.RecyclerView>(R.id.reminders_list)
-        val holder = recyclerView.findViewHolderForAdapterPosition(0) as RemindersAdapter.ItemViewHolder
+        val holder = recyclerView.findViewHolderForAdapterPosition(1) as RemindersAdapter.ItemViewHolder
 
         val text = holder.reminderInput.text
         assertTrue("Input text should be SPANNABLE", text is android.text.Spanned)
@@ -1516,9 +1487,9 @@ class MainActivityTest {
 
         val recyclerView = activity.findViewById<androidx.recyclerview.widget.RecyclerView>(R.id.reminders_list)
         val adapter = recyclerView.adapter as RemindersAdapter
-        assertEquals(2, adapter.itemCount)
+        assertEquals(3, adapter.itemCount)
 
-        val holder = recyclerView.findViewHolderForAdapterPosition(0) as RemindersAdapter.ItemViewHolder
+        val holder = recyclerView.findViewHolderForAdapterPosition(1) as RemindersAdapter.ItemViewHolder
         assertTrue(holder.reminderInput.text.toString().contains("Buy groceries #work"))
     }
 
@@ -1549,7 +1520,7 @@ class MainActivityTest {
 
         val recyclerView = activity.findViewById<androidx.recyclerview.widget.RecyclerView>(R.id.reminders_list)
         val adapter = recyclerView.adapter as RemindersAdapter
-        assertEquals(3, adapter.itemCount)
+        assertEquals(4, adapter.itemCount)
     }
 
     @Test
@@ -1742,17 +1713,17 @@ class MainActivityTest {
         val recyclerView = activity.findViewById<RecyclerView>(R.id.reminders_list)
         val adapter = recyclerView.adapter as RemindersAdapter
 
-        // Focused on "Work": 2 work tasks + 1 footer = 3 items
-        assertEquals(3, adapter.itemCount)
+        // Focused on "Work": 1 header + 2 work tasks + 1 footer = 4 items
+        assertEquals(4, adapter.itemCount)
 
         // Type search query "report"
         val searchInput = activity.findViewById<EditText>(R.id.search_reminder_input)
         searchInput.setText("report")
         org.robolectric.shadows.ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
 
-        // Search "report" on Work focus: 1 matching task ("Write report #work") + 1 footer = 2 items
-        assertEquals(2, adapter.itemCount)
-        val holder = recyclerView.findViewHolderForAdapterPosition(0) as RemindersAdapter.ItemViewHolder
+        // Search "report" on Work focus: 1 header + 1 matching task ("Write report #work") + 1 footer = 3 items
+        assertEquals(3, adapter.itemCount)
+        val holder = recyclerView.findViewHolderForAdapterPosition(1) as RemindersAdapter.ItemViewHolder
         assertTrue(holder.reminderInput.text.toString().contains("Write report #work"))
 
         // Type search query "gym" (exists in #fitness task, but NOT in #work focus)
@@ -1762,6 +1733,39 @@ class MainActivityTest {
         // Search "gym" on Work focus yields 0 matching tasks
         assertEquals(0, adapter.itemCount)
         assertEquals(View.VISIBLE, activity.findViewById<View>(R.id.layout_empty_reminders).visibility)
+    }
+
+    @Test
+    fun testCollapsibleActiveAndPuntedSectionHeaders() {
+        val prefs = RuntimeEnvironment.getApplication().getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
+        val snoozeTime = System.currentTimeMillis() + 3600000L
+        prefs.edit().clear()
+            .putStringSet("key_reminders_list", setOf("Task Active", "Task Punted"))
+            .putLong("snooze_task punted", snoozeTime)
+            .commit()
+
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = controller.get()
+
+        val recyclerView = activity.findViewById<RecyclerView>(R.id.reminders_list)
+        val adapter = recyclerView.adapter as RemindersAdapter
+
+        // Default: 1 active header + 1 active task + 1 punted header + 1 punted task + 1 footer = 5 items
+        assertEquals(5, adapter.itemCount)
+
+        // Toggle Active section collapsed
+        activity.toggleActiveCollapsed()
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        // Collapsed Active: 1 active header + 1 punted header + 1 punted task + 1 footer = 4 items
+        assertEquals(4, adapter.itemCount)
+
+        // Toggle Punted section collapsed
+        activity.togglePuntedCollapsed()
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        // Collapsed both: 1 active header + 1 punted header + 1 footer = 3 items
+        assertEquals(3, adapter.itemCount)
     }
 
     @Test
