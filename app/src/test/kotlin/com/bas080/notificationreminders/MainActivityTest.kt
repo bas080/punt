@@ -1576,19 +1576,30 @@ class MainActivityTest {
         val recyclerView = activity.findViewById<RecyclerView>(R.id.reminders_list)
         val adapter = recyclerView.adapter as RemindersAdapter
 
-        // Default: 1 active header + 1 active task + 1 punted header + 1 punted task + 1 footer = 5 items
-        assertEquals(5, adapter.itemCount)
+        // Measure and layout RecyclerView
+        recyclerView.measure(View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY))
+        recyclerView.layout(0, 0, 1000, 1000)
+        shadowOf(android.os.Looper.getMainLooper()).idle()
 
-        // Toggle Active section collapsed
+        val holder0 = adapter.createViewHolder(recyclerView, RemindersAdapter.TYPE_SECTION_HEADER) as RemindersAdapter.HeaderViewHolder
+        adapter.onBindViewHolder(holder0, 0)
+        assertEquals("▼ ACTIVE (1)", holder0.txtHeaderTitle.text.toString())
+
         activity.toggleActiveCollapsed()
         shadowOf(android.os.Looper.getMainLooper()).idle()
 
-        // Collapsed Active: 1 active header + 1 punted header + 1 punted task + 1 footer = 4 items
-        assertEquals(4, adapter.itemCount)
+        adapter.onBindViewHolder(holder0, 0)
+        assertEquals("▶ ACTIVE (1)", holder0.txtHeaderTitle.text.toString())
 
-        // Toggle Punted section collapsed
+        val holder1 = adapter.createViewHolder(recyclerView, RemindersAdapter.TYPE_SECTION_HEADER) as RemindersAdapter.HeaderViewHolder
+        adapter.onBindViewHolder(holder1, 1)
+        assertEquals("▼ PUNTED (1)", holder1.txtHeaderTitle.text.toString())
+
         activity.togglePuntedCollapsed()
         shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        adapter.onBindViewHolder(holder1, 1)
+        assertEquals("▶ PUNTED (1)", holder1.txtHeaderTitle.text.toString())
 
         // Collapsed both: 1 active header + 1 punted header + 1 footer = 3 items
         assertEquals(3, adapter.itemCount)
