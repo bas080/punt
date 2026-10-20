@@ -194,9 +194,9 @@ class ScreenshotGeneratorTest {
 
         shadowOf(Looper.getMainLooper()).idle()
 
-        val decorView = activity.window.decorView
-        renderAndSaveView(decorView, File(phoneScreenshotsDir, "6.png"), 375, 667)
-        renderAndSaveView(decorView, File(tabletScreenshotsDir, "6.png"), 1024, 768)
+        val viewToRender = activity.window.decorView
+        renderAndSaveView(viewToRender, File(phoneScreenshotsDir, "6.png"), 375, 667)
+        renderAndSaveView(viewToRender, File(tabletScreenshotsDir, "6.png"), 1024, 768)
     }
 
     private fun createMockSbn(packageName: String, title: String, text: String): StatusBarNotification {
