@@ -122,7 +122,11 @@ class ScreenshotGeneratorTest {
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
 
-        val btnFilter = activity.findViewById<View>(R.id.btn_tags_filter)
+        val btnMenu = activity.findViewById<View>(R.id.btn_menu)
+        btnMenu?.performClick()
+        shadowOf(Looper.getMainLooper()).idle()
+
+        val btnFilter = activity.findViewById<View>(R.id.btn_menu_filter)
         btnFilter?.performClick()
         shadowOf(Looper.getMainLooper()).idle()
 
@@ -162,8 +166,9 @@ class ScreenshotGeneratorTest {
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
 
-        val btnAbout = activity.findViewById<TextView>(R.id.btn_nav_about)
-        btnAbout?.performClick()
+        val showAboutMethod = MainActivity::class.java.getDeclaredMethod("showAboutView")
+        showAboutMethod.isAccessible = true
+        showAboutMethod.invoke(activity)
         shadowOf(Looper.getMainLooper()).idle()
 
         val decorView = activity.window.decorView

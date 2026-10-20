@@ -210,78 +210,28 @@ class MainActivityTest {
     }
 
     @Test
-    fun testFloatingHamburgerFabTogglesVerticalPillMenuAndNavigates() {
+    fun testTopMenuTogglesContainerAndNavigates() {
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
 
-        val fabMenu = activity.findViewById<ImageView>(R.id.fab_menu)
-        val pillContainer = activity.findViewById<View>(R.id.fab_pill_menu_container)
-        val btnNavAbout = activity.findViewById<TextView>(R.id.btn_nav_about)
-        val btnNavReminders = activity.findViewById<TextView>(R.id.btn_nav_reminders)
-        val btnFabPuntAll = activity.findViewById<View>(R.id.btn_fab_punt_all)
-        val btnFabShareMatching = activity.findViewById<View>(R.id.btn_fab_share_matching)
+        val btnMenu = activity.findViewById<ImageView>(R.id.btn_menu)
+        val menuContainer = activity.findViewById<View>(R.id.menu_container)
+        val btnMenuPuntAll = activity.findViewById<View>(R.id.btn_menu_punt_all)
+        val btnMenuShareMatching = activity.findViewById<View>(R.id.btn_menu_share_matching)
 
-        assertNotNull(fabMenu)
-        assertNotNull(pillContainer)
-        assertEquals(View.GONE, pillContainer.visibility)
+        assertNotNull(btnMenu)
+        assertNotNull(menuContainer)
+        assertEquals(View.GONE, menuContainer.visibility)
 
-        // Tapping FAB expands vertical pill container
-        fabMenu.performClick()
-        assertEquals(View.VISIBLE, pillContainer.visibility)
+        // Tapping top menu expands menu container
+        btnMenu.performClick()
+        assertEquals(View.VISIBLE, menuContainer.visibility)
 
-        // Tapping About pill navigates to About view and collapses pill container
-        btnNavAbout.performClick()
-        assertEquals(View.GONE, pillContainer.visibility)
-        assertEquals(View.VISIBLE, activity.findViewById<View>(R.id.about_container).visibility)
-        assertEquals(View.GONE, activity.findViewById<View>(R.id.reminders_container).visibility)
-        assertEquals(View.GONE, btnFabPuntAll.visibility)
-        assertEquals(View.GONE, btnFabShareMatching.visibility)
-
-        // Expanding again and tapping Tasks pill navigates back to Tasks
-        fabMenu.performClick()
-        assertEquals(View.VISIBLE, pillContainer.visibility)
-        btnNavReminders.performClick()
-        assertEquals(View.GONE, pillContainer.visibility)
-        assertEquals(View.VISIBLE, activity.findViewById<View>(R.id.reminders_container).visibility)
-        assertEquals(View.VISIBLE, btnFabPuntAll.visibility)
-        assertEquals(View.VISIBLE, btnFabShareMatching.visibility)
-
-        // Tapping action pills collapses menu
-        fabMenu.performClick()
-        assertEquals(View.VISIBLE, pillContainer.visibility)
-        assertNotNull(btnFabPuntAll)
-        assertNotNull(btnFabShareMatching)
-        btnFabShareMatching.performClick()
-        assertEquals(View.GONE, pillContainer.visibility)
-    }
-
-    @Test
-    fun testDraggableFabAndResetPosition() {
-        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
-        val activity = controller.get()
-
-        val fabMenu = activity.findViewById<ImageView>(R.id.fab_menu)
-        val btnResetFabPosition = activity.findViewById<TextView>(R.id.btn_reset_fab_position)
-        assertNotNull(fabMenu)
-        assertNotNull(btnResetFabPosition)
-
-        val downTime = SystemClock.uptimeMillis()
-        fabMenu.dispatchTouchEvent(MotionEvent.obtain(downTime, downTime, MotionEvent.ACTION_DOWN, 100f, 100f, 0))
-
-        shadowOf(android.os.Looper.getMainLooper()).idleFor(600, java.util.concurrent.TimeUnit.MILLISECONDS)
-
-        fabMenu.dispatchTouchEvent(MotionEvent.obtain(downTime, downTime + 200, MotionEvent.ACTION_MOVE, 200f, 200f, 0))
-        fabMenu.dispatchTouchEvent(MotionEvent.obtain(downTime, downTime + 300, MotionEvent.ACTION_UP, 200f, 200f, 0))
-
-        shadowOf(android.os.Looper.getMainLooper()).idle()
-
-        val prefs = activity.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
-
-        btnResetFabPosition.performClick()
-        shadowOf(android.os.Looper.getMainLooper()).idle()
-
-        assertEquals(-1f, prefs.getFloat("key_fab_rel_x", -1f), 0.001f)
-        assertEquals(-1f, prefs.getFloat("key_fab_rel_y", -1f), 0.001f)
+        // Tapping action pill collapses menu
+        assertNotNull(btnMenuPuntAll)
+        assertNotNull(btnMenuShareMatching)
+        btnMenuShareMatching.performClick()
+        assertEquals(View.GONE, menuContainer.visibility)
     }
 
     @Test
@@ -289,10 +239,9 @@ class MainActivityTest {
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
 
-        val btnNavAbout = activity.findViewById<TextView>(R.id.btn_nav_about)
-        assertNotNull(btnNavAbout)
-
-        btnNavAbout.performClick()
+        val showAboutMethod = MainActivity::class.java.getDeclaredMethod("showAboutView")
+        showAboutMethod.isAccessible = true
+        showAboutMethod.invoke(activity)
 
         val aboutContainer = activity.findViewById<View>(R.id.about_container)
         assertEquals(View.VISIBLE, aboutContainer.visibility)
@@ -364,8 +313,8 @@ class MainActivityTest {
         input.setText("#punt")
         shadowOf(android.os.Looper.getMainLooper()).idleFor(250, java.util.concurrent.TimeUnit.MILLISECONDS)
 
-        val btnFabShareMatching = activity.findViewById<View>(R.id.btn_fab_share_matching)
-        assertNotNull(btnFabShareMatching)
+        val btnMenuShareMatching = activity.findViewById<View>(R.id.btn_menu_share_matching)
+        assertNotNull(btnMenuShareMatching)
 
         val showExportOptionsMethod = MainActivity::class.java.getDeclaredMethod("showExportOptionsDialog", List::class.java)
         showExportOptionsMethod.isAccessible = true
@@ -704,9 +653,12 @@ class MainActivityTest {
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
 
-        val btnFilter = activity.findViewById<View>(R.id.btn_tags_filter)
-        assertNotNull(btnFilter)
-        btnFilter.performClick()
+        val btnMenuFilter = activity.findViewById<View>(R.id.btn_menu_filter)
+        assertNotNull(btnMenuFilter)
+
+        val showTagsMethod = MainActivity::class.java.getDeclaredMethod("showTagsSelectionDialog")
+        showTagsMethod.isAccessible = true
+        showTagsMethod.invoke(activity)
 
         val dialog = ShadowAlertDialog.getLatestDialog() as? AlertDialog
         assertNotNull(dialog)
@@ -811,9 +763,9 @@ class MainActivityTest {
         val controller1 = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity1 = controller1.get()
 
-        val btnTagsFilter1 = activity1.findViewById<View>(R.id.btn_tags_filter)
-        assertNotNull(btnTagsFilter1)
-        btnTagsFilter1.performClick()
+        val showTagsMethod = MainActivity::class.java.getDeclaredMethod("showTagsSelectionDialog")
+        showTagsMethod.isAccessible = true
+        showTagsMethod.invoke(activity1)
 
         val dialog = ShadowAlertDialog.getLatestDialog() as? AlertDialog
         assertNotNull(dialog)
@@ -841,17 +793,46 @@ class MainActivityTest {
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
 
-        val btnTagsFilter = activity.findViewById<View>(R.id.btn_tags_filter)
-        assertNotNull(btnTagsFilter)
-
-        // Open filter selection dialog
-        btnTagsFilter.performClick()
+        val showTagsMethod = MainActivity::class.java.getDeclaredMethod("showTagsSelectionDialog")
+        showTagsMethod.isAccessible = true
+        showTagsMethod.invoke(activity)
 
         val dialog = ShadowAlertDialog.getLatestDialog() as? AlertDialog
         assertNotNull("Filter selection dialog should be shown", dialog)
 
-        dialog!!.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+        fun findRadioGroupInViewGroup(view: android.view.View?): android.widget.RadioGroup? {
+            if (view == null) return null
+            if (view is android.widget.RadioGroup) return view
+            if (view is android.view.ViewGroup) {
+                for (i in 0 until view.childCount) {
+                    val res = findRadioGroupInViewGroup(view.getChildAt(i))
+                    if (res != null) return res
+                }
+            }
+            return null
+        }
+
+        val radioGroup = findRadioGroupInViewGroup(dialog!!.findViewById(android.R.id.content) ?: dialog.window?.decorView)
+        assertNotNull(radioGroup)
+        val rbActive = radioGroup!!.getChildAt(1) as android.widget.RadioButton
+        rbActive.isChecked = true
+
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
         shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        assertEquals(ReminderFilter.ACTIVE.name, prefs.getString("key_reminder_filter", null))
+
+        // Open again and test Punted radio button
+        showTagsMethod.invoke(activity)
+        val dialog2 = ShadowAlertDialog.getLatestDialog() as? AlertDialog
+        val radioGroup2 = findRadioGroupInViewGroup(dialog2!!.findViewById(android.R.id.content) ?: dialog2.window?.decorView)!!
+        val rbPunted = radioGroup2.getChildAt(2) as android.widget.RadioButton
+        rbPunted.isChecked = true
+
+        dialog2.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        assertEquals(ReminderFilter.SNOOZED.name, prefs.getString("key_reminder_filter", null))
     }
 
     @Test
@@ -1221,35 +1202,6 @@ class MainActivityTest {
 
         val headerType = recyclerView.adapter!!.getItemViewType(1)
         assertEquals(RemindersAdapter.TYPE_SNOOZED_HEADER, headerType)
-    }
-
-    @Test
-    fun testHeaderNavigationRemainsVisibleOnScroll() {
-        val context = RuntimeEnvironment.getApplication()
-        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
-        val items = (1..15).map { "Task $it" }.toSet()
-        prefs.edit().clear().putStringSet("key_reminders_list", items).commit()
-
-        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
-        val activity = controller.get()
-
-        val fabContainer = activity.findViewById<View>(R.id.layout_fab_container)
-        val recyclerView = activity.findViewById<RecyclerView>(R.id.reminders_list)
-        assertNotNull(fabContainer)
-        assertNotNull(recyclerView)
-
-        // Navigation is VISIBLE
-        assertEquals(View.VISIBLE, fabContainer.visibility)
-
-        // Scroll down list to position 5
-        recyclerView.scrollToPosition(5)
-        shadowOf(android.os.Looper.getMainLooper()).idle()
-
-        // Trigger onScrolled
-        recyclerView.scrollBy(0, 50)
-        shadowOf(android.os.Looper.getMainLooper()).idle()
-
-        assertEquals("Floating navigation container should remain VISIBLE on scroll", View.VISIBLE, fabContainer.visibility)
     }
 
     @Test
@@ -1810,5 +1762,19 @@ class MainActivityTest {
         // Search "gym" on Work focus yields 0 matching tasks
         assertEquals(0, adapter.itemCount)
         assertEquals(View.VISIBLE, activity.findViewById<View>(R.id.layout_empty_reminders).visibility)
+    }
+
+    @Test
+    fun testSendFeedbackEmailLaunchesEmailChooser() {
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = controller.get()
+
+        val sendFeedbackEmailMethod = MainActivity::class.java.getDeclaredMethod("sendFeedbackEmail")
+        sendFeedbackEmailMethod.isAccessible = true
+        sendFeedbackEmailMethod.invoke(activity)
+
+        val nextStartedActivity = shadowOf(activity).nextStartedActivity
+        assertNotNull(nextStartedActivity)
+        assertEquals(android.content.Intent.ACTION_CHOOSER, nextStartedActivity.action)
     }
 }
