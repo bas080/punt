@@ -55,6 +55,7 @@
     <string name="swipe_instructions">Swipe left to toggle punt • Swipe right to mark done</string>
     <string name="snooze_status_format">Punted • until %s</string>
     <string name="reminders_summary_combined">%1$d active • %2$d punted</string>
+    <string name="reminders_summary_focus">%1$s • %2$d active • %3$d punted</string>
     <string name="share">Share</string>
     <string name="active_reminders_count">%d active reminders</string>
     <string name="active_reminder_single">1 active reminder</string>

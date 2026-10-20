@@ -302,6 +302,35 @@ class ReminderNotificationListenerServiceTest {
     }
 
     @Test
+    fun testStatusNotificationWithActiveFocusProfile() {
+        val context = RuntimeEnvironment.getApplication()
+        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
+        val now = System.currentTimeMillis()
+        val profilesJson = org.json.JSONArray().apply {
+            put(org.json.JSONObject().put("name", "Fitness").put("query", "#fitness"))
+        }.toString()
+
+        prefs.edit()
+            .putStringSet("key_reminders_list", setOf("Run 5k #fitness", "Gym #fitness", "Work meeting #work"))
+            .putLong("snooze_gym #fitness", now + 3600000L)
+            .putString("key_focus_profiles", profilesJson)
+            .putString("key_active_focus_profile", "Fitness")
+            .apply()
+
+        val service = Robolectric.buildService(ReminderNotificationListenerService::class.java).create().get()
+        service.postMatchNotification("Run 5k #fitness")
+
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val shadowNM = Shadows.shadowOf(notificationManager)
+
+        val statusNotif = shadowNM.getNotification(ReminderNotificationListenerService.NOTIFICATION_ID)
+        assertNotNull(statusNotif)
+
+        val statusText = statusNotif.extras.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""
+        assertEquals("Fitness • 1 active • 1 punted", statusText)
+    }
+
+    @Test
     fun testGetTopSnoozeChoicesDefaultAndRecent() {
         val context = RuntimeEnvironment.getApplication()
         val defaultChoices = ReminderNotificationListenerService.getTopSnoozeChoices(context)
