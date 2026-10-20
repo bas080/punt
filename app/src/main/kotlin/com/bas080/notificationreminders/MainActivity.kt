@@ -1926,14 +1926,14 @@ class RemindersAdapter(
             val item = displayedReminders[position]
             val context = holder.itemView.context
             if (item == HEADER_ACTIVE_SECTION_MARKER) {
-                val arrow = if (sectionState.isActiveCollapsed) "▼" else "▲"
-                holder.txtHeaderTitle.text = "ACTIVE (${sectionState.activeCount}) $arrow"
+                val arrow = if (sectionState.isActiveCollapsed) "▶" else "▼"
+                holder.txtHeaderTitle.text = "$arrow ACTIVE (${sectionState.activeCount})"
                 holder.layoutSectionHeader.setOnClickListener {
                     (context as? MainActivity)?.toggleActiveCollapsed()
                 }
             } else if (item == HEADER_SNOOZED_SECTION_MARKER) {
-                val arrow = if (sectionState.isPuntedCollapsed) "▼" else "▲"
-                holder.txtHeaderTitle.text = "PUNTED (${sectionState.puntedCount}) $arrow"
+                val arrow = if (sectionState.isPuntedCollapsed) "▶" else "▼"
+                holder.txtHeaderTitle.text = "$arrow PUNTED (${sectionState.puntedCount})"
                 holder.layoutSectionHeader.setOnClickListener {
                     (context as? MainActivity)?.togglePuntedCollapsed()
                 }
