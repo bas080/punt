@@ -1604,4 +1604,37 @@ class MainActivityTest {
         // Collapsed both: 1 active header + 1 punted header + 1 footer = 3 items
         assertEquals(3, adapter.itemCount)
     }
+
+    @Test
+    fun testSectionHeaderCountsUpdateOnTaskStateChange() {
+        val prefs = RuntimeEnvironment.getApplication().getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
+        prefs.edit().clear().putStringSet("key_reminders_list", setOf("Task A", "Task B")).commit()
+
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = controller.get()
+
+        val recyclerView = activity.findViewById<RecyclerView>(R.id.reminders_list)
+        val adapter = recyclerView.adapter as RemindersAdapter
+
+        recyclerView.measure(View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY))
+        recyclerView.layout(0, 0, 1000, 1000)
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        val holder0 = adapter.createViewHolder(recyclerView, RemindersAdapter.TYPE_SECTION_HEADER) as RemindersAdapter.HeaderViewHolder
+        adapter.onBindViewHolder(holder0, 0)
+        assertEquals("▼ ACTIVE (2)", holder0.txtHeaderTitle.text.toString())
+
+        // Apply snooze to Task A -> active decreases to 1, punted increases to 1
+        val applySnoozeMethod = MainActivity::class.java.getDeclaredMethod("applySnoozeDuration", String::class.java, String::class.java)
+        applySnoozeMethod.isAccessible = true
+        applySnoozeMethod.invoke(activity, "Task A", "1h")
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        adapter.onBindViewHolder(holder0, 0)
+        assertEquals("▼ ACTIVE (1)", holder0.txtHeaderTitle.text.toString())
+
+        val holderPunted = adapter.createViewHolder(recyclerView, RemindersAdapter.TYPE_SECTION_HEADER) as RemindersAdapter.HeaderViewHolder
+        adapter.onBindViewHolder(holderPunted, 2) // ACTIVE header + Task B + PUNTED header
+        assertEquals("▼ PUNTED (1)", holderPunted.txtHeaderTitle.text.toString())
+    }
 }

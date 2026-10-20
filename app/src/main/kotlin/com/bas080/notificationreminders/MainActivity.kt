@@ -158,31 +158,8 @@ class MainActivity : AppCompatActivity() {
         setupSwipeGestures()
         loadReminders()
 
-        setupKeyboardListener()
         checkAndShowCrashReportDialog()
         checkAndRequestPermissions()
-    }
-
-    private fun setupKeyboardListener() {
-        val rootView = binding.root
-        rootView.viewTreeObserver.addOnGlobalLayoutListener {
-            val rect = android.graphics.Rect()
-            rootView.getWindowVisibleDisplayFrame(rect)
-            val screenHeight = rootView.rootView.height
-            val keypadHeight = screenHeight - rect.bottom
-            val isKeyboardOpen = keypadHeight > screenHeight * 0.15
-            if (isKeyboardOpen) {
-                binding.menuContainer.visibility = View.GONE
-            }
-        }
-
-        ViewCompat.setOnApplyWindowInsetsListener(rootView) { _, insets ->
-            val isImeVisible = insets.isVisible(WindowInsetsCompat.Type.ime())
-            if (isImeVisible) {
-                binding.menuContainer.visibility = View.GONE
-            }
-            insets
-        }
     }
 
     private fun setupSwipeRefresh() {
@@ -1811,7 +1788,9 @@ class RemindersAdapter(
         private val oldList: List<String>,
         private val newList: List<String>,
         private val oldSnoozeMap: Map<String, Long>,
-        private val newSnoozeMap: Map<String, Long>
+        private val newSnoozeMap: Map<String, Long>,
+        private val oldSectionState: SectionState = SectionState(),
+        private val newSectionState: SectionState = SectionState()
     ) : androidx.recyclerview.widget.DiffUtil.Callback() {
         override fun getOldListSize(): Int = if (oldList.isEmpty()) 0 else oldList.size + 1
         override fun getNewListSize(): Int = if (newList.isEmpty()) 0 else newList.size + 1
@@ -1849,7 +1828,10 @@ class RemindersAdapter(
 
             return when (oldType) {
                 TYPE_FOOTER_INSTRUCTIONS -> true
-                TYPE_SECTION_HEADER -> oldList.getOrNull(oldItemPosition) == newList.getOrNull(newItemPosition)
+                TYPE_SECTION_HEADER -> {
+                    oldList.getOrNull(oldItemPosition) == newList.getOrNull(newItemPosition) &&
+                            oldSectionState == newSectionState
+                }
                 else -> {
                     val oldItem = oldList.getOrNull(oldItemPosition) ?: return true
                     val newItem = newList.getOrNull(newItemPosition) ?: return true
@@ -1870,15 +1852,22 @@ class RemindersAdapter(
     fun updateList(
         newList: List<String>,
         newSnoozeMap: Map<String, Long> = emptyMap(),
-        sectionState: SectionState = SectionState()
+        newSectionState: SectionState = SectionState()
     ) {
-        val diffCallback = RemindersDiffCallback(displayedReminders, newList, currentSnoozeMap, newSnoozeMap)
+        val diffCallback = RemindersDiffCallback(
+            displayedReminders,
+            newList,
+            currentSnoozeMap,
+            newSnoozeMap,
+            this.sectionState,
+            newSectionState
+        )
         val diffResult = androidx.recyclerview.widget.DiffUtil.calculateDiff(diffCallback)
         displayedReminders.clear()
         displayedReminders.addAll(newList)
         currentSnoozeMap.clear()
         currentSnoozeMap.putAll(newSnoozeMap)
-        this.sectionState = sectionState
+        this.sectionState = newSectionState
         diffResult.dispatchUpdatesTo(this)
     }
 
