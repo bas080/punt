@@ -43,6 +43,7 @@ import java.util.Locale
 
 enum class ReminderFilter { ALL, ACTIVE, SNOOZED }
 
+const val HEADER_ACTIVE_SECTION_MARKER = "HEADER_ACTIVE_SECTION_MARKER"
 const val HEADER_SNOOZED_SECTION_MARKER = "HEADER_SNOOZED_SECTION_MARKER"
 
 class MainActivity : AppCompatActivity() {
@@ -131,12 +132,10 @@ class MainActivity : AppCompatActivity() {
             val allGranted = permissions.values.all { it }
             if (allGranted) {
                 com.bas080.notificationreminders.utils.CalendarSyncManager.setCalendarSyncEnabled(this, true)
-                updateCalendarSyncButtonText()
                 com.bas080.notificationreminders.utils.CalendarSyncManager.syncRemindersToCalendar(this)
                 Toast.makeText(this, "Calendar Sync enabled", Toast.LENGTH_SHORT).show()
             } else {
                 com.bas080.notificationreminders.utils.CalendarSyncManager.setCalendarSyncEnabled(this, false)
-                updateCalendarSyncButtonText()
                 showCalendarPermissionSettingsDialog()
             }
         }
@@ -214,45 +213,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupNavigation() {
-        markAsButtonAccessibility(binding.btnClearLogs)
-        markAsButtonAccessibility(binding.btnExportMarkdown)
-        markAsButtonAccessibility(binding.btnImportMarkdown)
-        markAsButtonAccessibility(binding.btnDonate)
-        markAsButtonAccessibility(binding.btnToggleCalendarSync)
-        markAsButtonAccessibility(binding.btnFeedback)
         markAsButtonAccessibility(binding.btnMenu)
-
-        updateCalendarSyncButtonText()
-
-        binding.btnToggleCalendarSync.setOnClickListener {
-            val currentlyEnabled = com.bas080.notificationreminders.utils.CalendarSyncManager.isCalendarSyncEnabled(this)
-            if (currentlyEnabled) {
-                com.bas080.notificationreminders.utils.CalendarSyncManager.setCalendarSyncEnabled(this, false)
-                updateCalendarSyncButtonText()
-                Toast.makeText(this, "Calendar Sync disabled", Toast.LENGTH_SHORT).show()
-            } else {
-                if (com.bas080.notificationreminders.utils.CalendarSyncManager.hasCalendarPermission(this)) {
-                    com.bas080.notificationreminders.utils.CalendarSyncManager.setCalendarSyncEnabled(this, true)
-                    updateCalendarSyncButtonText()
-                    com.bas080.notificationreminders.utils.CalendarSyncManager.syncRemindersToCalendar(this)
-                    Toast.makeText(this, "Calendar Sync enabled", Toast.LENGTH_SHORT).show()
-                } else {
-                    requestCalendarPermissionLauncher.launch(
-                        arrayOf(Manifest.permission.READ_CALENDAR, Manifest.permission.WRITE_CALENDAR)
-                    )
-                }
-            }
-        }
-
-        binding.btnDonate.setOnClickListener {
-            val donateUri = android.net.Uri.parse("https://liberapay.com/bas080")
-            val intent = Intent(Intent.ACTION_VIEW, donateUri)
-            try {
-                startActivity(intent)
-            } catch (_: Exception) {
-                Toast.makeText(this, "Unable to open donation link", Toast.LENGTH_SHORT).show()
-            }
-        }
 
         markAsButtonAccessibility(binding.btnEmptyClearFilter)
 
@@ -270,6 +231,7 @@ class MainActivity : AppCompatActivity() {
         markAsButtonAccessibility(binding.btnMenuFilter)
         markAsButtonAccessibility(binding.btnMenuPuntAll)
         markAsButtonAccessibility(binding.btnMenuShareMatching)
+        markAsButtonAccessibility(binding.btnMenuAbout)
 
         val toggleMenu = {
             val isCurrentlyExpanded = binding.menuContainer.visibility == View.VISIBLE
@@ -288,10 +250,6 @@ class MainActivity : AppCompatActivity() {
             collapseMenu()
         }
 
-        binding.aboutContainer.setOnClickListener {
-            collapseMenu()
-        }
-
         binding.btnMenuFocusProfiles.setOnClickListener {
             collapseMenu()
             showFocusProfilesDialog()
@@ -305,7 +263,7 @@ class MainActivity : AppCompatActivity() {
         binding.btnMenuPuntAll.setOnClickListener {
             collapseMenu()
             val activeList = displayedReminders.filter {
-                it != HEADER_SNOOZED_SECTION_MARKER && !it.contains("#done", ignoreCase = true)
+                it != HEADER_ACTIVE_SECTION_MARKER && it != HEADER_SNOOZED_SECTION_MARKER && !it.contains("#done", ignoreCase = true)
             }
             showBulkSnoozeDialog(activeList)
         }
@@ -313,31 +271,237 @@ class MainActivity : AppCompatActivity() {
         binding.btnMenuShareMatching.setOnClickListener {
             collapseMenu()
             val activeList = displayedReminders.filter {
-                it != HEADER_SNOOZED_SECTION_MARKER && !it.contains("#done", ignoreCase = true)
+                it != HEADER_ACTIVE_SECTION_MARKER && it != HEADER_SNOOZED_SECTION_MARKER && !it.contains("#done", ignoreCase = true)
             }
             showExportOptionsDialog(activeList)
         }
 
-        binding.btnFeedback.setOnClickListener {
+        binding.btnMenuAbout.setOnClickListener {
+            collapseMenu()
+            showAboutDialog()
+        }
+    }
+
+    fun showAboutDialog() {
+        val density = resources.displayMetrics.density
+        val padding = (20 * density).toInt()
+
+        val container = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            setPadding(padding, padding / 2, padding, padding / 2)
+        }
+
+        val titleTv = TextView(this).apply {
+            text = getString(R.string.app_name)
+            setTextAppearance(android.R.style.TextAppearance_Large)
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_primary))
+            setTypeface(null, android.graphics.Typeface.BOLD)
+        }
+        container.addView(titleTv)
+
+        val versionText = try {
+            val pInfo = packageManager.getPackageInfo(packageName, 0)
+            getString(R.string.app_version_format, pInfo.versionName)
+        } catch (_: Exception) {
+            getString(R.string.app_version_format, "1.0")
+        }
+
+        val versionTv = TextView(this).apply {
+            text = versionText
+            setTextAppearance(android.R.style.TextAppearance_Small)
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_secondary))
+            setPadding(0, (2 * density).toInt(), 0, (12 * density).toInt())
+        }
+        container.addView(versionTv)
+
+        val row1 = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.HORIZONTAL
+            setPadding(0, 0, 0, (8 * density).toInt())
+        }
+
+        val accentColor = ContextCompat.getColor(this, R.color.accent)
+
+        val btnImport = TextView(this).apply {
+            text = getString(R.string.import_markdown)
+            setTextColor(accentColor)
+            setTextAppearance(android.R.style.TextAppearance_Small)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setPadding(0, (4 * density).toInt(), (12 * density).toInt(), (4 * density).toInt())
+            isClickable = true
+            isFocusable = true
+        }
+
+        val btnExport = TextView(this).apply {
+            text = getString(R.string.export_markdown)
+            setTextColor(accentColor)
+            setTextAppearance(android.R.style.TextAppearance_Small)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setPadding((12 * density).toInt(), (4 * density).toInt(), (12 * density).toInt(), (4 * density).toInt())
+            isClickable = true
+            isFocusable = true
+        }
+
+        val btnFeedback = TextView(this).apply {
+            text = getString(R.string.feedback)
+            setTextColor(accentColor)
+            setTextAppearance(android.R.style.TextAppearance_Small)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setPadding((12 * density).toInt(), (4 * density).toInt(), 0, (4 * density).toInt())
+            isClickable = true
+            isFocusable = true
+        }
+
+        row1.addView(btnImport)
+        row1.addView(btnExport)
+        row1.addView(btnFeedback)
+        container.addView(row1)
+
+        val row2 = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.HORIZONTAL
+            setPadding(0, 0, 0, (12 * density).toInt())
+        }
+
+        val btnDonate = TextView(this).apply {
+            text = getString(R.string.donate)
+            setTextColor(accentColor)
+            setTextAppearance(android.R.style.TextAppearance_Small)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setPadding(0, (4 * density).toInt(), (12 * density).toInt(), (4 * density).toInt())
+            isClickable = true
+            isFocusable = true
+        }
+
+        val isSyncEnabled = com.bas080.notificationreminders.utils.CalendarSyncManager.isCalendarSyncEnabled(this)
+        val syncText = if (isSyncEnabled) getString(R.string.calendar_sync_enabled) else getString(R.string.calendar_sync_disabled)
+
+        val btnCalendarSync = TextView(this).apply {
+            text = syncText
+            setTextColor(accentColor)
+            setTextAppearance(android.R.style.TextAppearance_Small)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setPadding((12 * density).toInt(), (4 * density).toInt(), 0, (4 * density).toInt())
+            isClickable = true
+            isFocusable = true
+        }
+
+        row2.addView(btnDonate)
+        row2.addView(btnCalendarSync)
+        container.addView(row2)
+
+        val logsHeaderRow = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            setPadding(0, (8 * density).toInt(), 0, (6 * density).toInt())
+        }
+
+        val logsHeaderTv = TextView(this).apply {
+            text = "APPLICATION LOGS"
+            setTextAppearance(android.R.style.TextAppearance_Small)
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_secondary))
+            setTypeface(null, android.graphics.Typeface.BOLD)
+        }
+
+        val spaceView = View(this).apply {
+            layoutParams = android.widget.LinearLayout.LayoutParams(0, 1, 1f)
+        }
+
+        val btnClearLogs = TextView(this).apply {
+            text = getString(R.string.clear_logs)
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.accent_danger))
+            setTextAppearance(android.R.style.TextAppearance_Small)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            isClickable = true
+            isFocusable = true
+        }
+
+        logsHeaderRow.addView(logsHeaderTv)
+        logsHeaderRow.addView(spaceView)
+        logsHeaderRow.addView(btnClearLogs)
+        container.addView(logsHeaderRow)
+
+        val logsTv = TextView(this).apply {
+            val rawLogs = AppLogger.getLogs(this@MainActivity)
+            text = if (rawLogs.isNotBlank()) rawLogs else "No logs available."
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_primary))
+            setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 11f)
+            typeface = android.graphics.Typeface.MONOSPACE
+            setTextIsSelectable(true)
+        }
+
+        val scrollView = android.widget.ScrollView(this).apply {
+            layoutParams = android.widget.LinearLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                (160 * density).toInt()
+            )
+            setBackgroundResource(R.drawable.bg_card)
+            val p = (10 * density).toInt()
+            setPadding(p, p, p, p)
+            addView(logsTv)
+        }
+        container.addView(scrollView)
+
+        val dialog = AlertDialog.Builder(this, R.style.Theme_Punt_Dialog)
+            .setTitle("About Punt")
+            .setView(container)
+            .setPositiveButton("Close", null)
+            .create()
+
+        btnImport.setOnClickListener {
+            dialog.dismiss()
+            showImportMarkdownDialog()
+        }
+
+        btnExport.setOnClickListener {
+            dialog.dismiss()
+            showExportOptionsDialog(activeReminders)
+        }
+
+        btnFeedback.setOnClickListener {
+            dialog.dismiss()
             val intent = Intent(this, CrashReportActivity::class.java).apply {
                 putExtra(CrashReportActivity.EXTRA_IS_FEEDBACK, true)
             }
             startActivity(intent)
         }
 
-        binding.btnClearLogs.setOnClickListener {
+        btnDonate.setOnClickListener {
+            val donateUri = android.net.Uri.parse("https://liberapay.com/bas080")
+            val intent = Intent(Intent.ACTION_VIEW, donateUri)
+            try {
+                startActivity(intent)
+            } catch (_: Exception) {
+                Toast.makeText(this, "Unable to open donation link", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        btnCalendarSync.setOnClickListener {
+            val currentlyEnabled = com.bas080.notificationreminders.utils.CalendarSyncManager.isCalendarSyncEnabled(this)
+            if (currentlyEnabled) {
+                com.bas080.notificationreminders.utils.CalendarSyncManager.setCalendarSyncEnabled(this, false)
+                btnCalendarSync.text = getString(R.string.calendar_sync_disabled)
+                Toast.makeText(this, "Calendar Sync disabled", Toast.LENGTH_SHORT).show()
+            } else {
+                if (com.bas080.notificationreminders.utils.CalendarSyncManager.hasCalendarPermission(this)) {
+                    com.bas080.notificationreminders.utils.CalendarSyncManager.setCalendarSyncEnabled(this, true)
+                    btnCalendarSync.text = getString(R.string.calendar_sync_enabled)
+                    com.bas080.notificationreminders.utils.CalendarSyncManager.syncRemindersToCalendar(this)
+                    Toast.makeText(this, "Calendar Sync enabled", Toast.LENGTH_SHORT).show()
+                } else {
+                    dialog.dismiss()
+                    requestCalendarPermissionLauncher.launch(
+                        arrayOf(Manifest.permission.READ_CALENDAR, Manifest.permission.WRITE_CALENDAR)
+                    )
+                }
+            }
+        }
+
+        btnClearLogs.setOnClickListener {
             AppLogger.clearLogs(this)
-            loadLogs()
+            logsTv.text = "No logs available."
             Toast.makeText(this, R.string.toast_logs_cleared, Toast.LENGTH_SHORT).show()
         }
 
-        binding.btnExportMarkdown.setOnClickListener {
-            showExportOptionsDialog(activeReminders)
-        }
-
-        binding.btnImportMarkdown.setOnClickListener {
-            showImportMarkdownDialog()
-        }
+        dialog.show()
     }
 
     private fun setupSearchInput() {
@@ -796,16 +960,6 @@ class MainActivity : AppCompatActivity() {
         })
     }
 
-    private fun showRemindersView() {
-        binding.remindersContainer.visibility = View.VISIBLE
-        binding.aboutContainer.visibility = View.GONE
-
-        binding.btnMenuFocusProfiles.visibility = View.VISIBLE
-        binding.btnMenuFilter.visibility = View.VISIBLE
-        binding.btnMenuPuntAll.visibility = View.VISIBLE
-        binding.btnMenuShareMatching.visibility = View.VISIBLE
-    }
-
     private fun showCalendarPermissionSettingsDialog() {
         AlertDialog.Builder(this, R.style.Theme_Punt_Dialog)
             .setTitle(R.string.calendar_sync_title)
@@ -822,37 +976,6 @@ class MainActivity : AppCompatActivity() {
             }
             .setNegativeButton(R.string.cancel, null)
             .show()
-    }
-
-    private fun updateCalendarSyncButtonText() {
-        val enabled = com.bas080.notificationreminders.utils.CalendarSyncManager.isCalendarSyncEnabled(this)
-        binding.btnToggleCalendarSync.setText(
-            if (enabled) R.string.calendar_sync_enabled else R.string.calendar_sync_disabled
-        )
-    }
-
-    private fun showAboutView() {
-        binding.remindersContainer.visibility = View.GONE
-        binding.aboutContainer.visibility = View.VISIBLE
-
-        binding.btnMenuFocusProfiles.visibility = View.GONE
-        binding.btnMenuFilter.visibility = View.GONE
-        binding.btnMenuPuntAll.visibility = View.GONE
-        binding.btnMenuShareMatching.visibility = View.GONE
-
-        try {
-            val pInfo = packageManager.getPackageInfo(packageName, 0)
-            binding.txtAppVersion.text = getString(R.string.app_version_format, pInfo.versionName)
-        } catch (_: Exception) {
-            binding.txtAppVersion.text = getString(R.string.app_version_format, "1.0")
-        }
-
-        loadLogs()
-    }
-
-    private fun loadLogs() {
-        val logs = AppLogger.getLogs(this)
-        binding.txtLogs.text = if (logs.isNotBlank()) logs else "No logs available."
     }
 
     private fun setupRecyclerView() {
@@ -1409,6 +1532,9 @@ class MainActivity : AppCompatActivity() {
         val savedQuery = prefs.getString(KEY_SEARCH_QUERY, "") ?: ""
         currentSearchQuery = savedQuery
         activeFocusProfileName = prefs.getString(KEY_ACTIVE_FOCUS_PROFILE, null).takeIf { !it.isNullOrBlank() }
+        isActiveCollapsed = prefs.getBoolean(KEY_ACTIVE_COLLAPSED, false)
+        isPuntedCollapsed = prefs.getBoolean(KEY_PUNTED_COLLAPSED, false)
+
         updateSearchInputHint()
         if (binding.searchReminderInput.text.toString() != savedQuery) {
             binding.searchReminderInput.setText(savedQuery)
@@ -1518,12 +1644,25 @@ class MainActivity : AppCompatActivity() {
         snoozedItems.sortBy { it.second }
 
         val sorted = mutableListOf<String>()
-        sorted.addAll(activeItems)
+
+        if (activeItems.isNotEmpty()) {
+            sorted.add(HEADER_ACTIVE_SECTION_MARKER)
+            if (!isActiveCollapsed) {
+                sorted.addAll(activeItems)
+            }
+        }
 
         if (currentFilter == ReminderFilter.ALL && snoozedItems.isNotEmpty()) {
             sorted.add(HEADER_SNOOZED_SECTION_MARKER)
+            if (!isPuntedCollapsed) {
+                sorted.addAll(snoozedItems.map { it.first })
+            }
+        } else if (currentFilter == ReminderFilter.SNOOZED && snoozedItems.isNotEmpty()) {
+            sorted.add(HEADER_SNOOZED_SECTION_MARKER)
+            if (!isPuntedCollapsed) {
+                sorted.addAll(snoozedItems.map { it.first })
+            }
         }
-        sorted.addAll(snoozedItems.map { it.first })
 
         val snoozeMap = mutableMapOf<String, Long>()
         for (reminder in activeReminders) {
@@ -1536,7 +1675,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        adapter.updateList(sorted, snoozeMap)
+        adapter.updateList(sorted, snoozeMap, activeItems.size, snoozedItems.size, isActiveCollapsed, isPuntedCollapsed)
         updateSummary()
 
         if (firstVisiblePos != RecyclerView.NO_POSITION && firstVisiblePos < sorted.size) {
@@ -1581,9 +1720,6 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         com.bas080.notificationreminders.utils.CalendarSyncManager.syncCalendarChangesToReminders(this)
         loadReminders()
-        if (binding.aboutContainer.visibility == View.VISIBLE) {
-            loadLogs()
-        }
         if (isNotificationListenerEnabled()) {
             startReminderService()
         }
@@ -1883,11 +2019,15 @@ class RemindersAdapter(
     companion object {
         const val TYPE_ACTIVE_REMINDER = 1
         const val TYPE_FOOTER_INSTRUCTIONS = 2
-        const val TYPE_SNOOZED_HEADER = 3
+        const val TYPE_SECTION_HEADER = 3
         private const val PREFS_REMINDERS = "reminders_prefs"
     }
 
     private val currentSnoozeMap = mutableMapOf<String, Long>()
+    private var activeCount = 0
+    private var puntedCount = 0
+    private var isActiveCollapsed = false
+    private var isPuntedCollapsed = false
 
     private class RemindersDiffCallback(
         private val oldList: List<String>,
@@ -1900,12 +2040,14 @@ class RemindersAdapter(
 
         private fun getOldType(position: Int): Int {
             if (oldList.isNotEmpty() && position == oldList.size) return TYPE_FOOTER_INSTRUCTIONS
-            return if (oldList.getOrNull(position) == HEADER_SNOOZED_SECTION_MARKER) TYPE_SNOOZED_HEADER else TYPE_ACTIVE_REMINDER
+            val item = oldList.getOrNull(position)
+            return if (item == HEADER_ACTIVE_SECTION_MARKER || item == HEADER_SNOOZED_SECTION_MARKER) TYPE_SECTION_HEADER else TYPE_ACTIVE_REMINDER
         }
 
         private fun getNewType(position: Int): Int {
             if (newList.isNotEmpty() && position == newList.size) return TYPE_FOOTER_INSTRUCTIONS
-            return if (newList.getOrNull(position) == HEADER_SNOOZED_SECTION_MARKER) TYPE_SNOOZED_HEADER else TYPE_ACTIVE_REMINDER
+            val item = newList.getOrNull(position)
+            return if (item == HEADER_ACTIVE_SECTION_MARKER || item == HEADER_SNOOZED_SECTION_MARKER) TYPE_SECTION_HEADER else TYPE_ACTIVE_REMINDER
         }
 
         override fun areItemsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
@@ -1916,7 +2058,7 @@ class RemindersAdapter(
 
             return when (oldType) {
                 TYPE_FOOTER_INSTRUCTIONS -> true
-                TYPE_SNOOZED_HEADER -> true
+                TYPE_SECTION_HEADER -> oldList.getOrNull(oldItemPosition) == newList.getOrNull(newItemPosition)
                 else -> oldList.getOrNull(oldItemPosition) == newList.getOrNull(newItemPosition)
             }
         }
@@ -1929,7 +2071,7 @@ class RemindersAdapter(
 
             return when (oldType) {
                 TYPE_FOOTER_INSTRUCTIONS -> true
-                TYPE_SNOOZED_HEADER -> true
+                TYPE_SECTION_HEADER -> oldList.getOrNull(oldItemPosition) == newList.getOrNull(newItemPosition)
                 else -> {
                     val oldItem = oldList.getOrNull(oldItemPosition) ?: return true
                     val newItem = newList.getOrNull(newItemPosition) ?: return true
@@ -1947,13 +2089,24 @@ class RemindersAdapter(
         }
     }
 
-    fun updateList(newList: List<String>, newSnoozeMap: Map<String, Long> = emptyMap()) {
+    fun updateList(
+        newList: List<String>,
+        newSnoozeMap: Map<String, Long> = emptyMap(),
+        activeCount: Int = 0,
+        puntedCount: Int = 0,
+        isActiveCollapsed: Boolean = false,
+        isPuntedCollapsed: Boolean = false
+    ) {
         val diffCallback = RemindersDiffCallback(displayedReminders, newList, currentSnoozeMap, newSnoozeMap)
         val diffResult = androidx.recyclerview.widget.DiffUtil.calculateDiff(diffCallback)
         displayedReminders.clear()
         displayedReminders.addAll(newList)
         currentSnoozeMap.clear()
         currentSnoozeMap.putAll(newSnoozeMap)
+        this.activeCount = activeCount
+        this.puntedCount = puntedCount
+        this.isActiveCollapsed = isActiveCollapsed
+        this.isPuntedCollapsed = isPuntedCollapsed
         diffResult.dispatchUpdatesTo(this)
     }
 
@@ -1966,6 +2119,7 @@ class RemindersAdapter(
     }
 
     class HeaderViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+        val layoutSectionHeader: View = view.findViewById(R.id.layout_section_header)
         val txtHeaderTitle: TextView = view.findViewById(R.id.txt_header_title)
     }
 
@@ -1974,7 +2128,7 @@ class RemindersAdapter(
     override fun getItemViewType(position: Int): Int {
         if (displayedReminders.isNotEmpty() && position == displayedReminders.size) return TYPE_FOOTER_INSTRUCTIONS
         val item = displayedReminders[position]
-        return if (item == HEADER_SNOOZED_SECTION_MARKER) TYPE_SNOOZED_HEADER else TYPE_ACTIVE_REMINDER
+        return if (item == HEADER_ACTIVE_SECTION_MARKER || item == HEADER_SNOOZED_SECTION_MARKER) TYPE_SECTION_HEADER else TYPE_ACTIVE_REMINDER
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
@@ -1984,7 +2138,7 @@ class RemindersAdapter(
                 val view = inflater.inflate(R.layout.item_footer_instructions, parent, false)
                 FooterViewHolder(view)
             }
-            TYPE_SNOOZED_HEADER -> {
+            TYPE_SECTION_HEADER -> {
                 val view = inflater.inflate(R.layout.item_section_header, parent, false)
                 HeaderViewHolder(view)
             }
@@ -1997,7 +2151,21 @@ class RemindersAdapter(
 
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
         if (holder is HeaderViewHolder) {
-            holder.txtHeaderTitle.text = "PUNTED"
+            val item = displayedReminders[position]
+            val context = holder.itemView.context
+            if (item == HEADER_ACTIVE_SECTION_MARKER) {
+                val arrow = if (isActiveCollapsed) "▼" else "▲"
+                holder.txtHeaderTitle.text = "ACTIVE ($activeCount) $arrow"
+                holder.layoutSectionHeader.setOnClickListener {
+                    (context as? MainActivity)?.toggleActiveCollapsed()
+                }
+            } else if (item == HEADER_SNOOZED_SECTION_MARKER) {
+                val arrow = if (isPuntedCollapsed) "▼" else "▲"
+                holder.txtHeaderTitle.text = "PUNTED ($puntedCount) $arrow"
+                holder.layoutSectionHeader.setOnClickListener {
+                    (context as? MainActivity)?.togglePuntedCollapsed()
+                }
+            }
             return
         }
         if (holder !is ItemViewHolder) return
