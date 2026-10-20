@@ -57,6 +57,8 @@ class MainActivity : AppCompatActivity() {
         private const val KEY_FAB_REL_Y = "key_fab_rel_y"
         private const val KEY_FOCUS_PROFILES = "key_focus_profiles"
         private const val KEY_ACTIVE_FOCUS_PROFILE = "key_active_focus_profile"
+        private const val KEY_ACTIVE_COLLAPSED = "key_active_collapsed"
+        private const val KEY_PUNTED_COLLAPSED = "key_punted_collapsed"
 
         fun getCleanTrimmed(reminderText: String): String {
             return reminderText.replace(Regex("(?i)\\s*#done\\b"), "").trim().lowercase()
@@ -99,6 +101,10 @@ class MainActivity : AppCompatActivity() {
     private var currentFilter = ReminderFilter.ALL
     private var currentSearchQuery = ""
     private var activeFocusProfileName: String? = null
+    var isActiveCollapsed = false
+        private set
+    var isPuntedCollapsed = false
+        private set
     private val recentlyDoneReminders = mutableSetOf<String>()
 
     private val searchHandler = android.os.Handler(android.os.Looper.getMainLooper())
@@ -906,6 +912,24 @@ class MainActivity : AppCompatActivity() {
             .putString(KEY_ACTIVE_FOCUS_PROFILE, "")
             .apply()
         updateSearchInputHint()
+        updateSummaryAndAdapter()
+    }
+
+    fun toggleActiveCollapsed() {
+        isActiveCollapsed = !isActiveCollapsed
+        getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_ACTIVE_COLLAPSED, isActiveCollapsed)
+            .apply()
+        updateSummaryAndAdapter()
+    }
+
+    fun togglePuntedCollapsed() {
+        isPuntedCollapsed = !isPuntedCollapsed
+        getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_PUNTED_COLLAPSED, isPuntedCollapsed)
+            .apply()
         updateSummaryAndAdapter()
     }
 
