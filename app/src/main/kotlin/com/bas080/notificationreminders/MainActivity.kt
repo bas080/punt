@@ -53,8 +53,6 @@ class MainActivity : AppCompatActivity() {
         private const val KEY_REMINDER_FILTER = "key_reminder_filter"
         private const val KEY_SEARCH_QUERY = "key_search_query"
         private const val PREFS_SNOOZE_FREQ = "snooze_freq_prefs"
-        private const val KEY_FAB_REL_X = "key_fab_rel_x"
-        private const val KEY_FAB_REL_Y = "key_fab_rel_y"
         private const val KEY_FOCUS_PROFILES = "key_focus_profiles"
         private const val KEY_ACTIVE_FOCUS_PROFILE = "key_active_focus_profile"
         private const val KEY_ACTIVE_COLLAPSED = "key_active_collapsed"
@@ -172,14 +170,14 @@ class MainActivity : AppCompatActivity() {
             val keypadHeight = screenHeight - rect.bottom
             val isKeyboardOpen = keypadHeight > screenHeight * 0.15
             if (isKeyboardOpen) {
-                binding.fabPillMenuContainer.visibility = View.GONE
+                binding.menuContainer.visibility = View.GONE
             }
         }
 
         ViewCompat.setOnApplyWindowInsetsListener(rootView) { _, insets ->
             val isImeVisible = insets.isVisible(WindowInsetsCompat.Type.ime())
             if (isImeVisible) {
-                binding.fabPillMenuContainer.visibility = View.GONE
+                binding.menuContainer.visibility = View.GONE
             }
             insets
         }
@@ -216,16 +214,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupNavigation() {
-        markAsButtonAccessibility(binding.btnNavReminders)
-        markAsButtonAccessibility(binding.btnNavAbout)
         markAsButtonAccessibility(binding.btnClearLogs)
         markAsButtonAccessibility(binding.btnExportMarkdown)
         markAsButtonAccessibility(binding.btnImportMarkdown)
         markAsButtonAccessibility(binding.btnDonate)
         markAsButtonAccessibility(binding.btnToggleCalendarSync)
-        markAsButtonAccessibility(binding.btnResetFabPosition)
         markAsButtonAccessibility(binding.btnFeedback)
-        markAsButtonAccessibility(binding.btnTagsFilter)
+        markAsButtonAccessibility(binding.btnMenu)
 
         updateCalendarSyncButtonText()
 
@@ -259,9 +254,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        binding.btnResetFabPosition.setOnClickListener {
-            resetFabPosition()
-        }
         markAsButtonAccessibility(binding.btnEmptyClearFilter)
 
         binding.btnEmptyClearFilter.setOnClickListener {
@@ -274,72 +266,52 @@ class MainActivity : AppCompatActivity() {
             clearFocusProfileAction()
         }
 
-        markAsButtonAccessibility(binding.fabMenu)
-        markAsButtonAccessibility(binding.btnFabFocusProfiles)
-        markAsButtonAccessibility(binding.btnFabPuntAll)
-        markAsButtonAccessibility(binding.btnFabShareMatching)
+        markAsButtonAccessibility(binding.btnMenuFocusProfiles)
+        markAsButtonAccessibility(binding.btnMenuFilter)
+        markAsButtonAccessibility(binding.btnMenuPuntAll)
+        markAsButtonAccessibility(binding.btnMenuShareMatching)
 
-        val updateFabState = { isExpanded: Boolean ->
-            if (isExpanded) {
-                binding.fabMenu.setBackgroundResource(R.drawable.bg_fab_circle)
-                binding.fabMenu.setColorFilter(ContextCompat.getColor(this, R.color.bg_dark))
-            } else {
-                binding.fabMenu.setBackgroundResource(R.drawable.bg_fab_circle_normal)
-                binding.fabMenu.setColorFilter(ContextCompat.getColor(this, R.color.text_primary))
-            }
+        val toggleMenu = {
+            val isCurrentlyExpanded = binding.menuContainer.visibility == View.VISIBLE
+            binding.menuContainer.visibility = if (!isCurrentlyExpanded) View.VISIBLE else View.GONE
         }
 
-        val toggleFabMenu = {
-            val isCurrentlyExpanded = binding.fabPillMenuContainer.visibility == View.VISIBLE
-            val willBeExpanded = !isCurrentlyExpanded
-            binding.fabPillMenuContainer.visibility = if (willBeExpanded) View.VISIBLE else View.GONE
-            updateFabState(willBeExpanded)
+        val collapseMenu = {
+            binding.menuContainer.visibility = View.GONE
         }
 
-        val collapseFabMenu = {
-            if (binding.fabPillMenuContainer.visibility == View.VISIBLE) {
-                binding.fabPillMenuContainer.visibility = View.GONE
-                updateFabState(false)
-            }
-        }
-
-        binding.fabMenu.setOnClickListener {
-            toggleFabMenu()
+        binding.btnMenu.setOnClickListener {
+            toggleMenu()
         }
 
         binding.remindersContainer.setOnClickListener {
-            collapseFabMenu()
+            collapseMenu()
         }
 
         binding.aboutContainer.setOnClickListener {
-            collapseFabMenu()
+            collapseMenu()
         }
 
-        binding.btnNavReminders.setOnClickListener {
-            collapseFabMenu()
-            showRemindersView()
-        }
-
-        binding.btnNavAbout.setOnClickListener {
-            collapseFabMenu()
-            showAboutView()
-        }
-
-        binding.btnFabFocusProfiles.setOnClickListener {
-            collapseFabMenu()
+        binding.btnMenuFocusProfiles.setOnClickListener {
+            collapseMenu()
             showFocusProfilesDialog()
         }
 
-        binding.btnFabPuntAll.setOnClickListener {
-            collapseFabMenu()
+        binding.btnMenuFilter.setOnClickListener {
+            collapseMenu()
+            showTagsSelectionDialog()
+        }
+
+        binding.btnMenuPuntAll.setOnClickListener {
+            collapseMenu()
             val activeList = displayedReminders.filter {
                 it != HEADER_SNOOZED_SECTION_MARKER && !it.contains("#done", ignoreCase = true)
             }
             showBulkSnoozeDialog(activeList)
         }
 
-        binding.btnFabShareMatching.setOnClickListener {
-            collapseFabMenu()
+        binding.btnMenuShareMatching.setOnClickListener {
+            collapseMenu()
             val activeList = displayedReminders.filter {
                 it != HEADER_SNOOZED_SECTION_MARKER && !it.contains("#done", ignoreCase = true)
             }
@@ -366,247 +338,6 @@ class MainActivity : AppCompatActivity() {
         binding.btnImportMarkdown.setOnClickListener {
             showImportMarkdownDialog()
         }
-
-        binding.btnTagsFilter.setOnClickListener {
-            showTagsSelectionDialog()
-        }
-
-        setupDraggableFab()
-    }
-
-    private fun updatePillMenuDirection() {
-        val rootWidth = binding.root.width.takeIf { it > 0 } ?: return
-        val rootHeight = binding.root.height.takeIf { it > 0 } ?: return
-
-        val location = IntArray(2)
-        binding.fabMenu.getLocationOnScreen(location)
-        val fabCenterX = location[0] + binding.fabMenu.width / 2
-        val fabCenterY = location[1] + binding.fabMenu.height / 2
-
-        val isTopHalf = fabCenterY < rootHeight / 2
-        val isLeftHalf = fabCenterX < rootWidth / 2
-
-        val density = resources.displayMetrics.density
-        val margin14 = (14 * density).toInt()
-
-        val fabParams = binding.fabMenu.layoutParams as? android.widget.RelativeLayout.LayoutParams ?: return
-        fabParams.removeRule(android.widget.RelativeLayout.ALIGN_PARENT_START)
-        fabParams.removeRule(android.widget.RelativeLayout.ALIGN_PARENT_END)
-
-        val pillParams = binding.fabPillMenuContainer.layoutParams as? android.widget.RelativeLayout.LayoutParams ?: return
-        pillParams.removeRule(android.widget.RelativeLayout.ABOVE)
-        pillParams.removeRule(android.widget.RelativeLayout.BELOW)
-        pillParams.removeRule(android.widget.RelativeLayout.ALIGN_START)
-        pillParams.removeRule(android.widget.RelativeLayout.ALIGN_END)
-
-        if (isTopHalf) {
-            pillParams.addRule(android.widget.RelativeLayout.BELOW, R.id.fab_menu)
-            pillParams.topMargin = margin14
-            pillParams.bottomMargin = 0
-        } else {
-            pillParams.addRule(android.widget.RelativeLayout.ABOVE, R.id.fab_menu)
-            pillParams.bottomMargin = margin14
-            pillParams.topMargin = 0
-        }
-
-        val targetGravity = if (isLeftHalf) android.view.Gravity.START else android.view.Gravity.END
-        if (isLeftHalf) {
-            fabParams.addRule(android.widget.RelativeLayout.ALIGN_PARENT_START)
-            pillParams.addRule(android.widget.RelativeLayout.ALIGN_START, R.id.fab_menu)
-        } else {
-            fabParams.addRule(android.widget.RelativeLayout.ALIGN_PARENT_END)
-            pillParams.addRule(android.widget.RelativeLayout.ALIGN_END, R.id.fab_menu)
-        }
-
-        binding.fabMenu.layoutParams = fabParams
-
-        binding.fabPillMenuContainer.gravity = targetGravity
-        (binding.btnNavReminders.layoutParams as? android.widget.LinearLayout.LayoutParams)?.gravity = targetGravity
-        (binding.btnNavAbout.layoutParams as? android.widget.LinearLayout.LayoutParams)?.gravity = targetGravity
-        (binding.btnFabFocusProfiles.layoutParams as? android.widget.LinearLayout.LayoutParams)?.gravity = targetGravity
-        (binding.btnFabPuntAll.layoutParams as? android.widget.LinearLayout.LayoutParams)?.gravity = targetGravity
-        (binding.btnFabShareMatching.layoutParams as? android.widget.LinearLayout.LayoutParams)?.gravity = targetGravity
-
-        binding.fabPillMenuContainer.layoutParams = pillParams
-
-        val containerParams = binding.layoutFabContainer.layoutParams as? android.widget.FrameLayout.LayoutParams
-        if (containerParams != null) {
-            val desiredGravity = android.view.Gravity.BOTTOM or (if (isLeftHalf) android.view.Gravity.START else android.view.Gravity.END)
-            if (containerParams.gravity != desiredGravity) {
-                val currentFabLoc = IntArray(2)
-                binding.fabMenu.getLocationOnScreen(currentFabLoc)
-
-                containerParams.gravity = desiredGravity
-                binding.layoutFabContainer.layoutParams = containerParams
-                binding.layoutFabContainer.requestLayout()
-
-                binding.layoutFabContainer.post {
-                    val newFabLoc = IntArray(2)
-                    binding.fabMenu.getLocationOnScreen(newFabLoc)
-                    val dx = currentFabLoc[0] - newFabLoc[0]
-                    val dy = currentFabLoc[1] - newFabLoc[1]
-                    binding.layoutFabContainer.translationX += dx
-                    binding.layoutFabContainer.translationY += dy
-                }
-            }
-        }
-    }
-
-    private fun setupDraggableFab() {
-        binding.layoutFabContainer.bringToFront()
-
-        var startRawX = 0f
-        var startRawY = 0f
-        var initialTranslationX = 0f
-        var initialTranslationY = 0f
-        var isDragging = false
-        val longPressHandler = android.os.Handler(android.os.Looper.getMainLooper())
-        val touchSlop = android.view.ViewConfiguration.get(this).scaledTouchSlop
-
-        val longPressRunnable = Runnable {
-            isDragging = true
-            try {
-                binding.fabMenu.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
-            } catch (_: Exception) {}
-            binding.fabMenu.animate().scaleX(1.15f).scaleY(1.15f).setDuration(100).start()
-        }
-
-        binding.fabMenu.setOnTouchListener { view, event ->
-            if (binding.fabPillMenuContainer.visibility == View.VISIBLE) {
-                longPressHandler.removeCallbacks(longPressRunnable)
-                return@setOnTouchListener false
-            }
-
-            when (event.action) {
-                android.view.MotionEvent.ACTION_DOWN -> {
-                    startRawX = event.rawX
-                    startRawY = event.rawY
-                    initialTranslationX = binding.layoutFabContainer.translationX
-                    initialTranslationY = binding.layoutFabContainer.translationY
-                    isDragging = false
-                    longPressHandler.postDelayed(longPressRunnable, android.view.ViewConfiguration.getLongPressTimeout().toLong())
-                    true
-                }
-                android.view.MotionEvent.ACTION_MOVE -> {
-                    val dx = event.rawX - startRawX
-                    val dy = event.rawY - startRawY
-                    if (!isDragging && Math.hypot(dx.toDouble(), dy.toDouble()) > touchSlop) {
-                        longPressHandler.removeCallbacks(longPressRunnable)
-                    }
-                    if (isDragging) {
-                        binding.layoutFabContainer.translationX = initialTranslationX + dx
-                        binding.layoutFabContainer.translationY = initialTranslationY + dy
-                    }
-                    true
-                }
-                android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
-                    longPressHandler.removeCallbacks(longPressRunnable)
-                    if (isDragging) {
-                        isDragging = false
-                        binding.fabMenu.animate().scaleX(1.0f).scaleY(1.0f).setDuration(100).start()
-                        clampAndSaveFabPosition()
-                    } else {
-                        view.performClick()
-                    }
-                    true
-                }
-                else -> false
-            }
-        }
-
-        restoreFabPosition()
-    }
-
-    private fun clampAndSaveFabPosition() {
-        val rootWidth = binding.root.width.toFloat().takeIf { it > 0f } ?: return
-        val rootHeight = binding.root.height.toFloat().takeIf { it > 0f } ?: return
-
-        val rootLoc = IntArray(2)
-        binding.root.getLocationOnScreen(rootLoc)
-
-        val container = binding.layoutFabContainer
-        val containerLoc = IntArray(2)
-        container.getLocationOnScreen(containerLoc)
-
-        val containerXInRoot = containerLoc[0] - rootLoc[0]
-        val containerYInRoot = containerLoc[1] - rootLoc[1]
-
-        val centerXInRoot = containerXInRoot + container.width / 2f
-        val centerYInRoot = containerYInRoot + container.height / 2f
-
-        val relX = (centerXInRoot / rootWidth).coerceIn(0.05f, 0.95f)
-        val relY = (centerYInRoot / rootHeight).coerceIn(0.05f, 0.95f)
-
-        getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
-            .edit()
-            .putFloat(KEY_FAB_REL_X, relX)
-            .putFloat(KEY_FAB_REL_Y, relY)
-            .apply()
-
-        updatePillMenuDirection()
-    }
-
-    private fun restoreFabPosition() {
-        binding.root.post {
-            val rootWidth = binding.root.width.toFloat().takeIf { it > 0f } ?: return@post
-            val rootHeight = binding.root.height.toFloat().takeIf { it > 0f } ?: return@post
-
-            val prefs = getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
-            val relX = prefs.getFloat(KEY_FAB_REL_X, -1f)
-            val relY = prefs.getFloat(KEY_FAB_REL_Y, -1f)
-
-            if (relX >= 0f && relY >= 0f) {
-                val container = binding.layoutFabContainer
-                val fab = binding.fabMenu
-
-                val rootLoc = IntArray(2)
-                binding.root.getLocationOnScreen(rootLoc)
-
-                val fabLoc = IntArray(2)
-                fab.getLocationOnScreen(fabLoc)
-
-                val currentFabXInRoot = (fabLoc[0] - rootLoc[0]) - container.translationX
-                val currentFabYInRoot = (fabLoc[1] - rootLoc[1]) - container.translationY
-
-                val targetCenterXInRoot = relX * rootWidth
-                val targetCenterYInRoot = relY * rootHeight
-
-                val targetFabXInRoot = targetCenterXInRoot - fab.width / 2f
-                val targetFabYInRoot = targetCenterYInRoot - fab.height / 2f
-
-                val pad = 16 * resources.displayMetrics.density
-                val minFabLeft = pad
-                val maxFabLeft = rootWidth - pad - fab.width
-                val minFabTop = pad
-                val maxFabTop = rootHeight - pad - fab.height
-
-                val clampedFabXInRoot = targetFabXInRoot.coerceIn(minFabLeft, maxFabLeft)
-                val clampedFabYInRoot = targetFabYInRoot.coerceIn(minFabTop, maxFabTop)
-
-                container.translationX = clampedFabXInRoot - currentFabXInRoot
-                container.translationY = clampedFabYInRoot - currentFabYInRoot
-                updatePillMenuDirection()
-            }
-        }
-    }
-
-    private fun resetFabPosition() {
-        getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
-            .edit()
-            .remove(KEY_FAB_REL_X)
-            .remove(KEY_FAB_REL_Y)
-            .apply()
-
-        binding.layoutFabContainer.animate()
-            .translationX(0f)
-            .translationY(0f)
-            .setDuration(200)
-            .withEndAction {
-                updatePillMenuDirection()
-            }
-            .start()
-
-        Toast.makeText(this, "FAB position reset", Toast.LENGTH_SHORT).show()
     }
 
     private fun setupSearchInput() {
@@ -1069,16 +800,10 @@ class MainActivity : AppCompatActivity() {
         binding.remindersContainer.visibility = View.VISIBLE
         binding.aboutContainer.visibility = View.GONE
 
-        binding.btnFabFocusProfiles.visibility = View.VISIBLE
-        binding.btnFabPuntAll.visibility = View.VISIBLE
-        binding.btnFabShareMatching.visibility = View.VISIBLE
-
-        binding.btnNavReminders.isSelected = true
-        binding.btnNavReminders.setTypeface(null, android.graphics.Typeface.BOLD)
-        binding.btnNavReminders.setTextColor(ContextCompat.getColor(this, R.color.bg_dark))
-        binding.btnNavAbout.isSelected = false
-        binding.btnNavAbout.setTypeface(null, android.graphics.Typeface.BOLD)
-        binding.btnNavAbout.setTextColor(ContextCompat.getColor(this, R.color.bg_dark))
+        binding.btnMenuFocusProfiles.visibility = View.VISIBLE
+        binding.btnMenuFilter.visibility = View.VISIBLE
+        binding.btnMenuPuntAll.visibility = View.VISIBLE
+        binding.btnMenuShareMatching.visibility = View.VISIBLE
     }
 
     private fun showCalendarPermissionSettingsDialog() {
@@ -1110,16 +835,10 @@ class MainActivity : AppCompatActivity() {
         binding.remindersContainer.visibility = View.GONE
         binding.aboutContainer.visibility = View.VISIBLE
 
-        binding.btnFabFocusProfiles.visibility = View.GONE
-        binding.btnFabPuntAll.visibility = View.GONE
-        binding.btnFabShareMatching.visibility = View.GONE
-
-        binding.btnNavReminders.isSelected = false
-        binding.btnNavReminders.setTypeface(null, android.graphics.Typeface.BOLD)
-        binding.btnNavReminders.setTextColor(ContextCompat.getColor(this, R.color.bg_dark))
-        binding.btnNavAbout.isSelected = true
-        binding.btnNavAbout.setTypeface(null, android.graphics.Typeface.BOLD)
-        binding.btnNavAbout.setTextColor(ContextCompat.getColor(this, R.color.bg_dark))
+        binding.btnMenuFocusProfiles.visibility = View.GONE
+        binding.btnMenuFilter.visibility = View.GONE
+        binding.btnMenuPuntAll.visibility = View.GONE
+        binding.btnMenuShareMatching.visibility = View.GONE
 
         try {
             val pInfo = packageManager.getPackageInfo(packageName, 0)

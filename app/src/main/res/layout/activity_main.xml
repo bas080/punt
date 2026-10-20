@@ -57,14 +57,14 @@
                     android:paddingHorizontal="4dp"
                     android:background="@null" />
 
-                <!-- Filter Icon Button -->
+                <!-- Menu Action Button replacing old filter button -->
                 <ImageView
-                    android:id="@+id/btn_tags_filter"
+                    android:id="@+id/btn_menu"
                     android:layout_width="32dp"
                     android:layout_height="32dp"
-                    android:src="@drawable/ic_action_filter"
-                    app:tint="@color/accent"
-                    android:contentDescription="Filter reminders"
+                    android:src="@drawable/ic_action_menu"
+                    app:tint="@color/text_primary"
+                    android:contentDescription="Menu"
                     android:scaleType="centerInside"
                     android:padding="4dp"
                     android:layout_marginStart="4dp"
@@ -248,22 +248,6 @@
                                 android:focusable="true"
                                 android:background="?attr/selectableItemBackground" />
 
-                            <TextView
-                                android:id="@+id/btn_reset_fab_position"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@string/reset_fab_position"
-                                android:textSize="12sp"
-                                android:textStyle="bold"
-                                android:textColor="@color/accent"
-                                android:letterSpacing="0.05"
-                                android:paddingVertical="6dp"
-                                android:paddingHorizontal="8dp"
-                                android:layout_marginStart="8dp"
-                                android:clickable="true"
-                                android:focusable="true"
-                                android:background="?attr/selectableItemBackground" />
-
                         </LinearLayout>
                     </HorizontalScrollView>
 
@@ -375,199 +359,164 @@
 
         </LinearLayout>
 
-        <!-- Floating Bottom-Right Hamburger FAB Menu Overlay Container -->
-        <RelativeLayout
-            android:id="@+id/layout_fab_container"
+        <!-- Top Menu Pill Overlay Container -->
+        <LinearLayout
+            android:id="@+id/menu_container"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_gravity="bottom|end"
-            android:clipToPadding="false"
-            android:clipChildren="false"
-            android:paddingEnd="16dp"
-            android:paddingBottom="32dp">
+            android:layout_gravity="top|end"
+            android:layout_marginTop="50dp"
+            android:layout_marginEnd="4dp"
+            android:orientation="vertical"
+            android:gravity="end"
+            android:visibility="gone"
+            android:elevation="12dp"
+            android:translationZ="12dp">
 
-            <!-- Floating Action Button (FAB) -->
-            <ImageView
-                android:id="@+id/fab_menu"
-                android:layout_width="56dp"
-                android:layout_height="56dp"
-                android:layout_alignParentBottom="true"
-                android:layout_alignParentEnd="true"
-                android:src="@drawable/ic_action_menu"
-                app:tint="@color/text_primary"
-                android:contentDescription="Navigation menu"
-                android:scaleType="centerInside"
-                android:padding="14dp"
+            <!-- Action Pill: Focus -->
+            <LinearLayout
+                android:id="@+id/btn_menu_focus_profiles"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:paddingHorizontal="18dp"
                 android:elevation="12dp"
                 android:translationZ="12dp"
                 android:clickable="true"
                 android:focusable="true"
-                android:background="@drawable/bg_fab_circle_normal" />
+                android:background="@drawable/bg_pill_inverted"
+                android:layout_marginBottom="8dp">
 
-            <!-- Vertical Upward Expanded Pill Stack -->
-            <LinearLayout
-                android:id="@+id/fab_pill_menu_container"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_above="@id/fab_menu"
-                android:layout_alignEnd="@id/fab_menu"
-                android:orientation="vertical"
-                android:gravity="end"
-                android:visibility="gone"
-                android:clipToPadding="false"
-                android:clipChildren="false"
-                android:layout_marginBottom="14dp">
+                <ImageView
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:src="@drawable/ic_action_filter"
+                    app:tint="@color/bg_dark"
+                    android:contentDescription="Focus"
+                    android:scaleType="centerInside"
+                    android:layout_marginEnd="8dp" />
 
-                <!-- Navigation Pill: Tasks -->
                 <TextView
-                    android:id="@+id/btn_nav_reminders"
                     android:layout_width="wrap_content"
-                    android:layout_height="40dp"
-                    android:gravity="center"
-                    android:text="@string/nav_reminders"
+                    android:layout_height="wrap_content"
+                    android:text="Focus"
                     android:textSize="14sp"
                     android:textStyle="bold"
-                    android:textColor="@color/bg_dark"
-                    android:paddingHorizontal="20dp"
                     android:maxLines="1"
                     android:singleLine="true"
-                    android:elevation="12dp"
-                    android:translationZ="12dp"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:background="@drawable/bg_pill_inverted"
-                    android:layout_marginBottom="10dp" />
-
-                <!-- Navigation Pill: About -->
-                <TextView
-                    android:id="@+id/btn_nav_about"
-                    android:layout_width="wrap_content"
-                    android:layout_height="40dp"
-                    android:gravity="center"
-                    android:text="@string/nav_about"
-                    android:textSize="14sp"
-                    android:textStyle="bold"
-                    android:textColor="@color/bg_dark"
-                    android:paddingHorizontal="20dp"
-                    android:maxLines="1"
-                    android:singleLine="true"
-                    android:elevation="12dp"
-                    android:translationZ="12dp"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:background="@drawable/bg_pill_inverted"
-                    android:layout_marginBottom="10dp" />
-
-                <!-- Action Pill: Focus -->
-                <LinearLayout
-                    android:id="@+id/btn_fab_focus_profiles"
-                    android:layout_width="wrap_content"
-                    android:layout_height="40dp"
-                    android:orientation="horizontal"
-                    android:gravity="center"
-                    android:paddingHorizontal="18dp"
-                    android:elevation="12dp"
-                    android:translationZ="12dp"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:background="@drawable/bg_pill_inverted"
-                    android:layout_marginBottom="10dp">
-
-                    <ImageView
-                        android:layout_width="18dp"
-                        android:layout_height="18dp"
-                        android:src="@drawable/ic_action_filter"
-                        app:tint="@color/bg_dark"
-                        android:contentDescription="Focus"
-                        android:scaleType="centerInside"
-                        android:layout_marginEnd="8dp" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Focus"
-                        android:textSize="14sp"
-                        android:textStyle="bold"
-                        android:maxLines="1"
-                        android:singleLine="true"
-                        android:textColor="@color/bg_dark" />
-
-                </LinearLayout>
-
-                <!-- Action Pill: Punt -->
-                <LinearLayout
-                    android:id="@+id/btn_fab_punt_all"
-                    android:layout_width="wrap_content"
-                    android:layout_height="40dp"
-                    android:orientation="horizontal"
-                    android:gravity="center"
-                    android:paddingHorizontal="18dp"
-                    android:elevation="12dp"
-                    android:translationZ="12dp"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:background="@drawable/bg_pill_inverted"
-                    android:layout_marginBottom="10dp">
-
-                    <ImageView
-                        android:layout_width="18dp"
-                        android:layout_height="18dp"
-                        android:src="@drawable/ic_action_snooze"
-                        app:tint="@color/bg_dark"
-                        android:contentDescription="Punt"
-                        android:scaleType="centerInside"
-                        android:layout_marginEnd="8dp" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Punt"
-                        android:textSize="14sp"
-                        android:textStyle="bold"
-                        android:maxLines="1"
-                        android:singleLine="true"
-                        android:textColor="@color/bg_dark" />
-
-                </LinearLayout>
-
-                <!-- Action Pill: Share -->
-                <LinearLayout
-                    android:id="@+id/btn_fab_share_matching"
-                    android:layout_width="wrap_content"
-                    android:layout_height="40dp"
-                    android:orientation="horizontal"
-                    android:gravity="center"
-                    android:paddingHorizontal="18dp"
-                    android:elevation="12dp"
-                    android:translationZ="12dp"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:background="@drawable/bg_pill_inverted">
-
-                    <ImageView
-                        android:layout_width="18dp"
-                        android:layout_height="18dp"
-                        android:src="@drawable/ic_action_share"
-                        app:tint="@color/bg_dark"
-                        android:contentDescription="Share"
-                        android:scaleType="centerInside"
-                        android:layout_marginEnd="8dp" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Share"
-                        android:textSize="14sp"
-                        android:textStyle="bold"
-                        android:maxLines="1"
-                        android:singleLine="true"
-                        android:textColor="@color/bg_dark" />
-
-                </LinearLayout>
+                    android:textColor="@color/bg_dark" />
 
             </LinearLayout>
 
-        </RelativeLayout>
+            <!-- Action Pill: Filter -->
+            <LinearLayout
+                android:id="@+id/btn_menu_filter"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:paddingHorizontal="18dp"
+                android:elevation="12dp"
+                android:translationZ="12dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="@drawable/bg_pill_inverted"
+                android:layout_marginBottom="8dp">
+
+                <ImageView
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:src="@drawable/ic_action_filter"
+                    app:tint="@color/bg_dark"
+                    android:contentDescription="Filter"
+                    android:scaleType="centerInside"
+                    android:layout_marginEnd="8dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Filter"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:maxLines="1"
+                    android:singleLine="true"
+                    android:textColor="@color/bg_dark" />
+
+            </LinearLayout>
+
+            <!-- Action Pill: Punt -->
+            <LinearLayout
+                android:id="@+id/btn_menu_punt_all"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:paddingHorizontal="18dp"
+                android:elevation="12dp"
+                android:translationZ="12dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="@drawable/bg_pill_inverted"
+                android:layout_marginBottom="8dp">
+
+                <ImageView
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:src="@drawable/ic_action_snooze"
+                    app:tint="@color/bg_dark"
+                    android:contentDescription="Punt"
+                    android:scaleType="centerInside"
+                    android:layout_marginEnd="8dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Punt"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:maxLines="1"
+                    android:singleLine="true"
+                    android:textColor="@color/bg_dark" />
+
+            </LinearLayout>
+
+            <!-- Action Pill: Share -->
+            <LinearLayout
+                android:id="@+id/btn_menu_share_matching"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:paddingHorizontal="18dp"
+                android:elevation="12dp"
+                android:translationZ="12dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="@drawable/bg_pill_inverted">
+
+                <ImageView
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:src="@drawable/ic_action_share"
+                    app:tint="@color/bg_dark"
+                    android:contentDescription="Share"
+                    android:scaleType="centerInside"
+                    android:layout_marginEnd="8dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Share"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:maxLines="1"
+                    android:singleLine="true"
+                    android:textColor="@color/bg_dark" />
+
+            </LinearLayout>
+
+        </LinearLayout>
 
     </FrameLayout>
 
