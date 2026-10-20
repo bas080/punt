@@ -126,8 +126,8 @@ class ScreenshotGeneratorTest {
         btnMenu?.performClick()
         shadowOf(Looper.getMainLooper()).idle()
 
-        val btnFilter = activity.findViewById<View>(R.id.btn_menu_filter)
-        btnFilter?.performClick()
+        val btnFocus = activity.findViewById<View>(R.id.btn_menu_focus_profiles)
+        btnFocus?.performClick()
         shadowOf(Looper.getMainLooper()).idle()
 
         val dialog = ShadowAlertDialog.getLatestDialog()
