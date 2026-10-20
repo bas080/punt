@@ -46,6 +46,13 @@ enum class ReminderFilter { ALL, ACTIVE, SNOOZED }
 const val HEADER_ACTIVE_SECTION_MARKER = "HEADER_ACTIVE_SECTION_MARKER"
 const val HEADER_SNOOZED_SECTION_MARKER = "HEADER_SNOOZED_SECTION_MARKER"
 
+data class SectionState(
+    val activeCount: Int = 0,
+    val puntedCount: Int = 0,
+    val isActiveCollapsed: Boolean = false,
+    val isPuntedCollapsed: Boolean = false
+)
+
 class MainActivity : AppCompatActivity() {
 
     companion object {
@@ -1675,7 +1682,16 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        adapter.updateList(sorted, snoozeMap, activeItems.size, snoozedItems.size, isActiveCollapsed, isPuntedCollapsed)
+        adapter.updateList(
+            sorted,
+            snoozeMap,
+            SectionState(
+                activeCount = activeItems.size,
+                puntedCount = snoozedItems.size,
+                isActiveCollapsed = isActiveCollapsed,
+                isPuntedCollapsed = isPuntedCollapsed
+            )
+        )
         updateSummary()
 
         if (firstVisiblePos != RecyclerView.NO_POSITION && firstVisiblePos < sorted.size) {
@@ -2024,10 +2040,7 @@ class RemindersAdapter(
     }
 
     private val currentSnoozeMap = mutableMapOf<String, Long>()
-    private var activeCount = 0
-    private var puntedCount = 0
-    private var isActiveCollapsed = false
-    private var isPuntedCollapsed = false
+    private var sectionState = SectionState()
 
     private class RemindersDiffCallback(
         private val oldList: List<String>,
@@ -2092,10 +2105,7 @@ class RemindersAdapter(
     fun updateList(
         newList: List<String>,
         newSnoozeMap: Map<String, Long> = emptyMap(),
-        activeCount: Int = 0,
-        puntedCount: Int = 0,
-        isActiveCollapsed: Boolean = false,
-        isPuntedCollapsed: Boolean = false
+        sectionState: SectionState = SectionState()
     ) {
         val diffCallback = RemindersDiffCallback(displayedReminders, newList, currentSnoozeMap, newSnoozeMap)
         val diffResult = androidx.recyclerview.widget.DiffUtil.calculateDiff(diffCallback)
@@ -2103,10 +2113,7 @@ class RemindersAdapter(
         displayedReminders.addAll(newList)
         currentSnoozeMap.clear()
         currentSnoozeMap.putAll(newSnoozeMap)
-        this.activeCount = activeCount
-        this.puntedCount = puntedCount
-        this.isActiveCollapsed = isActiveCollapsed
-        this.isPuntedCollapsed = isPuntedCollapsed
+        this.sectionState = sectionState
         diffResult.dispatchUpdatesTo(this)
     }
 
@@ -2154,14 +2161,14 @@ class RemindersAdapter(
             val item = displayedReminders[position]
             val context = holder.itemView.context
             if (item == HEADER_ACTIVE_SECTION_MARKER) {
-                val arrow = if (isActiveCollapsed) "▼" else "▲"
-                holder.txtHeaderTitle.text = "ACTIVE ($activeCount) $arrow"
+                val arrow = if (sectionState.isActiveCollapsed) "▼" else "▲"
+                holder.txtHeaderTitle.text = "ACTIVE (${sectionState.activeCount}) $arrow"
                 holder.layoutSectionHeader.setOnClickListener {
                     (context as? MainActivity)?.toggleActiveCollapsed()
                 }
             } else if (item == HEADER_SNOOZED_SECTION_MARKER) {
-                val arrow = if (isPuntedCollapsed) "▼" else "▲"
-                holder.txtHeaderTitle.text = "PUNTED ($puntedCount) $arrow"
+                val arrow = if (sectionState.isPuntedCollapsed) "▼" else "▲"
+                holder.txtHeaderTitle.text = "PUNTED (${sectionState.puntedCount}) $arrow"
                 holder.layoutSectionHeader.setOnClickListener {
                     (context as? MainActivity)?.togglePuntedCollapsed()
                 }
