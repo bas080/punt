@@ -1489,6 +1489,34 @@ class MainActivityTest {
     }
 
     @Test
+    fun testFocusProfilesDirectEditIconTap() {
+        val prefs = RuntimeEnvironment.getApplication().getSharedPreferences("reminders_prefs", android.content.Context.MODE_PRIVATE)
+        val profilesJson = org.json.JSONArray().apply {
+            put(org.json.JSONObject().put("name", "Work").put("query", "#work"))
+        }.toString()
+
+        prefs.edit()
+            .putString("key_focus_profiles", profilesJson)
+            .apply()
+
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = controller.get()
+
+        activity.showFocusProfilesDialog()
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        val focusDialog = ShadowAlertDialog.getLatestDialog() as? AlertDialog
+        assertNotNull(focusDialog)
+
+        // Trigger direct edit options
+        activity.showEditOrDeleteFocusProfileOptions(MainActivity.FocusProfile("Work", "#work"))
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        val editOptionsDialog = ShadowAlertDialog.getLatestDialog() as? AlertDialog
+        assertNotNull(editOptionsDialog)
+    }
+
+    @Test
     fun testFocusProfilesCreateValidationBlankName() {
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
