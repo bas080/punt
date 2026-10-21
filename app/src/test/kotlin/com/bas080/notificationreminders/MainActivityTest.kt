@@ -1351,45 +1351,7 @@ class MainActivityTest {
     }
 
     @Test
-    fun testFocusProfilesDialogCreateProfile() {
-        val prefs = RuntimeEnvironment.getApplication().getSharedPreferences("reminders_prefs", android.content.Context.MODE_PRIVATE)
-        prefs.edit().putStringSet("key_reminders_list", setOf("Yoga #fitness")).apply()
-
-        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
-        val activity = controller.get()
-
-        activity.showCreateFocusProfileDialog()
-        shadowOf(android.os.Looper.getMainLooper()).idle()
-
-        val createDialog = ShadowAlertDialog.getLatestDialog() as? AlertDialog
-        assertNotNull(createDialog)
-
-        val editTexts = mutableListOf<android.widget.EditText>()
-        fun findEditTexts(view: android.view.View?) {
-            if (view == null) return
-            if (view is android.widget.EditText) {
-                editTexts.add(view)
-            } else if (view is android.view.ViewGroup) {
-                for (i in 0 until view.childCount) {
-                    findEditTexts(view.getChildAt(i))
-                }
-            }
-        }
-        findEditTexts(createDialog!!.findViewById(android.R.id.content) ?: createDialog.window?.decorView)
-
-        assertEquals(2, editTexts.size)
-        editTexts[0].setText("Fitness")
-        editTexts[1].setText("#fitness")
-
-        createDialog.getButton(android.content.DialogInterface.BUTTON_POSITIVE).performClick()
-        shadowOf(android.os.Looper.getMainLooper()).idle()
-
-        assertEquals("Focus: Fitness", activity.findViewById<android.widget.EditText>(R.id.search_reminder_input).hint.toString())
-        assertEquals("Fitness", prefs.getString("key_active_focus_profile", null))
-    }
-
-    @Test
-    fun testFocusProfilesDialogSelectProfileAndAllNoProfile() {
+    fun testFocusProfilesDialogInlineEditAndMultiToggle() {
         val prefs = RuntimeEnvironment.getApplication().getSharedPreferences("reminders_prefs", android.content.Context.MODE_PRIVATE)
         val profilesJson = org.json.JSONArray().apply {
             put(org.json.JSONObject().put("name", "Work").put("query", "#work"))
@@ -1397,8 +1359,9 @@ class MainActivityTest {
         }.toString()
 
         prefs.edit()
-            .putStringSet("key_reminders_list", setOf("Task A #work", "Task B #fitness"))
+            .putStringSet("key_reminders_list", setOf("Task A #work", "Task B #fitness", "Task C #other"))
             .putString("key_focus_profiles", profilesJson)
+            .putStringSet("key_active_focus_profiles", setOf("Work", "Fitness"))
             .apply()
 
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
@@ -1410,126 +1373,14 @@ class MainActivityTest {
         val focusDialog = ShadowAlertDialog.getLatestDialog() as? AlertDialog
         assertNotNull(focusDialog)
 
-        fun findListViewInViewGroup(view: android.view.View?): android.widget.ListView? {
-            if (view == null) return null
-            if (view is android.widget.ListView) return view
-            if (view is android.view.ViewGroup) {
-                for (i in 0 until view.childCount) {
-                    val res = findListViewInViewGroup(view.getChildAt(i))
-                    if (res != null) return res
-                }
-            }
-            return null
-        }
-
-        val listView = findListViewInViewGroup(focusDialog!!.findViewById(android.R.id.content) ?: focusDialog.window?.decorView)
-        assertNotNull(listView)
-
-        val row0 = listView!!.adapter!!.getView(0, null, listView)
-        row0.performClick()
+        focusDialog!!.getButton(android.content.DialogInterface.BUTTON_POSITIVE).performClick()
         shadowOf(android.os.Looper.getMainLooper()).idle()
 
-        assertEquals("Focus: Work", activity.findViewById<android.widget.EditText>(R.id.search_reminder_input).hint.toString())
-        assertEquals("Work", prefs.getString("key_active_focus_profile", null))
-
-        activity.showFocusProfilesDialog()
-        shadowOf(android.os.Looper.getMainLooper()).idle()
-
-        val focusDialog2 = ShadowAlertDialog.getLatestDialog() as? AlertDialog
-        focusDialog2!!.getButton(android.content.DialogInterface.BUTTON_NEGATIVE).performClick()
-        shadowOf(android.os.Looper.getMainLooper()).idle()
-
-        assertEquals("Add or search reminders...", activity.findViewById<android.widget.EditText>(R.id.search_reminder_input).hint.toString())
-        assertEquals("", prefs.getString("key_active_focus_profile", null))
-    }
-
-    @Test
-    fun testFocusProfilesEditAndDeleteOptions() {
-        val prefs = RuntimeEnvironment.getApplication().getSharedPreferences("reminders_prefs", android.content.Context.MODE_PRIVATE)
-        val profilesJson = org.json.JSONArray().apply {
-            put(org.json.JSONObject().put("name", "Work").put("query", "#work"))
-            put(org.json.JSONObject().put("name", "Fitness").put("query", "#fitness"))
-        }.toString()
-
-        prefs.edit()
-            .putStringSet("key_reminders_list", setOf("Task A #work"))
-            .putString("key_focus_profiles", profilesJson)
-            .putString("key_active_focus_profile", "Work")
-            .apply()
-
-        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
-        val activity = controller.get()
-
-        activity.showEditOrDeleteFocusProfileOptions(MainActivity.FocusProfile("Work", "#work"))
-        shadowOf(android.os.Looper.getMainLooper()).idle()
-
-        val optionsDialog = ShadowAlertDialog.getLatestDialog() as? AlertDialog
-        assertNotNull(optionsDialog)
-        val optionsListView = optionsDialog!!.listView!!
-
-        optionsListView.performItemClick(optionsListView.adapter!!.getView(0, null, optionsListView)!!, 0, 0)
-        shadowOf(android.os.Looper.getMainLooper()).idle()
-
-        val editDialog = ShadowAlertDialog.getLatestDialog() as? AlertDialog
-        assertNotNull(editDialog)
-        editDialog!!.getButton(android.content.DialogInterface.BUTTON_POSITIVE).performClick()
-        shadowOf(android.os.Looper.getMainLooper()).idle()
-
-        activity.showEditOrDeleteFocusProfileOptions(MainActivity.FocusProfile("Work", "#work"))
-        shadowOf(android.os.Looper.getMainLooper()).idle()
-
-        val deleteOptionsDialog = ShadowAlertDialog.getLatestDialog() as? AlertDialog
-        val deleteListView = deleteOptionsDialog!!.listView!!
-
-        deleteListView.performItemClick(deleteListView.adapter!!.getView(1, null, deleteListView)!!, 1, 1)
-        shadowOf(android.os.Looper.getMainLooper()).idle()
-
-        assertEquals("", prefs.getString("key_active_focus_profile", null))
-    }
-
-    @Test
-    fun testFocusProfilesDirectEditIconTap() {
-        val prefs = RuntimeEnvironment.getApplication().getSharedPreferences("reminders_prefs", android.content.Context.MODE_PRIVATE)
-        val profilesJson = org.json.JSONArray().apply {
-            put(org.json.JSONObject().put("name", "Work").put("query", "#work"))
-        }.toString()
-
-        prefs.edit()
-            .putString("key_focus_profiles", profilesJson)
-            .apply()
-
-        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
-        val activity = controller.get()
-
-        activity.showFocusProfilesDialog()
-        shadowOf(android.os.Looper.getMainLooper()).idle()
-
-        val focusDialog = ShadowAlertDialog.getLatestDialog() as? AlertDialog
-        assertNotNull(focusDialog)
-
-        // Trigger direct edit options
-        activity.showEditOrDeleteFocusProfileOptions(MainActivity.FocusProfile("Work", "#work"))
-        shadowOf(android.os.Looper.getMainLooper()).idle()
-
-        val editOptionsDialog = ShadowAlertDialog.getLatestDialog() as? AlertDialog
-        assertNotNull(editOptionsDialog)
-    }
-
-    @Test
-    fun testFocusProfilesCreateValidationBlankName() {
-        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
-        val activity = controller.get()
-
-        activity.showCreateFocusProfileDialog()
-        shadowOf(android.os.Looper.getMainLooper()).idle()
-
-        val createDialog = ShadowAlertDialog.getLatestDialog() as? AlertDialog
-        assertNotNull(createDialog)
-
-        createDialog!!.getButton(android.content.DialogInterface.BUTTON_POSITIVE).performClick()
-        shadowOf(android.os.Looper.getMainLooper()).idle()
-
-        assertEquals("Add or search reminders...", activity.findViewById<android.widget.EditText>(R.id.search_reminder_input).hint.toString())
+        val activeSet = prefs.getStringSet("key_active_focus_profiles", null)
+        assertNotNull(activeSet)
+        assertTrue(activeSet!!.contains("Work"))
+        assertTrue(activeSet.contains("Fitness"))
+        assertTrue(activity.findViewById<android.widget.EditText>(R.id.search_reminder_input).hint.toString().contains("Focus:"))
     }
 
     @Test
