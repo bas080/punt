@@ -7,8 +7,10 @@ A feature allowing users to define, save, and select named profiles ("Focus" pro
 1. **UI Access**:
    - Access Focus Profiles via a button in the floating FAB menu that opens a dedicated "Focus Profiles" dialog.
 
-2. **Dialog Functionality**:
-   - Lists saved Focus Profiles and includes a default "All / No Profile" option to clear active profile filtering.
+2. **Dialog Functionality & Button Hierarchy**:
+   - Lists saved Focus Profiles using simple full-width buttons (no radio controls) and includes a default "All (No Focus)" button.
+   - Each profile row displays an explicit edit icon `✎` (or text link) next to the profile button so users can edit or delete that profile in a sub-dialog without needing hidden gestures.
+   - Dialog maintains standard button hierarchy: exactly one primary action button (`+ NEW FOCUS PROFILE` styled in accent color) and secondary/subtle buttons (`Clear Focus` / `Cancel` / `Delete`).
    - Allows creating new Focus Profiles pre-filled from the currently active search box text. If an existing profile is already selected when creating a new profile, the query is pre-filled as `profile query + search query`.
    - Unique profile names: Saving a profile with an existing profile name updates/overwrites that profile.
    - Allows selecting, editing, or deleting existing Focus Profiles.
