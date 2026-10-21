@@ -343,17 +343,28 @@ class ReminderNotificationListenerService : NotificationListenerService() {
             var activeCount = 0
             var snoozedCount = 0
 
-            val activeFocusProfileName = prefs.getString("key_active_focus_profile", null)
+            val savedActiveSet = prefs.getStringSet("key_active_focus_profiles", null)
+            val activeFocusProfileNames = mutableSetOf<String>()
+            if (savedActiveSet != null) {
+                activeFocusProfileNames.addAll(savedActiveSet)
+            } else {
+                val legacySingle = prefs.getString("key_active_focus_profile", null)
+                if (!legacySingle.isNullOrBlank()) {
+                    activeFocusProfileNames.add(legacySingle)
+                }
+            }
+
             val focusProfilesJson = prefs.getString("key_focus_profiles", null)
-            var focusQuery: String? = null
-            if (!activeFocusProfileName.isNullOrBlank() && !focusProfilesJson.isNullOrBlank()) {
+            val focusQueries = mutableListOf<String>()
+            if (activeFocusProfileNames.isNotEmpty() && !focusProfilesJson.isNullOrBlank()) {
                 try {
                     val jsonArray = org.json.JSONArray(focusProfilesJson)
                     for (i in 0 until jsonArray.length()) {
                         val obj = jsonArray.getJSONObject(i)
-                        if (obj.optString("name").equals(activeFocusProfileName, ignoreCase = true)) {
-                            focusQuery = obj.optString("query")
-                            break
+                        val name = obj.optString("name")
+                        if (activeFocusProfileNames.any { it.equals(name, ignoreCase = true) }) {
+                            val q = obj.optString("query")
+                            if (q.isNotBlank()) focusQueries.add(q)
                         }
                     }
                 } catch (e: org.json.JSONException) {
@@ -365,8 +376,11 @@ class ReminderNotificationListenerService : NotificationListenerService() {
                 if (reminder.contains("#done", ignoreCase = true)) {
                     continue
                 }
-                if (!focusQuery.isNullOrBlank() && !reminder.contains(focusQuery, ignoreCase = true)) {
-                    continue
+                if (focusQueries.isNotEmpty()) {
+                    val matchesAnyFocus = focusQueries.any { query ->
+                        com.bas080.notificationreminders.utils.ReminderMatcher.matchesSearchQuery(reminder, query)
+                    }
+                    if (!matchesAnyFocus) continue
                 }
                 val trimmed = reminder.trim()
                 val lower = trimmed.lowercase()
@@ -381,8 +395,9 @@ class ReminderNotificationListenerService : NotificationListenerService() {
                 }
             }
 
-            val statusText = if (!activeFocusProfileName.isNullOrBlank()) {
-                getString(R.string.reminders_summary_focus, activeFocusProfileName, activeCount, snoozedCount)
+            val namesSummary = activeFocusProfileNames.joinToString(", ")
+            val statusText = if (activeFocusProfileNames.isNotEmpty()) {
+                getString(R.string.reminders_summary_focus, namesSummary, activeCount, snoozedCount)
             } else if (activeCount == 0 && snoozedCount == 0) {
                 getString(R.string.no_active_reminders)
             } else {
