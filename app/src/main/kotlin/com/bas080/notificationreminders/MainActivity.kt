@@ -1584,8 +1584,8 @@ class MainActivity : AppCompatActivity() {
         val accentColor = ContextCompat.getColor(this, R.color.accent)
 
         class FocusItemViewHolder(view: android.view.View) {
-            val btnSelect: android.widget.TextView = view.findViewById(101)
-            val btnEdit: android.widget.TextView = view.findViewById(102)
+            val btnSelect: android.widget.TextView = view.findViewById(R.id.btn_focus_select)
+            val btnEdit: android.widget.TextView = view.findViewById(R.id.btn_focus_edit)
         }
 
         val adapter = object : android.widget.BaseAdapter() {
@@ -1610,13 +1610,13 @@ class MainActivity : AppCompatActivity() {
                     }
 
                     val btnSelect = android.widget.TextView(this@MainActivity).apply {
-                        id = 101
+                        id = R.id.btn_focus_select
                         textSize = 16f
                         layoutParams = android.widget.LinearLayout.LayoutParams(0, android.view.ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
                     }
 
                     val btnEdit = android.widget.TextView(this@MainActivity).apply {
-                        id = 102
+                        id = R.id.btn_focus_edit
                         textSize = 18f
                         text = "✎"
                         setPadding((12 * density).toInt(), (4 * density).toInt(), (12 * density).toInt(), (4 * density).toInt())
@@ -1678,17 +1678,18 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Handle direct edit button tap
-        listView.setOnTouchListener { _, event ->
+        listView.setOnTouchListener { v, event ->
             if (event.action == android.view.MotionEvent.ACTION_UP) {
                 val pos = listView.pointToPosition(event.x.toInt(), event.y.toInt())
                 if (pos > 0) {
                     val child = listView.getChildAt(pos - listView.firstVisiblePosition)
                     if (child is android.view.ViewGroup) {
-                        val editBtn = child.findViewById<android.view.View>(102)
+                        val editBtn = child.findViewById<android.view.View>(R.id.btn_focus_edit)
                         if (editBtn != null && editBtn.visibility == android.view.View.VISIBLE) {
                             val rect = android.graphics.Rect()
                             editBtn.getGlobalVisibleRect(rect)
                             if (rect.contains(event.rawX.toInt(), event.rawY.toInt())) {
+                                v.performClick()
                                 dialogRef?.dismiss()
                                 showEditOrDeleteFocusProfileOptions(profiles[pos - 1])
                                 return@setOnTouchListener true
