@@ -1591,11 +1591,9 @@ class MainActivity : AppCompatActivity() {
         }
 
         val adapter = object : android.widget.BaseAdapter() {
-            override fun getCount(): Int = profiles.size + 1
+            override fun getCount(): Int = profiles.size
 
-            override fun getItem(position: Int): Any {
-                return if (position == 0) "All (No Focus)" else profiles[position - 1]
-            }
+            override fun getItem(position: Int): Any = profiles[position]
 
             override fun getItemId(position: Int): Long = position.toLong()
 
@@ -1639,40 +1637,28 @@ class MainActivity : AppCompatActivity() {
                     holder = view.tag as FocusItemViewHolder
                 }
 
-                if (position == 0) {
-                    val isAllActive = activeFocusProfileName.isNullOrBlank()
-                    holder.btnSelect.text = "All (No Focus)"
-                    holder.btnSelect.setTextColor(if (isAllActive) accentColor else textPrimaryColor)
-                    holder.btnEdit.visibility = android.view.View.GONE
-                    holder.btnEdit.setOnClickListener(null)
-                    view.setOnClickListener {
-                        clearFocusProfileAction()
-                        dialogRef?.dismiss()
-                    }
-                } else {
-                    val profile = profiles[position - 1]
-                    val isActive = profile.name.equals(activeFocusProfileName, ignoreCase = true)
-                    val queryPart = if (profile.query.isNotBlank()) " (${profile.query})" else ""
+                val profile = profiles[position]
+                val isActive = profile.name.equals(activeFocusProfileName, ignoreCase = true)
+                val queryPart = if (profile.query.isNotBlank()) " (${profile.query})" else ""
 
-                    holder.btnSelect.text = "${profile.name}$queryPart"
-                    holder.btnSelect.setTextColor(if (isActive) accentColor else textPrimaryColor)
-                    holder.btnEdit.visibility = android.view.View.VISIBLE
+                holder.btnSelect.text = "${profile.name}$queryPart"
+                holder.btnSelect.setTextColor(if (isActive) accentColor else textPrimaryColor)
+                holder.btnEdit.visibility = android.view.View.VISIBLE
 
-                    holder.btnEdit.setOnClickListener {
-                        dialogRef?.dismiss()
-                        showEditOrDeleteFocusProfileOptions(profile)
-                    }
+                holder.btnEdit.setOnClickListener {
+                    dialogRef?.dismiss()
+                    showEditOrDeleteFocusProfileOptions(profile)
+                }
 
-                    view.setOnClickListener {
-                        activeFocusProfileName = profile.name
-                        getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
-                            .edit()
-                            .putString(KEY_ACTIVE_FOCUS_PROFILE, profile.name)
-                            .apply()
-                        updateSearchInputHint()
-                        updateSummaryAndAdapter()
-                        dialogRef?.dismiss()
-                    }
+                view.setOnClickListener {
+                    activeFocusProfileName = profile.name
+                    getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
+                        .edit()
+                        .putString(KEY_ACTIVE_FOCUS_PROFILE, profile.name)
+                        .apply()
+                    updateSearchInputHint()
+                    updateSummaryAndAdapter()
+                    dialogRef?.dismiss()
                 }
 
                 return view
@@ -1688,10 +1674,10 @@ class MainActivity : AppCompatActivity() {
         val dialog = AlertDialog.Builder(this, R.style.Theme_Punt_Dialog)
             .setTitle("Focus Profiles")
             .setView(listView)
-            .setPositiveButton("+ New Focus Profile") { _, _ ->
+            .setPositiveButton("New") { _, _ ->
                 showCreateFocusProfileDialog()
             }
-            .setNegativeButton("Clear Focus") { _, _ ->
+            .setNegativeButton("Clear") { _, _ ->
                 clearFocusProfileAction()
             }
             .create()
