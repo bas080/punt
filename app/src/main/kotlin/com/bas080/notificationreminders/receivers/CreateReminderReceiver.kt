@@ -252,27 +252,41 @@ class CreateReminderReceiver : BroadcastReceiver() {
                 return null
             }
             val clean = reminderText.replace(Regex("(?i)\\s*#done\\b"), "").trim()
-            val match = RECURRENCE_REGEX.find(clean) ?: return null
+            val matches = RECURRENCE_REGEX.findAll(clean).toList()
+            if (matches.isEmpty()) return null
 
-            val rawDuration = when {
-                match.groupValues[1].isNotBlank() -> match.groupValues[1].trim()
-                match.groupValues[2].isNotBlank() -> match.groupValues[2].trim()
-                else -> return null
+            var minResult: Pair<Long, String>? = null
+
+            for (match in matches) {
+                val rawDuration = when {
+                    match.groupValues[1].isNotBlank() -> match.groupValues[1].trim()
+                    match.groupValues[2].isNotBlank() -> match.groupValues[2].trim()
+                    else -> ""
+                }
+
+                if (rawDuration.isEmpty()) continue
+
+                var parseResult = parseSnoozeDuration(rawDuration, nowMillis)
+                if (parseResult == null) {
+                    val words = rawDuration.split("\\s+".toRegex())
+                    for (i in words.size - 1 downTo 1) {
+                        val subCandidate = words.take(i).joinToString(" ")
+                        val candidateParse = parseSnoozeDuration(subCandidate, nowMillis)
+                        if (candidateParse != null) {
+                            parseResult = candidateParse
+                            break
+                        }
+                    }
+                }
+
+                if (parseResult != null) {
+                    if (minResult == null || parseResult.first < minResult.first) {
+                        minResult = parseResult
+                    }
+                }
             }
 
-            if (rawDuration.isEmpty()) return null
-
-            val directParse = parseSnoozeDuration(rawDuration, nowMillis)
-            if (directParse != null) return directParse
-
-            val words = rawDuration.split("\\s+".toRegex())
-            for (i in words.size - 1 downTo 1) {
-                val subCandidate = words.take(i).joinToString(" ")
-                val parseResult = parseSnoozeDuration(subCandidate, nowMillis)
-                if (parseResult != null) return parseResult
-            }
-
-            return null
+            return minResult
         }
 
         private fun parseWeekdaySnooze(raw: String, nowMillis: Long): Pair<Pair<Long, String>, String>? {

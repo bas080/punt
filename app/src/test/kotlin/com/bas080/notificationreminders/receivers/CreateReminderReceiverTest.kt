@@ -449,6 +449,10 @@ class CreateReminderReceiverTest {
 
         val parse6 = CreateReminderReceiver.parseRecurrenceDuration("Message everyone tomorrow", now)
         org.junit.Assert.assertNull(parse6)
+
+        val parseMultiple = CreateReminderReceiver.parseRecurrenceDuration("Workout #every 2d #every 12h #repeat 1w", now)
+        assertNotNull(parseMultiple)
+        assertEquals(12 * 60 * 60 * 1000L, parseMultiple!!.first)
     }
 
     @Test
