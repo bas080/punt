@@ -1425,7 +1425,8 @@ class MainActivityTest {
         val listView = findListViewInViewGroup(focusDialog!!.findViewById(android.R.id.content) ?: focusDialog.window?.decorView)
         assertNotNull(listView)
 
-        listView!!.performItemClick(listView.adapter!!.getView(1, null, listView)!!, 1, 1)
+        val row1 = listView!!.adapter!!.getView(1, null, listView)
+        row1.performClick()
         shadowOf(android.os.Looper.getMainLooper()).idle()
 
         assertEquals("Focus: Work", activity.findViewById<android.widget.EditText>(R.id.search_reminder_input).hint.toString())
@@ -1437,7 +1438,8 @@ class MainActivityTest {
         val focusDialog2 = ShadowAlertDialog.getLatestDialog() as? AlertDialog
         val listView2 = findListViewInViewGroup(focusDialog2!!.findViewById(android.R.id.content) ?: focusDialog2.window?.decorView)!!
 
-        listView2.performItemClick(listView2.adapter!!.getView(0, null, listView2)!!, 0, 0)
+        val row0 = listView2.adapter!!.getView(0, null, listView2)
+        row0.performClick()
         shadowOf(android.os.Looper.getMainLooper()).idle()
 
         assertEquals("Add or search reminders...", activity.findViewById<android.widget.EditText>(R.id.search_reminder_input).hint.toString())
