@@ -1583,9 +1583,11 @@ class MainActivity : AppCompatActivity() {
         val textSecondaryColor = ContextCompat.getColor(this, R.color.text_secondary)
         val accentColor = ContextCompat.getColor(this, R.color.accent)
 
+        var dialogRef: AlertDialog? = null
+
         class FocusItemViewHolder(view: android.view.View) {
             val btnSelect: android.widget.TextView = view.findViewById(R.id.btn_focus_select)
-            val btnEdit: android.widget.TextView = view.findViewById(R.id.btn_focus_edit)
+            val btnEdit: android.widget.ImageButton = view.findViewById(R.id.btn_focus_edit)
         }
 
         val adapter = object : android.widget.BaseAdapter() {
@@ -1605,7 +1607,7 @@ class MainActivity : AppCompatActivity() {
                     val density = resources.displayMetrics.density
                     view = android.widget.LinearLayout(this@MainActivity).apply {
                         orientation = android.widget.LinearLayout.HORIZONTAL
-                        setPadding((16 * density).toInt(), (12 * density).toInt(), (16 * density).toInt(), (12 * density).toInt())
+                        setPadding((24 * density).toInt(), (12 * density).toInt(), (16 * density).toInt(), (12 * density).toInt())
                         gravity = android.view.Gravity.CENTER_VERTICAL
                     }
 
@@ -1615,12 +1617,16 @@ class MainActivity : AppCompatActivity() {
                         layoutParams = android.widget.LinearLayout.LayoutParams(0, android.view.ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
                     }
 
-                    val btnEdit = android.widget.TextView(this@MainActivity).apply {
+                    val btnEdit = android.widget.ImageButton(this@MainActivity).apply {
                         id = R.id.btn_focus_edit
-                        textSize = 18f
-                        text = "✎"
-                        setPadding((12 * density).toInt(), (4 * density).toInt(), (12 * density).toInt(), (4 * density).toInt())
-                        setTextColor(textSecondaryColor)
+                        setImageResource(R.drawable.ic_action_edit)
+                        setBackgroundResource(android.R.color.transparent)
+                        setColorFilter(textSecondaryColor)
+                        contentDescription = "Edit Profile"
+                        isFocusable = false
+                        isFocusableInTouchMode = false
+                        val btnSize = (36 * density).toInt()
+                        layoutParams = android.widget.LinearLayout.LayoutParams(btnSize, btnSize)
                     }
 
                     view.addView(btnSelect)
@@ -1635,70 +1641,48 @@ class MainActivity : AppCompatActivity() {
 
                 if (position == 0) {
                     val isAllActive = activeFocusProfileName.isNullOrBlank()
-                    holder.btnSelect.text = if (isAllActive) "All (No Focus) ✓" else "All (No Focus)"
+                    holder.btnSelect.text = "All (No Focus)"
                     holder.btnSelect.setTextColor(if (isAllActive) accentColor else textPrimaryColor)
                     holder.btnEdit.visibility = android.view.View.GONE
+                    holder.btnEdit.setOnClickListener(null)
+                    view.setOnClickListener {
+                        clearFocusProfileAction()
+                        dialogRef?.dismiss()
+                    }
                 } else {
                     val profile = profiles[position - 1]
                     val isActive = profile.name.equals(activeFocusProfileName, ignoreCase = true)
                     val queryPart = if (profile.query.isNotBlank()) " (${profile.query})" else ""
-                    val checkMark = if (isActive) " ✓" else ""
 
-                    holder.btnSelect.text = "${profile.name}$queryPart$checkMark"
+                    holder.btnSelect.text = "${profile.name}$queryPart"
                     holder.btnSelect.setTextColor(if (isActive) accentColor else textPrimaryColor)
                     holder.btnEdit.visibility = android.view.View.VISIBLE
+
+                    holder.btnEdit.setOnClickListener {
+                        dialogRef?.dismiss()
+                        showEditOrDeleteFocusProfileOptions(profile)
+                    }
+
+                    view.setOnClickListener {
+                        activeFocusProfileName = profile.name
+                        getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
+                            .edit()
+                            .putString(KEY_ACTIVE_FOCUS_PROFILE, profile.name)
+                            .apply()
+                        updateSearchInputHint()
+                        updateSummaryAndAdapter()
+                        dialogRef?.dismiss()
+                    }
                 }
 
                 return view
             }
         }
 
-        var dialogRef: AlertDialog? = null
-
         val listView = android.widget.ListView(this).apply {
             this.adapter = adapter
             divider = ContextCompat.getDrawable(this@MainActivity, R.drawable.dialog_divider)
             dividerHeight = 1
-        }
-
-        listView.setOnItemClickListener { _, _, position, _ ->
-            if (position == 0) {
-                clearFocusProfileAction()
-            } else {
-                val selectedProfile = profiles[position - 1]
-                activeFocusProfileName = selectedProfile.name
-                getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
-                    .edit()
-                    .putString(KEY_ACTIVE_FOCUS_PROFILE, selectedProfile.name)
-                    .apply()
-                updateSearchInputHint()
-                updateSummaryAndAdapter()
-            }
-            dialogRef?.dismiss()
-        }
-
-        // Handle direct edit button tap
-        listView.setOnTouchListener { v, event ->
-            if (event.action == android.view.MotionEvent.ACTION_UP) {
-                val pos = listView.pointToPosition(event.x.toInt(), event.y.toInt())
-                if (pos > 0) {
-                    val child = listView.getChildAt(pos - listView.firstVisiblePosition)
-                    if (child is android.view.ViewGroup) {
-                        val editBtn = child.findViewById<android.view.View>(R.id.btn_focus_edit)
-                        if (editBtn != null && editBtn.visibility == android.view.View.VISIBLE) {
-                            val rect = android.graphics.Rect()
-                            editBtn.getGlobalVisibleRect(rect)
-                            if (rect.contains(event.rawX.toInt(), event.rawY.toInt())) {
-                                v.performClick()
-                                dialogRef?.dismiss()
-                                showEditOrDeleteFocusProfileOptions(profiles[pos - 1])
-                                return@setOnTouchListener true
-                            }
-                        }
-                    }
-                }
-            }
-            false
         }
 
         val dialog = AlertDialog.Builder(this, R.style.Theme_Punt_Dialog)
@@ -1768,8 +1752,8 @@ class MainActivity : AppCompatActivity() {
         val profiles = getSavedFocusProfiles()
         val container = android.widget.LinearLayout(this).apply {
             orientation = android.widget.LinearLayout.VERTICAL
-            val padding = (16 * resources.displayMetrics.density).toInt()
-            setPadding(padding, padding, padding, padding)
+            val padding = (24 * resources.displayMetrics.density).toInt()
+            setPadding(padding, padding / 2, padding, padding)
         }
 
         val inputName = android.widget.EditText(this).apply {
