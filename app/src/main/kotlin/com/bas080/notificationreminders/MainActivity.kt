@@ -1579,47 +1579,87 @@ class MainActivity : AppCompatActivity() {
 
     fun showFocusProfilesDialog() {
         val profiles = getSavedFocusProfiles()
-        val options = mutableListOf<String>()
+        val textPrimaryColor = ContextCompat.getColor(this, R.color.text_primary)
+        val textSecondaryColor = ContextCompat.getColor(this, R.color.text_secondary)
+        val accentColor = ContextCompat.getColor(this, R.color.accent)
 
-        val defaultLabel = if (activeFocusProfileName.isNullOrBlank()) "All / No Profile ✓" else "All / No Profile"
-        options.add(defaultLabel)
-
-        for (p in profiles) {
-            val isActive = p.name.equals(activeFocusProfileName, ignoreCase = true)
-            val queryPart = if (p.query.isNotBlank()) " (${p.query})" else ""
-            val checkMark = if (isActive) " ✓" else ""
-            options.add("${p.name}$queryPart$checkMark")
+        class FocusItemViewHolder(view: android.view.View) {
+            val btnSelect: android.widget.TextView = view.findViewById(101)
+            val btnEdit: android.widget.TextView = view.findViewById(102)
         }
 
-        val textPrimaryColor = ContextCompat.getColor(this, R.color.text_primary)
-        val adapter = object : android.widget.ArrayAdapter<String>(
-            this,
-            android.R.layout.simple_list_item_1,
-            options
-        ) {
+        val adapter = object : android.widget.BaseAdapter() {
+            override fun getCount(): Int = profiles.size + 1
+
+            override fun getItem(position: Int): Any {
+                return if (position == 0) "All (No Focus)" else profiles[position - 1]
+            }
+
+            override fun getItemId(position: Int): Long = position.toLong()
+
             override fun getView(position: Int, convertView: android.view.View?, parent: android.view.ViewGroup): android.view.View {
-                val view = super.getView(position, convertView, parent)
-                if (view is android.widget.TextView) {
-                    view.setTextColor(textPrimaryColor)
+                val view: android.widget.LinearLayout
+                val holder: FocusItemViewHolder
+
+                if (convertView == null) {
+                    val density = resources.displayMetrics.density
+                    view = android.widget.LinearLayout(this@MainActivity).apply {
+                        orientation = android.widget.LinearLayout.HORIZONTAL
+                        setPadding((16 * density).toInt(), (12 * density).toInt(), (16 * density).toInt(), (12 * density).toInt())
+                        gravity = android.view.Gravity.CENTER_VERTICAL
+                    }
+
+                    val btnSelect = android.widget.TextView(this@MainActivity).apply {
+                        id = 101
+                        textSize = 16f
+                        layoutParams = android.widget.LinearLayout.LayoutParams(0, android.view.ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+                    }
+
+                    val btnEdit = android.widget.TextView(this@MainActivity).apply {
+                        id = 102
+                        textSize = 18f
+                        text = "✎"
+                        setPadding((12 * density).toInt(), (4 * density).toInt(), (12 * density).toInt(), (4 * density).toInt())
+                        setTextColor(textSecondaryColor)
+                    }
+
+                    view.addView(btnSelect)
+                    view.addView(btnEdit)
+
+                    holder = FocusItemViewHolder(view)
+                    view.tag = holder
+                } else {
+                    view = convertView as android.widget.LinearLayout
+                    holder = view.tag as FocusItemViewHolder
                 }
+
+                if (position == 0) {
+                    val isAllActive = activeFocusProfileName.isNullOrBlank()
+                    holder.btnSelect.text = if (isAllActive) "All (No Focus) ✓" else "All (No Focus)"
+                    holder.btnSelect.setTextColor(if (isAllActive) accentColor else textPrimaryColor)
+                    holder.btnEdit.visibility = android.view.View.GONE
+                } else {
+                    val profile = profiles[position - 1]
+                    val isActive = profile.name.equals(activeFocusProfileName, ignoreCase = true)
+                    val queryPart = if (profile.query.isNotBlank()) " (${profile.query})" else ""
+                    val checkMark = if (isActive) " ✓" else ""
+
+                    holder.btnSelect.text = "${profile.name}$queryPart$checkMark"
+                    holder.btnSelect.setTextColor(if (isActive) accentColor else textPrimaryColor)
+                    holder.btnEdit.visibility = android.view.View.VISIBLE
+                }
+
                 return view
             }
         }
+
+        var dialogRef: AlertDialog? = null
 
         val listView = android.widget.ListView(this).apply {
             this.adapter = adapter
             divider = ContextCompat.getDrawable(this@MainActivity, R.drawable.dialog_divider)
             dividerHeight = 1
         }
-
-        val dialog = AlertDialog.Builder(this, R.style.Theme_Punt_Dialog)
-            .setTitle("Focus Profiles")
-            .setView(listView)
-            .setPositiveButton("New Profile") { _, _ ->
-                showCreateFocusProfileDialog()
-            }
-            .setNegativeButton(R.string.cancel, null)
-            .create()
 
         listView.setOnItemClickListener { _, _, position, _ ->
             if (position == 0) {
@@ -1634,16 +1674,53 @@ class MainActivity : AppCompatActivity() {
                 updateSearchInputHint()
                 updateSummaryAndAdapter()
             }
-            dialog.dismiss()
+            dialogRef?.dismiss()
         }
 
-        listView.setOnItemLongClickListener { _, _, position, _ ->
-            if (position > 0) {
-                dialog.dismiss()
-                val targetProfile = profiles[position - 1]
-                showEditOrDeleteFocusProfileOptions(targetProfile)
-                true
-            } else false
+        // Handle direct edit button tap
+        listView.setOnTouchListener { _, event ->
+            if (event.action == android.view.MotionEvent.ACTION_UP) {
+                val pos = listView.pointToPosition(event.x.toInt(), event.y.toInt())
+                if (pos > 0) {
+                    val child = listView.getChildAt(pos - listView.firstVisiblePosition)
+                    if (child is android.view.ViewGroup) {
+                        val editBtn = child.findViewById<android.view.View>(102)
+                        if (editBtn != null && editBtn.visibility == android.view.View.VISIBLE) {
+                            val rect = android.graphics.Rect()
+                            editBtn.getGlobalVisibleRect(rect)
+                            if (rect.contains(event.rawX.toInt(), event.rawY.toInt())) {
+                                dialogRef?.dismiss()
+                                showEditOrDeleteFocusProfileOptions(profiles[pos - 1])
+                                return@setOnTouchListener true
+                            }
+                        }
+                    }
+                }
+            }
+            false
+        }
+
+        val dialog = AlertDialog.Builder(this, R.style.Theme_Punt_Dialog)
+            .setTitle("Focus Profiles")
+            .setView(listView)
+            .setPositiveButton("+ New Focus Profile") { _, _ ->
+                showCreateFocusProfileDialog()
+            }
+            .setNegativeButton("Clear Focus") { _, _ ->
+                clearFocusProfileAction()
+            }
+            .create()
+
+        dialogRef = dialog
+
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.apply {
+                setTextColor(accentColor)
+                setTypeface(null, android.graphics.Typeface.BOLD)
+            }
+            dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.apply {
+                setTextColor(textSecondaryColor)
+            }
         }
 
         dialog.show()
