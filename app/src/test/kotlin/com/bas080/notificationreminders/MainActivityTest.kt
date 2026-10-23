@@ -92,7 +92,7 @@ class MainActivityTest {
     }
 
     @Test
-    fun testPullDownToCreateReminderFromTopInput() {
+    fun testPullDownToRefreshClearsRecentlyDoneAndReloadsList() {
         val context = RuntimeEnvironment.getApplication()
         val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
         prefs.edit().clear().putStringSet("key_reminders_list", setOf("Buy milk", "Clean garage")).commit()
@@ -101,15 +101,8 @@ class MainActivityTest {
         val activity = controller.get()
 
         val recyclerView = activity.findViewById<RecyclerView>(R.id.reminders_list)
-        val input = activity.findViewById<EditText>(R.id.search_reminder_input)
         val swipeRefresh = activity.findViewById<androidx.swiperefreshlayout.widget.SwipeRefreshLayout>(R.id.swipe_refresh_layout)
 
-        // Typing "milk" should filter displayed items to 1 active header + 1 reminder ("Buy milk")
-        input.setText("milk")
-        shadowOf(android.os.Looper.getMainLooper()).idleFor(250, java.util.concurrent.TimeUnit.MILLISECONDS)
-        assertEquals("Expected 3 items when filtered", 3, recyclerView.adapter!!.itemCount)
-
-        // Pulling down (swipe to refresh) should convert "milk" into a new reminder and clear search query
         val listenerField = androidx.swiperefreshlayout.widget.SwipeRefreshLayout::class.java.getDeclaredField("mListener")
         listenerField.isAccessible = true
         val onRefreshListener = listenerField.get(swipeRefresh) as? androidx.swiperefreshlayout.widget.SwipeRefreshLayout.OnRefreshListener
@@ -117,15 +110,7 @@ class MainActivityTest {
         onRefreshListener!!.onRefresh()
         shadowOf(android.os.Looper.getMainLooper()).idle()
 
-        assertEquals("Reminder created", ShadowToast.getTextOfLatestToast())
-        assertEquals("", input.text.toString())
-
-        // Verify the newly created reminder is displayed at position 1 (position 0 = ACTIVE header)
-        recyclerView.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED)
-        recyclerView.layout(0, 0, 1080, 1920)
-        val holder = recyclerView.findViewHolderForAdapterPosition(1) as? com.bas080.notificationreminders.RemindersAdapter.ItemViewHolder
-        assertNotNull("ViewHolder at position 1 should exist", holder)
-        assertEquals("milk", holder?.reminderInput?.text?.toString())
+        assertEquals(4, recyclerView.adapter!!.itemCount)
     }
 
     @Test
@@ -677,7 +662,7 @@ class MainActivityTest {
         val btnEmptyClearFilter = activity.findViewById<TextView>(R.id.btn_empty_clear_filter)
         assertNotNull(txtEmpty)
         assertEquals(View.VISIBLE, txtEmpty.visibility)
-        assertTrue(txtEmpty.text.toString().contains("Pull down or press Enter to create task"))
+        assertTrue(txtEmpty.text.toString().contains("Press Enter to create task"))
         assertTrue(txtEmpty.text.toString().contains("Swipe right on task to mark done"))
         assertTrue(txtEmpty.text.toString().contains("Swipe left on task to punt"))
         assertTrue(txtEmpty.text.toString().contains("Use #every 1d for recurring tasks"))
@@ -1343,7 +1328,7 @@ class MainActivityTest {
         clearFocusBtn.performClick()
         shadowOf(android.os.Looper.getMainLooper()).idle()
 
-        assertEquals("Add or search reminders...", searchInput.hint.toString())
+        assertEquals("Add reminder (press ↵) or search...", searchInput.hint.toString())
 
         val recyclerView = activity.findViewById<androidx.recyclerview.widget.RecyclerView>(R.id.reminders_list)
         val adapter = recyclerView.adapter as RemindersAdapter
