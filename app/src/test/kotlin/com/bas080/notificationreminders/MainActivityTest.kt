@@ -1434,9 +1434,10 @@ class MainActivityTest {
         searchInput.setText("gym")
         org.robolectric.shadows.ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
 
-        // Search "gym" on Work focus yields 0 matching tasks
-        assertEquals(0, adapter.itemCount)
-        assertEquals(View.VISIBLE, activity.findViewById<View>(R.id.layout_empty_reminders).visibility)
+        // Search "gym" on Work focus falls back to searching all items: 1 header + 1 matching task ("Gym session #fitness") + 1 footer = 3 items
+        assertEquals(3, adapter.itemCount)
+        val gymHolder = recyclerView.findViewHolderForAdapterPosition(1) as RemindersAdapter.ItemViewHolder
+        assertTrue(gymHolder.reminderInput.text.toString().contains("Gym session #fitness"))
     }
 
     @Test

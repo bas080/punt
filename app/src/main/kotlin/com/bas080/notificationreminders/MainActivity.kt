@@ -1396,7 +1396,12 @@ class MainActivity : AppCompatActivity() {
         }
 
         val filtered = if (currentSearchQuery.isNotBlank()) {
-            com.bas080.notificationreminders.utils.ReminderMatcher.filterSearchQueryTiered(focusedFiltered, currentSearchQuery, this)
+            val focusMatches = com.bas080.notificationreminders.utils.ReminderMatcher.filterSearchQueryTiered(focusedFiltered, currentSearchQuery, this)
+            if (focusMatches.isEmpty() && activeProfiles.isNotEmpty()) {
+                com.bas080.notificationreminders.utils.ReminderMatcher.filterSearchQueryTiered(statusFiltered, currentSearchQuery, this)
+            } else {
+                focusMatches
+            }
         } else {
             focusedFiltered
         }
