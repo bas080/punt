@@ -453,6 +453,23 @@ class CreateReminderReceiverTest {
         val parseMultiple = CreateReminderReceiver.parseRecurrenceDuration("Workout #every 2d #every 12h #repeat 1w", now)
         assertNotNull(parseMultiple)
         assertEquals(12 * 60 * 60 * 1000L, parseMultiple!!.first)
+
+        // Test weekday recurrence evaluation selecting nearest day
+        // Fixed base timestamp at Thursday, March 13, 2025 at 10:00 AM
+        val thuCal = java.util.Calendar.getInstance().apply {
+            set(2025, java.util.Calendar.MARCH, 13, 10, 0, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }
+        val thuNow = thuCal.timeInMillis
+        // On Thu, #everyWed is 6 days away (March 19 09:00), #everyFri is 1 day away (March 14 09:00).
+        val parseDays = CreateReminderReceiver.parseRecurrenceDuration("Task #everyWed #everyFri", thuNow)
+        assertNotNull(parseDays)
+        val friCal = java.util.Calendar.getInstance().apply {
+            set(2025, java.util.Calendar.MARCH, 14, 9, 0, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }
+        val expectedFriMs = friCal.timeInMillis - thuNow
+        assertEquals(expectedFriMs, parseDays!!.first)
     }
 
     @Test
