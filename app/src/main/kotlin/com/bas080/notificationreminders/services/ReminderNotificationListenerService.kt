@@ -297,6 +297,14 @@ class ReminderNotificationListenerService : NotificationListenerService() {
             com.bas080.notificationreminders.utils.AppLogger.log(this, "NotificationListener", "Updating persistent status notification for reminder")
             activePostedReminders.add(matchedReminder)
             showStatusNotification()
+
+            if (matchedReminder.contains("#alarm", ignoreCase = true)) {
+                val alarmIntent = Intent(this, com.bas080.notificationreminders.AlarmActivity::class.java).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                    putExtra(com.bas080.notificationreminders.AlarmActivity.EXTRA_REMINDER_TEXT, matchedReminder)
+                }
+                startActivity(alarmIntent)
+            }
         } catch (_: Exception) {
         }
     }
