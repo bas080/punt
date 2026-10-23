@@ -166,27 +166,8 @@ class MainActivity : AppCompatActivity() {
     private fun setupSwipeRefresh() {
         binding.swipeRefreshLayout.setColorSchemeResources(R.color.accent)
         binding.swipeRefreshLayout.setOnRefreshListener {
-            searchRunnable?.let { searchHandler.removeCallbacks(it) }
-            val text = binding.searchReminderInput.text.toString().trim()
-            if (text.isNotEmpty()) {
-                com.bas080.notificationreminders.utils.ExperimentTracker.trackCreation(this, "app_input")
-                activeReminders.add(text)
-                currentSearchQuery = ""
-                getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
-                    .edit()
-                    .putString(KEY_SEARCH_QUERY, "")
-                    .apply()
-                recentlyDoneReminders.clear()
-                saveRemindersToPrefs()
-                ReminderNotificationListenerService.instance?.postMatchNotification(text)
-                binding.searchReminderInput.setText("")
-                updateSummaryAndAdapter()
-                Toast.makeText(this, R.string.toast_reminder_created, Toast.LENGTH_SHORT).show()
-                binding.searchReminderInput.requestFocus()
-            } else {
-                recentlyDoneReminders.clear()
-                loadReminders()
-            }
+            recentlyDoneReminders.clear()
+            loadReminders()
             binding.swipeRefreshLayout.isRefreshing = false
         }
     }
@@ -624,7 +605,7 @@ class MainActivity : AppCompatActivity() {
             val namesStr = activeFocusProfileNames.joinToString(", ")
             binding.searchReminderInput.hint = "Focus: $namesStr"
         } else {
-            binding.searchReminderInput.hint = "Add or search reminders..."
+            binding.searchReminderInput.hint = "Add reminder (press ↵) or search..."
         }
     }
 
@@ -1482,7 +1463,7 @@ class MainActivity : AppCompatActivity() {
                 binding.btnEmptyClearFocus.visibility = View.GONE
             }
 
-            val instructions = "Pull down or press Enter to create task\nSwipe right on task to mark done\nSwipe left on task to punt\nUse #every 1d for recurring tasks"
+            val instructions = "Press Enter to create task\nSwipe right on task to mark done\nSwipe left on task to punt\nUse #every 1d for recurring tasks"
             val spannable = android.text.SpannableStringBuilder(instructions)
             val tagMatch = Regex("#every 1d").find(instructions)
             if (tagMatch != null) {

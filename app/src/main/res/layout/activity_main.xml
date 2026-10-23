@@ -45,7 +45,7 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:hint="Add or search reminders..."
+                    android:hint="Add reminder (press ↵) or search..."
                     android:textColor="?android:attr/textColorPrimary"
                     android:textColorHint="?android:attr/textColorHint"
                     android:textSize="15sp"
@@ -56,6 +56,20 @@
                     android:paddingVertical="4dp"
                     android:paddingHorizontal="4dp"
                     android:background="@null" />
+
+                <!-- Static Enter Symbol Indicator -->
+                <ImageView
+                    android:id="@+id/icon_enter_indicator"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ic_action_enter"
+                    app:tint="@color/text_secondary"
+                    android:contentDescription="Press Enter to create task"
+                    android:scaleType="centerInside"
+                    android:padding="2dp"
+                    android:layout_marginStart="4dp"
+                    android:clickable="false"
+                    android:focusable="false" />
 
                 <!-- Menu Action Button replacing old filter button -->
                 <ImageView
