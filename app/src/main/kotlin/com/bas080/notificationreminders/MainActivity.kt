@@ -2004,14 +2004,14 @@ class RemindersAdapter(
         val recurringResult = CreateReminderReceiver.parseRecurrenceDuration(reminderText)
         if (recurringResult != null && !isDone) {
             val spannable = android.text.SpannableStringBuilder(reminderText)
-            val tagMatch = Regex("(?i)#(?:every|repeat)(?:\\(([^)]+)\\)|[:/]?\\s*([^#\n]+)?)").find(reminderText)
-            if (tagMatch != null) {
+            val tagMatches = Regex("(?i)#(?:every|repeat)(?:\\(([^)]+)\\)|[:/]?\\s*([^#\n]+)?)").findAll(reminderText)
+            val textColor = ContextCompat.getColor(context, R.color.text_secondary)
+            for (tagMatch in tagMatches) {
                 val start = tagMatch.range.first
                 var end = tagMatch.range.last + 1
                 while (end > start && reminderText[end - 1].isWhitespace()) {
                     end--
                 }
-                val textColor = ContextCompat.getColor(context, R.color.text_secondary)
                 val span = android.text.style.ForegroundColorSpan(textColor)
                 spannable.setSpan(span, start, end, android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
             }
