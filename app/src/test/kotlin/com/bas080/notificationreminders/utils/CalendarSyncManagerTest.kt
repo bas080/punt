@@ -3,6 +3,7 @@ package com.bas080.notificationreminders.utils
 import android.Manifest
 import android.content.Context
 import android.provider.CalendarContract
+import com.bas080.notificationreminders.MainActivity
 import com.bas080.notificationreminders.services.ReminderNotificationListenerService
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -66,11 +67,20 @@ class CalendarSyncManagerTest {
     }
 
     @Test
+    fun testFormatMinutesToDuration() {
+        assertEquals("15m", CalendarSyncManager.formatMinutesToDuration(15))
+        assertEquals("1h", CalendarSyncManager.formatMinutesToDuration(60))
+        assertEquals("1d", CalendarSyncManager.formatMinutesToDuration(1440))
+        assertEquals("2d", CalendarSyncManager.formatMinutesToDuration(2880))
+    }
+
+    @Test
     fun testSyncRemindersAndCalendarChanges() {
         shadowOf(context as android.app.Application).grantPermissions(
             Manifest.permission.READ_CALENDAR,
             Manifest.permission.WRITE_CALENDAR
         )
+        CalendarSyncManager.setCalendarSyncEnabled(context, true)
 
         val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
         val futureSnooze = System.currentTimeMillis() + 3600000L
@@ -100,6 +110,7 @@ class CalendarSyncManagerTest {
             Manifest.permission.READ_CALENDAR,
             Manifest.permission.WRITE_CALENDAR
         )
+        CalendarSyncManager.setCalendarSyncEnabled(context, true)
 
         val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
         val initialSnooze = System.currentTimeMillis() + 3600000L
@@ -116,9 +127,11 @@ class CalendarSyncManagerTest {
                 CalendarContract.Events._ID,
                 CalendarContract.Events.TITLE,
                 CalendarContract.Events.EVENT_LOCATION,
-                CalendarContract.Events.DTSTART
+                CalendarContract.Events.DTSTART,
+                CalendarContract.Events.DESCRIPTION,
+                CalendarContract.Events.ALL_DAY
             ))
-            setResults(arrayOf(arrayOf(1L, "Movable Task", "movable task", newStartTime)))
+            setResults(arrayOf(arrayOf(1L, "Movable Task", "movable task", newStartTime, "", 0)))
         }
         shadowOf(context.contentResolver).setCursor(CalendarContract.Events.CONTENT_URI, roboCursor)
 
@@ -134,6 +147,7 @@ class CalendarSyncManagerTest {
             Manifest.permission.READ_CALENDAR,
             Manifest.permission.WRITE_CALENDAR
         )
+        CalendarSyncManager.setCalendarSyncEnabled(context, true)
 
         val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
         prefs.edit()
@@ -148,11 +162,58 @@ class CalendarSyncManagerTest {
 
     @Test
     @Suppress("DEPRECATION")
+    fun testImportNewExternalCalendarEventCreatesTaskCardAndPunts() {
+        shadowOf(context as android.app.Application).grantPermissions(
+            Manifest.permission.READ_CALENDAR,
+            Manifest.permission.WRITE_CALENDAR
+        )
+        CalendarSyncManager.setCalendarSyncEnabled(context, true)
+
+        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
+        val futureStart = System.currentTimeMillis() + 3600000L
+
+        val eventsCursor = org.robolectric.fakes.RoboCursor().apply {
+            setColumnNames(listOf(
+                CalendarContract.Events._ID,
+                CalendarContract.Events.TITLE,
+                CalendarContract.Events.EVENT_LOCATION,
+                CalendarContract.Events.DTSTART,
+                CalendarContract.Events.DESCRIPTION,
+                CalendarContract.Events.ALL_DAY
+            ))
+            setResults(arrayOf(
+                arrayOf(100L, "Doctor Appointment", "", futureStart, "Checkup", 0)
+            ))
+        }
+        shadowOf(context.contentResolver).setCursor(CalendarContract.Events.CONTENT_URI, eventsCursor)
+
+        val remindersCursor = org.robolectric.fakes.RoboCursor().apply {
+            setColumnNames(listOf(CalendarContract.Reminders.MINUTES))
+            setResults(arrayOf(arrayOf(15)))
+        }
+        shadowOf(context.contentResolver).setCursor(CalendarContract.Reminders.CONTENT_URI, remindersCursor)
+
+        CalendarSyncManager.syncCalendarChangesToReminders(context)
+
+        val savedSet = prefs.getStringSet("key_reminders_list", emptySet()) ?: emptySet()
+        assertTrue(savedSet.any { it.startsWith("Doctor Appointment") })
+
+        val createdReminder = savedSet.first { it.startsWith("Doctor Appointment") }
+        assertTrue(createdReminder.contains("#every15m"))
+
+        val cleanKey = MainActivity.getCleanTrimmed(createdReminder)
+        val snoozeTime = prefs.getLong("snooze_$cleanKey", 0L)
+        assertEquals(futureStart, snoozeTime)
+    }
+
+    @Test
+    @Suppress("DEPRECATION")
     fun testSyncCalendarDeleteMarksReminderDone() {
         shadowOf(context as android.app.Application).grantPermissions(
             Manifest.permission.READ_CALENDAR,
             Manifest.permission.WRITE_CALENDAR
         )
+        CalendarSyncManager.setCalendarSyncEnabled(context, true)
 
         val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
         prefs.edit().putStringSet("key_reminders_list", setOf("Deleted Task", "Remaining Task")).commit()
@@ -164,9 +225,11 @@ class CalendarSyncManagerTest {
                 CalendarContract.Events._ID,
                 CalendarContract.Events.TITLE,
                 CalendarContract.Events.EVENT_LOCATION,
-                CalendarContract.Events.DTSTART
+                CalendarContract.Events.DTSTART,
+                CalendarContract.Events.DESCRIPTION,
+                CalendarContract.Events.ALL_DAY
             ))
-            setResults(arrayOf(arrayOf(2L, "Remaining Task", "remaining task", System.currentTimeMillis())))
+            setResults(arrayOf(arrayOf(2L, "Remaining Task", "remaining task", System.currentTimeMillis(), "", 0)))
         }
         shadowOf(context.contentResolver).setCursor(CalendarContract.Events.CONTENT_URI, roboCursor)
 
