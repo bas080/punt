@@ -448,9 +448,7 @@ object CalendarSyncManager {
             val matchedEvent = eventMapByLocation[cleanKey] ?: eventMapByTitleKey[cleanKey]
 
             if (syncContext.syncedCalendarKeys.contains(cleanKey) && matchedEvent == null) {
-                val wasDeleted = handleDeletedCalendarEvent(
-                    reminder, syncContext.savedReminders, i, syncContext.editor, syncContext.now
-                )
+                val wasDeleted = handleDeletedCalendarEvent(syncContext, reminder, i)
                 modified = wasDeleted || modified
             } else if (matchedEvent != null) {
                 val wasMoved = handleMovedCalendarEvent(
@@ -463,24 +461,27 @@ object CalendarSyncManager {
     }
 
     private fun handleDeletedCalendarEvent(
+        syncContext: SyncContext,
         reminder: String,
-        savedReminders: MutableList<String>,
-        index: Int,
-        editor: SharedPreferences.Editor,
-        now: Long
+        index: Int
     ): Boolean {
-        val recurringResult = CreateReminderReceiver.parseRecurrenceDuration(reminder, now)
+        val recurringResult = CreateReminderReceiver.parseRecurrenceDuration(reminder, syncContext.now)
         return if (recurringResult != null) {
             val snoozeMs: Long = recurringResult.first
-            val snoozeUntil: Long = now + snoozeMs
             val cleanText = reminder.replace(Regex("(?i)\\s*#done\\b"), "").trim()
             val cleanTrimmed = cleanText.lowercase()
-            savedReminders[index] = cleanText
-            editor.putLong("snooze_$cleanTrimmed", snoozeUntil)
+
+            val prefs = syncContext.context.getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
+            val currentSnooze = prefs.getLong("snooze_$cleanTrimmed", 0L)
+            val baseTime = if (currentSnooze > 0L) currentSnooze else syncContext.now
+            val snoozeUntil: Long = baseTime + snoozeMs
+
+            syncContext.savedReminders[index] = cleanText
+            syncContext.editor.putLong("snooze_$cleanTrimmed", snoozeUntil)
             ReminderNotificationListenerService.lastTriggeredMap["snooze_$cleanTrimmed"] = snoozeUntil
             true
         } else {
-            savedReminders[index] = "$reminder #done"
+            syncContext.savedReminders[index] = "$reminder #done"
             true
         }
     }
