@@ -238,4 +238,33 @@ class CalendarSyncManagerTest {
         val savedSet = prefs.getStringSet("key_reminders_list", emptySet()) ?: emptySet()
         assertTrue(savedSet.any { it.contains("Deleted Task") && it.contains("#done") })
     }
+
+    @Test
+    fun testIntermediateTypingKeystrokesAreNotReimportedAsDuplicateCards() {
+        shadowOf(context as android.app.Application).grantPermissions(
+            Manifest.permission.READ_CALENDAR,
+            Manifest.permission.WRITE_CALENDAR
+        )
+        CalendarSyncManager.setCalendarSyncEnabled(context, true)
+
+        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
+
+        // Simulate typing keystrokes: "Alex", "Alex houseparty", "Alex houseparty #social"
+        prefs.edit().putStringSet("key_reminders_list", setOf("Alex")).commit()
+        CalendarSyncManager.syncRemindersToCalendar(context)
+
+        prefs.edit().putStringSet("key_reminders_list", setOf("Alex houseparty")).commit()
+        CalendarSyncManager.syncRemindersToCalendar(context)
+
+        prefs.edit().putStringSet("key_reminders_list", setOf("Alex houseparty #social")).commit()
+        CalendarSyncManager.syncRemindersToCalendar(context)
+
+        // Sync changes from calendar back to Punt
+        CalendarSyncManager.syncCalendarChangesToReminders(context)
+
+        val savedSet = prefs.getStringSet("key_reminders_list", emptySet()) ?: emptySet()
+        // Ensure Punt holds only the final single reminder and did not re-import intermediate typing drafts
+        assertEquals(1, savedSet.size)
+        assertTrue(savedSet.contains("Alex houseparty #social"))
+    }
 }

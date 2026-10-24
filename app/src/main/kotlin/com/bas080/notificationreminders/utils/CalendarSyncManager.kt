@@ -127,9 +127,10 @@ object CalendarSyncManager {
         try {
             val prefs = context.getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
             val savedReminders = prefs.getStringSet(KEY_REMINDERS, emptySet()) ?: emptySet()
-            val existingEvents = queryCalendarEventsMap(context.contentResolver, calendarId)
+            val existingEvents = queryCalendarEventsDetails(context.contentResolver, calendarId)
             val activeKeys = processSyncEntries(context, calendarId, savedReminders, existingEvents)
-            prefs.edit().putStringSet(KEY_SYNCED_CALENDAR_KEYS, activeKeys).commit()
+            val previouslySynced = prefs.getStringSet(KEY_SYNCED_CALENDAR_KEYS, emptySet()) ?: emptySet()
+            prefs.edit().putStringSet(KEY_SYNCED_CALENDAR_KEYS, previouslySynced + activeKeys).commit()
         } catch (_: Exception) {
         } finally {
             isSyncing = false
@@ -140,13 +141,17 @@ object CalendarSyncManager {
         context: Context,
         calendarId: Long,
         savedReminders: Set<String>,
-        existingEvents: Map<String, Long>
+        existingEvents: List<CalendarEventDetails>
     ): Set<String> {
         val activeKeys = mutableSetOf<String>()
         val eventsUri = CalendarContract.Events.CONTENT_URI
+        val eventMapByLocation = existingEvents.associateBy { it.locationKey }
+        val eventMapByTitleKey = existingEvents.associateBy { MainActivity.getCleanTrimmed(it.title) }
+
         for (reminder in savedReminders) {
             val cleanKey = MainActivity.getCleanTrimmed(reminder)
-            val existingId = existingEvents[cleanKey]
+            val matchedEvent = eventMapByLocation[cleanKey] ?: eventMapByTitleKey[cleanKey]
+            val existingId = matchedEvent?.id
             val isDone = reminder.contains("#done", ignoreCase = true)
             if (isDone && existingId != null) {
                 try {
@@ -156,31 +161,25 @@ object CalendarSyncManager {
                 }
             } else if (!isDone) {
                 activeKeys.add(cleanKey)
+                val cleanTitle = reminder.replace(Regex("(?i)\\s*#done\\b"), "").trim()
+                val titleCleanKey = MainActivity.getCleanTrimmed(cleanTitle)
+                if (titleCleanKey.isNotEmpty()) {
+                    activeKeys.add(titleCleanKey)
+                }
                 upsertReminderEvent(context, calendarId, reminder, cleanKey, existingId)
             }
         }
-        for ((key, eventId) in existingEvents) {
-            if (!activeKeys.contains(key)) {
+        for (event in existingEvents) {
+            val titleCleanKey = MainActivity.getCleanTrimmed(event.title)
+            if (!activeKeys.contains(event.locationKey) && !activeKeys.contains(titleCleanKey)) {
                 try {
-                    val deleteUri = ContentUris.withAppendedId(eventsUri, eventId)
+                    val deleteUri = ContentUris.withAppendedId(eventsUri, event.id)
                     context.contentResolver.delete(deleteUri, null, null)
                 } catch (_: Exception) {
                 }
             }
         }
         return activeKeys
-    }
-
-    private fun queryCalendarEventsMap(
-        contentResolver: ContentResolver,
-        calendarId: Long
-    ): MutableMap<String, Long> {
-        val events = mutableMapOf<String, Long>()
-        val details = queryCalendarEventsDetails(contentResolver, calendarId)
-        for (event in details) {
-            events[event.locationKey] = event.id
-        }
-        return events
     }
 
     private fun queryCalendarEventsDetails(
