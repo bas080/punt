@@ -1192,21 +1192,28 @@ class MainActivity : AppCompatActivity() {
         val idx = activeReminders.indexOf(reminderText)
         if (idx != -1) {
             com.bas080.notificationreminders.utils.ExperimentTracker.trackTaskLifecycle(this, "marked_done")
+            val cleanTrimmed = getCleanTrimmed(reminderText)
+            val prefs = getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
+            val now = System.currentTimeMillis()
+            val currentSnooze = prefs.getLong("snooze_$cleanTrimmed", 0L).let {
+                if (it > 0L) it else (ReminderNotificationListenerService.lastTriggeredMap["snooze_$cleanTrimmed"] ?: 0L)
+            }
+            val isPunted = currentSnooze > now
             val recurringResult = CreateReminderReceiver.parseRecurrenceDuration(reminderText)
-            if (recurringResult != null) {
+
+            if (recurringResult != null && !isPunted) {
                 val (snoozeMs, durationLabel) = recurringResult
-                val snoozeUntil = System.currentTimeMillis() + snoozeMs
+                val snoozeUntil = now + snoozeMs
                 val cleanText = reminderText.replace(Regex("(?i)\\s*#done\\b"), "").trim()
-                val cleanTrimmed = cleanText.lowercase()
+                val cleanKey = cleanText.lowercase()
 
                 activeReminders[idx] = cleanText
 
-                val prefs = getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
                 prefs.edit()
                     .putStringSet(KEY_REMINDERS, activeReminders.toSet())
-                    .putLong("snooze_$cleanTrimmed", snoozeUntil)
+                    .putLong("snooze_$cleanKey", snoozeUntil)
                     .apply()
-                ReminderNotificationListenerService.lastTriggeredMap["snooze_$cleanTrimmed"] = snoozeUntil
+                ReminderNotificationListenerService.lastTriggeredMap["snooze_$cleanKey"] = snoozeUntil
 
                 val notificationId = ReminderNotificationListenerService.getNotificationIdForReminder(reminderText)
                 val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager
@@ -1225,7 +1232,6 @@ class MainActivity : AppCompatActivity() {
                 }
                 activeReminders[idx] = doneText
                 recentlyDoneReminders.add(doneText)
-                val prefs = getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
                 prefs.edit().putStringSet(KEY_REMINDERS, activeReminders.toSet()).apply()
 
                 val notificationId = ReminderNotificationListenerService.getNotificationIdForReminder(reminderText)

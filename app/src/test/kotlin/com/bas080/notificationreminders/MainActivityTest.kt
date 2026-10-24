@@ -801,6 +801,28 @@ class MainActivityTest {
     }
 
     @Test
+    fun testMarkingPuntedRecurringReminderDoneMarksDoneInsteadOfPuntingAgain() {
+        val context = RuntimeEnvironment.getApplication()
+        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
+        val futureSnooze = System.currentTimeMillis() + 3600000L
+        prefs.edit().clear()
+            .putStringSet("key_reminders_list", setOf("Water plants #every 1w"))
+            .putLong("snooze_water plants #every 1w", futureSnooze)
+            .commit()
+
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = controller.get()
+
+        val markDoneMethod = MainActivity::class.java.getDeclaredMethod("markReminderDone", String::class.java)
+        markDoneMethod.isAccessible = true
+        markDoneMethod.invoke(activity, "Water plants #every 1w")
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        val savedSet = prefs.getStringSet("key_reminders_list", emptySet()) ?: emptySet()
+        assertTrue("Saved set should contain 'Water plants #every 1w #done'", savedSet.contains("Water plants #every 1w #done"))
+    }
+
+    @Test
     fun testMarkingPuntedReminderDonePreservesPuntTimeAndSection() {
         val context = RuntimeEnvironment.getApplication()
         val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
