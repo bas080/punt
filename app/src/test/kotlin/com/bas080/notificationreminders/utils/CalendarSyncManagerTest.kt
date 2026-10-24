@@ -162,7 +162,7 @@ class CalendarSyncManagerTest {
 
     @Test
     @Suppress("DEPRECATION")
-    fun testExternalCalendarEventsAreNotImportedAsPuntTaskCards() {
+    fun testExternalCalendarEventsAreImportedAndStampedWithSyncData1() {
         shadowOf(context as android.app.Application).grantPermissions(
             Manifest.permission.READ_CALENDAR,
             Manifest.permission.WRITE_CALENDAR
@@ -178,20 +178,33 @@ class CalendarSyncManagerTest {
                 CalendarContract.Events.TITLE,
                 CalendarContract.Events.EVENT_LOCATION,
                 CalendarContract.Events.DTSTART,
+                CalendarContract.Events.SYNC_DATA1,
                 CalendarContract.Events.DESCRIPTION,
                 CalendarContract.Events.ALL_DAY
             ))
             setResults(arrayOf(
-                arrayOf(100L, "Doctor Appointment", "", futureStart, "Checkup", 0)
+                arrayOf(100L, "Doctor Appointment", "", futureStart, null, "Checkup", 0)
             ))
         }
         shadowOf(context.contentResolver).setCursor(CalendarContract.Events.CONTENT_URI, eventsCursor)
 
+        val remindersCursor = org.robolectric.fakes.RoboCursor().apply {
+            setColumnNames(listOf(CalendarContract.Reminders.MINUTES))
+            setResults(arrayOf(arrayOf(15)))
+        }
+        shadowOf(context.contentResolver).setCursor(CalendarContract.Reminders.CONTENT_URI, remindersCursor)
+
         CalendarSyncManager.syncCalendarChangesToReminders(context)
 
         val savedSet = prefs.getStringSet("key_reminders_list", emptySet()) ?: emptySet()
-        // Punt is the single source of truth; external events are not imported into Punt.
-        assertTrue(savedSet.isEmpty())
+        assertTrue(savedSet.any { it.startsWith("Doctor Appointment") })
+
+        val createdReminder = savedSet.first { it.startsWith("Doctor Appointment") }
+        assertTrue(createdReminder.contains("#every15m"))
+
+        val cleanKey = MainActivity.getCleanTrimmed(createdReminder)
+        val snoozeTime = prefs.getLong("snooze_$cleanKey", 0L)
+        assertEquals(futureStart, snoozeTime)
     }
 
     @Test
