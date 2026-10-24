@@ -162,7 +162,7 @@ class CalendarSyncManagerTest {
 
     @Test
     @Suppress("DEPRECATION")
-    fun testImportNewExternalCalendarEventCreatesTaskCardAndPunts() {
+    fun testExternalCalendarEventsAreNotImportedAsPuntTaskCards() {
         shadowOf(context as android.app.Application).grantPermissions(
             Manifest.permission.READ_CALENDAR,
             Manifest.permission.WRITE_CALENDAR
@@ -187,23 +187,11 @@ class CalendarSyncManagerTest {
         }
         shadowOf(context.contentResolver).setCursor(CalendarContract.Events.CONTENT_URI, eventsCursor)
 
-        val remindersCursor = org.robolectric.fakes.RoboCursor().apply {
-            setColumnNames(listOf(CalendarContract.Reminders.MINUTES))
-            setResults(arrayOf(arrayOf(15)))
-        }
-        shadowOf(context.contentResolver).setCursor(CalendarContract.Reminders.CONTENT_URI, remindersCursor)
-
         CalendarSyncManager.syncCalendarChangesToReminders(context)
 
         val savedSet = prefs.getStringSet("key_reminders_list", emptySet()) ?: emptySet()
-        assertTrue(savedSet.any { it.startsWith("Doctor Appointment") })
-
-        val createdReminder = savedSet.first { it.startsWith("Doctor Appointment") }
-        assertTrue(createdReminder.contains("#every15m"))
-
-        val cleanKey = MainActivity.getCleanTrimmed(createdReminder)
-        val snoozeTime = prefs.getLong("snooze_$cleanKey", 0L)
-        assertEquals(futureStart, snoozeTime)
+        // Punt is the single source of truth; external events are not imported into Punt.
+        assertTrue(savedSet.isEmpty())
     }
 
     @Test

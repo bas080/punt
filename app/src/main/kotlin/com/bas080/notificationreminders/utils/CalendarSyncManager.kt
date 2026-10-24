@@ -230,40 +230,6 @@ object CalendarSyncManager {
         }
     }
 
-    private fun queryEventAlarmMinutes(contentResolver: ContentResolver, eventId: Long): List<Int> {
-        val minutesList = mutableListOf<Int>()
-        val projection = arrayOf(CalendarContract.Reminders.MINUTES)
-        val selection = "${CalendarContract.Reminders.EVENT_ID} = ?"
-        val selectionArgs = arrayOf(eventId.toString())
-        val cursor = try {
-            contentResolver.query(
-                CalendarContract.Reminders.CONTENT_URI,
-                projection,
-                selection,
-                selectionArgs,
-                null
-            )
-        } catch (_: Exception) {
-            null
-        }
-
-        cursor?.use {
-            val minIdx = it.getColumnIndex(CalendarContract.Reminders.MINUTES)
-            if (minIdx >= 0) readAlarmMinutesFromCursor(it, minIdx, minutesList)
-        }
-        return minutesList
-    }
-
-    private fun readAlarmMinutesFromCursor(
-        cursor: Cursor,
-        minIdx: Int,
-        minutesList: MutableList<Int>
-    ) {
-        while (cursor.moveToNext()) {
-            val mins = cursor.getInt(minIdx)
-            if (mins >= 0) minutesList.add(mins)
-        }
-    }
 
     fun formatMinutesToDuration(minutes: Int): String {
         return when {
@@ -420,11 +386,8 @@ object CalendarSyncManager {
         val diffsModified = processExistingReminderDiffs(
             syncContext, eventMapByLocation, eventMapByTitleKey
         )
-        val importsModified = importNewCalendarEvents(
-            syncContext, calendarEvents
-        )
 
-        if (diffsModified || importsModified) {
+        if (diffsModified) {
             editor.putStringSet(KEY_REMINDERS, savedReminders.toSet())
             editor.putStringSet(KEY_SYNCED_CALENDAR_KEYS, syncedCalendarKeys)
             editor.commit()
@@ -503,41 +466,4 @@ object CalendarSyncManager {
         return false
     }
 
-    private fun importNewCalendarEvents(
-        syncContext: SyncContext,
-        calendarEvents: List<CalendarEventDetails>
-    ): Boolean {
-        val existingCleanKeys = syncContext.savedReminders.map { MainActivity.getCleanTrimmed(it) }.toSet()
-        var modified = false
-
-        for (event in calendarEvents) {
-            val titleCleanKey = MainActivity.getCleanTrimmed(event.title)
-            if (titleCleanKey.isEmpty()) continue
-
-            val isKnown = existingCleanKeys.contains(event.locationKey) ||
-                    existingCleanKeys.contains(titleCleanKey) ||
-                    syncContext.syncedCalendarKeys.contains(event.locationKey) ||
-                    syncContext.syncedCalendarKeys.contains(titleCleanKey)
-
-            if (!isKnown) {
-                val alarmMins = queryEventAlarmMinutes(syncContext.context.contentResolver, event.id)
-                val alarmTags = alarmMins.distinct().joinToString(" ") { "#every${formatMinutesToDuration(it)}" }
-                val baseTitle = event.title.trim()
-                val fullText = if (alarmTags.isNotEmpty()) "$baseTitle $alarmTags" else baseTitle
-
-                val cleanKey = MainActivity.getCleanTrimmed(fullText)
-                syncContext.savedReminders.add(fullText)
-                syncContext.syncedCalendarKeys.add(cleanKey)
-                syncContext.syncedCalendarKeys.add(titleCleanKey)
-
-                if (event.dtStart > syncContext.now) {
-                    syncContext.editor.putLong("snooze_$cleanKey", event.dtStart)
-                    ReminderNotificationListenerService.lastTriggeredMap["snooze_$cleanKey"] = event.dtStart
-                }
-
-                modified = true
-            }
-        }
-        return modified
-    }
 }
