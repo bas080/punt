@@ -1987,20 +1987,40 @@ class RemindersAdapter(
         val isSnoozed = snoozeUntil > now
 
         holder.reminderInput.hint = "Reminder"
-        val recurringResult = CreateReminderReceiver.parseRecurrenceDuration(reminderText)
-        if (recurringResult != null && !isDone) {
+        val hasRecurrence = CreateReminderReceiver.parseRecurrenceDuration(reminderText) != null
+        val hasNotify = reminderText.contains("#notify", ignoreCase = true)
+
+        if ((hasRecurrence || hasNotify) && !isDone) {
             val spannable = android.text.SpannableStringBuilder(reminderText)
-            val tagMatches = Regex("(?i)#(?:every|repeat)(?:\\(([^)]+)\\)|[:/]?\\s*([^#\n]+)?)").findAll(reminderText)
-            val textColor = ContextCompat.getColor(context, R.color.text_secondary)
-            for (tagMatch in tagMatches) {
-                val start = tagMatch.range.first
-                var end = tagMatch.range.last + 1
-                while (end > start && reminderText[end - 1].isWhitespace()) {
-                    end--
+
+            if (hasRecurrence) {
+                val tagMatches = Regex("(?i)#(?:every|repeat)(?:\\(([^)]+)\\)|[:/]?\\s*([^#\n]+)?)").findAll(reminderText)
+                val textColor = ContextCompat.getColor(context, R.color.text_secondary)
+                for (tagMatch in tagMatches) {
+                    val start = tagMatch.range.first
+                    var end = tagMatch.range.last + 1
+                    while (end > start && reminderText[end - 1].isWhitespace()) {
+                        end--
+                    }
+                    val span = android.text.style.ForegroundColorSpan(textColor)
+                    spannable.setSpan(span, start, end, android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
                 }
-                val span = android.text.style.ForegroundColorSpan(textColor)
-                spannable.setSpan(span, start, end, android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
             }
+
+            if (hasNotify) {
+                val notifyMatches = Regex("(?i)#notify(?:\\(([^)]+)\\)|[:/]?\\s*([^#\n]+)?)").findAll(reminderText)
+                val accentSubtleColor = ContextCompat.getColor(context, R.color.accent_subtle)
+                for (notifyMatch in notifyMatches) {
+                    val start = notifyMatch.range.first
+                    var end = notifyMatch.range.last + 1
+                    while (end > start && reminderText[end - 1].isWhitespace()) {
+                        end--
+                    }
+                    val span = android.text.style.ForegroundColorSpan(accentSubtleColor)
+                    spannable.setSpan(span, start, end, android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+                }
+            }
+
             holder.reminderInput.setText(spannable, TextView.BufferType.SPANNABLE)
         } else {
             holder.reminderInput.setText(reminderText)

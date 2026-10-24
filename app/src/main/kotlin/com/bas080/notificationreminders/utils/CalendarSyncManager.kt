@@ -214,12 +214,62 @@ object CalendarSyncManager {
             put(CalendarContract.Events.EVENT_TIMEZONE, TimeZone.getDefault().id)
         }
 
-        try {
+        val eventId = try {
             if (existingId != null) {
                 val updateUri = ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, existingId)
                 context.contentResolver.update(updateUri, values, null, null)
+                existingId
             } else {
-                context.contentResolver.insert(CalendarContract.Events.CONTENT_URI, values)
+                val insertedUri = context.contentResolver.insert(CalendarContract.Events.CONTENT_URI, values)
+                insertedUri?.lastPathSegment?.toLongOrNull()
+            }
+        } catch (_: Exception) {
+            null
+        }
+
+        if (eventId != null) {
+            syncEventReminders(context, eventId, reminder, isPunted, eventStart)
+        }
+    }
+
+    private fun syncEventReminders(
+        context: Context,
+        eventId: Long,
+        reminder: String,
+        isPunted: Boolean,
+        eventStart: Long
+    ) {
+        try {
+            val remindersUri = CalendarContract.Reminders.CONTENT_URI
+            val deleteSelection = "${CalendarContract.Reminders.EVENT_ID} = ?"
+            val deleteArgs = arrayOf(eventId.toString())
+            context.contentResolver.delete(remindersUri, deleteSelection, deleteArgs)
+
+            val notifyDurations = if (isPunted) {
+                CreateReminderReceiver.parseNotifyDurations(reminder, eventStart)
+            } else {
+                val default9AmMillis = java.util.Calendar.getInstance().apply {
+                    timeInMillis = eventStart
+                    set(java.util.Calendar.HOUR_OF_DAY, 9)
+                    set(java.util.Calendar.MINUTE, 0)
+                    set(java.util.Calendar.SECOND, 0)
+                    set(java.util.Calendar.MILLISECOND, 0)
+                }.timeInMillis
+                CreateReminderReceiver.parseNotifyDurations(reminder, default9AmMillis)
+            }
+
+            if (notifyDurations.isNotEmpty()) {
+                for ((leadMs, _) in notifyDurations) {
+                    val minutes = (leadMs / ONE_MINUTE_MS).toInt()
+                    if (minutes >= 0) {
+                        val reminderValues = ContentValues().apply {
+                            put(CalendarContract.Reminders.EVENT_ID, eventId)
+                            put(CalendarContract.Reminders.MINUTES, minutes)
+                            put(CalendarContract.Reminders.METHOD, CalendarContract.Reminders.METHOD_ALERT)
+                        }
+                        context.contentResolver.insert(remindersUri, reminderValues)
+                    }
+                }
             }
         } catch (_: Exception) {
         }

@@ -129,6 +129,24 @@ class CalendarSyncManagerTest {
     }
 
     @Test
+    fun testSyncRemindersAttachesValarmEntriesForNotifyTags() {
+        shadowOf(context as android.app.Application).grantPermissions(
+            Manifest.permission.READ_CALENDAR,
+            Manifest.permission.WRITE_CALENDAR
+        )
+
+        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
+        prefs.edit()
+            .putStringSet("key_reminders_list", setOf("Meeting #notify 1d #notify 1h"))
+            .commit()
+
+        CalendarSyncManager.syncRemindersToCalendar(context)
+
+        val savedSet = prefs.getStringSet("key_reminders_list", emptySet()) ?: emptySet()
+        assertTrue(savedSet.contains("Meeting #notify 1d #notify 1h"))
+    }
+
+    @Test
     @Suppress("DEPRECATION")
     fun testSyncCalendarDeleteMarksReminderDone() {
         shadowOf(context as android.app.Application).grantPermissions(

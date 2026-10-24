@@ -473,6 +473,21 @@ class CreateReminderReceiverTest {
     }
 
     @Test
+    fun testParseNotifyDurations() {
+        val now = System.currentTimeMillis()
+
+        val list1 = CreateReminderReceiver.parseNotifyDurations("Meeting #notify 1d", now)
+        assertEquals(1, list1.size)
+        assertEquals(24 * 60 * 60 * 1000L, list1[0].first)
+
+        val listMultiple = CreateReminderReceiver.parseNotifyDurations("Appointment #notify 1d #notify(1h) #notify:15m", now)
+        assertEquals(3, listMultiple.size)
+        assertEquals(24 * 60 * 60 * 1000L, listMultiple[0].first)
+        assertEquals(60 * 60 * 1000L, listMultiple[1].first)
+        assertEquals(15 * 60 * 1000L, listMultiple[2].first)
+    }
+
+    @Test
     fun testActionDoneReminderRecurring() {
         val context = RuntimeEnvironment.getApplication()
         val prefs = context.getSharedPreferences("reminders_prefs", android.content.Context.MODE_PRIVATE)
