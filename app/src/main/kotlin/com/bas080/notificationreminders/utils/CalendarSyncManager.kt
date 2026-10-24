@@ -1,3 +1,4 @@
+@file:Suppress("TooManyFunctions")
 package com.bas080.notificationreminders.utils
 
 import android.Manifest
@@ -28,6 +29,7 @@ object CalendarSyncManager {
     private const val ALL_DAY_TRUE = 1
     private const val ALL_DAY_FALSE = 0
     private const val PROJECTION_DTSTART_INDEX = 3
+    private const val DEFAULT_ALL_DAY_HOUR = 9
 
     private var isSyncing = false
 
@@ -245,34 +247,47 @@ object CalendarSyncManager {
             val deleteArgs = arrayOf(eventId.toString())
             context.contentResolver.delete(remindersUri, deleteSelection, deleteArgs)
 
-            val notifyDurations = if (isPunted) {
-                CreateReminderReceiver.parseNotifyDurations(reminder, eventStart)
-            } else {
-                val default9AmMillis = java.util.Calendar.getInstance().apply {
-                    timeInMillis = eventStart
-                    set(java.util.Calendar.HOUR_OF_DAY, 9)
-                    set(java.util.Calendar.MINUTE, 0)
-                    set(java.util.Calendar.SECOND, 0)
-                    set(java.util.Calendar.MILLISECOND, 0)
-                }.timeInMillis
-                CreateReminderReceiver.parseNotifyDurations(reminder, default9AmMillis)
-            }
-
-            if (notifyDurations.isNotEmpty()) {
-                for ((leadMs, _) in notifyDurations) {
-                    val minutes = (leadMs / ONE_MINUTE_MS).toInt()
-                    if (minutes >= 0) {
-                        val reminderValues = ContentValues().apply {
-                            put(CalendarContract.Reminders.EVENT_ID, eventId)
-                            put(CalendarContract.Reminders.MINUTES, minutes)
-                            put(CalendarContract.Reminders.METHOD, CalendarContract.Reminders.METHOD_ALERT)
-                        }
-                        context.contentResolver.insert(remindersUri, reminderValues)
-                    }
-                }
+            val notifyDurations = getNotifyDurationsForEvent(reminder, isPunted, eventStart)
+            for ((leadMs, _) in notifyDurations) {
+                insertCalendarReminder(context, remindersUri, eventId, leadMs)
             }
         } catch (_: Exception) {
         }
+    }
+
+    private fun insertCalendarReminder(
+        context: Context,
+        remindersUri: android.net.Uri,
+        eventId: Long,
+        leadMs: Long
+    ) {
+        val minutes = (leadMs / ONE_MINUTE_MS).toInt()
+        if (minutes >= 0) {
+            val reminderValues = ContentValues().apply {
+                put(CalendarContract.Reminders.EVENT_ID, eventId)
+                put(CalendarContract.Reminders.MINUTES, minutes)
+                put(CalendarContract.Reminders.METHOD, CalendarContract.Reminders.METHOD_ALERT)
+            }
+            context.contentResolver.insert(remindersUri, reminderValues)
+        }
+    }
+
+    private fun getNotifyDurationsForEvent(
+        reminder: String,
+        isPunted: Boolean,
+        eventStart: Long
+    ): List<Pair<Long, String>> {
+        if (isPunted) {
+            return CreateReminderReceiver.parseNotifyDurations(reminder, eventStart)
+        }
+        val default9AmMillis = java.util.Calendar.getInstance().apply {
+            timeInMillis = eventStart
+            set(java.util.Calendar.HOUR_OF_DAY, DEFAULT_ALL_DAY_HOUR)
+            set(java.util.Calendar.MINUTE, 0)
+            set(java.util.Calendar.SECOND, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        return CreateReminderReceiver.parseNotifyDurations(reminder, default9AmMillis)
     }
 
     @Synchronized
