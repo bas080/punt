@@ -245,6 +245,47 @@ class CreateReminderReceiver : BroadcastReceiver() {
         }
 
         private val RECURRENCE_REGEX = Regex("(?i)#(?:every|repeat)(?:\\(([^)]+)\\)|[:/]?\\s*([^#\n]+)?)")
+        private val NOTIFY_REGEX = Regex("(?i)#notify(?:\\(([^)]+)\\)|[:/]?\\s*([^#\n]+)?)")
+
+        fun parseNotifyDurations(reminderText: String?, nowMillis: Long = System.currentTimeMillis()): List<Pair<Long, String>> {
+            if (reminderText.isNullOrBlank() || !reminderText.contains("#notify", ignoreCase = true)) {
+                return emptyList()
+            }
+            val clean = reminderText.replace(Regex("(?i)\\s*#done\\b"), "").trim()
+            val matches = NOTIFY_REGEX.findAll(clean).toList()
+            if (matches.isEmpty()) return emptyList()
+
+            val results = mutableListOf<Pair<Long, String>>()
+
+            for (match in matches) {
+                val rawDuration = when {
+                    match.groupValues[1].isNotBlank() -> match.groupValues[1].trim()
+                    match.groupValues[2].isNotBlank() -> match.groupValues[2].trim()
+                    else -> ""
+                }
+
+                if (rawDuration.isEmpty()) continue
+
+                var parseResult = parseSnoozeDuration(rawDuration, nowMillis)
+                if (parseResult == null) {
+                    val words = rawDuration.split("\\s+".toRegex())
+                    for (i in words.size - 1 downTo 1) {
+                        val subCandidate = words.take(i).joinToString(" ")
+                        val candidateParse = parseSnoozeDuration(subCandidate, nowMillis)
+                        if (candidateParse != null) {
+                            parseResult = candidateParse
+                            break
+                        }
+                    }
+                }
+
+                if (parseResult != null) {
+                    results.add(parseResult)
+                }
+            }
+
+            return results
+        }
 
         fun parseRecurrenceDuration(reminderText: String?, nowMillis: Long = System.currentTimeMillis()): Pair<Long, String>? {
             if (reminderText.isNullOrBlank()) return null

@@ -1262,7 +1262,7 @@ class MainActivityTest {
     @Test
     fun testRecurrenceTagSpanAppliedToRecurringTask() {
         val prefs = RuntimeEnvironment.getApplication().getSharedPreferences("reminders_prefs", android.content.Context.MODE_PRIVATE)
-        prefs.edit().putStringSet("key_reminders_list", setOf("Water plants #every 1d")).apply()
+        prefs.edit().putStringSet("key_reminders_list", setOf("Water plants #every 1d #notify 1h")).apply()
 
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
@@ -1274,7 +1274,7 @@ class MainActivityTest {
         assertTrue("Input text should be SPANNABLE", text is android.text.Spanned)
         val spanned = text as android.text.Spanned
         val spans = spanned.getSpans(0, spanned.length, android.text.style.ForegroundColorSpan::class.java)
-        assertEquals(1, spans.size)
+        assertEquals(2, spans.size)
     }
 
     @Test
