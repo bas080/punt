@@ -268,4 +268,62 @@ class CalendarSyncManagerTest {
         assertEquals(1, savedSet.size)
         assertTrue(savedSet.contains("Alex houseparty #social"))
     }
+
+    @Test
+    @Suppress("DEPRECATION")
+    fun testDeletingRecurringCalendarEventPuntsTaskToNextRecurrence() {
+        shadowOf(context as android.app.Application).grantPermissions(
+            Manifest.permission.READ_CALENDAR,
+            Manifest.permission.WRITE_CALENDAR
+        )
+        CalendarSyncManager.setCalendarSyncEnabled(context, true)
+
+        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
+        val now = System.currentTimeMillis()
+        val initialSnooze = now + 3600000L
+        prefs.edit()
+            .putStringSet("key_reminders_list", setOf("Recurring Meeting #every 1d"))
+            .putLong("snooze_recurring meeting #every 1d", initialSnooze)
+            .commit()
+
+        CalendarSyncManager.syncRemindersToCalendar(context)
+
+        val roboCursor = org.robolectric.fakes.RoboCursor().apply {
+            setColumnNames(listOf(
+                CalendarContract.Events._ID,
+                CalendarContract.Events.TITLE,
+                CalendarContract.Events.EVENT_LOCATION,
+                CalendarContract.Events.DTSTART,
+                CalendarContract.Events.SYNC_DATA1,
+                CalendarContract.Events.DESCRIPTION,
+                CalendarContract.Events.ALL_DAY
+            ))
+            setResults(emptyArray())
+        }
+        shadowOf(context.contentResolver).setCursor(CalendarContract.Events.CONTENT_URI, roboCursor)
+
+        CalendarSyncManager.syncCalendarChangesToReminders(context)
+
+        val savedSet = prefs.getStringSet("key_reminders_list", emptySet()) ?: emptySet()
+        assertTrue(savedSet.contains("Recurring Meeting #every 1d"))
+        assertFalse(savedSet.any { it.contains("#done") })
+
+        val newSnooze = prefs.getLong("snooze_recurring meeting #every 1d", 0L)
+        assertTrue(newSnooze > 0L)
+    }
+
+    @Test
+    fun testSyncGracefullyHandlesNoCalendarPermission() {
+        // Revoke permissions
+        shadowOf(context as android.app.Application).denyPermissions(
+            Manifest.permission.READ_CALENDAR,
+            Manifest.permission.WRITE_CALENDAR
+        )
+
+        // Syncing without permission should do nothing and not throw exceptions
+        CalendarSyncManager.syncRemindersToCalendar(context)
+        CalendarSyncManager.syncCalendarChangesToReminders(context)
+
+        assertFalse(CalendarSyncManager.hasCalendarPermission(context))
+    }
 }
