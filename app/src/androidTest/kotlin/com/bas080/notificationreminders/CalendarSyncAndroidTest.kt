@@ -7,19 +7,26 @@ import android.content.Context
 import android.provider.CalendarContract
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.rule.GrantPermissionRule
 import com.bas080.notificationreminders.utils.CalendarSyncManager
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.util.TimeZone
 
 @RunWith(AndroidJUnit4::class)
 class CalendarSyncAndroidTest {
+
+    @get:Rule
+    val permissionRule: GrantPermissionRule = GrantPermissionRule.grant(
+        Manifest.permission.READ_CALENDAR,
+        Manifest.permission.WRITE_CALENDAR
+    )
 
     private lateinit var context: Context
 
@@ -28,18 +35,6 @@ class CalendarSyncAndroidTest {
         context = ApplicationProvider.getApplicationContext()
         val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
         prefs.edit().clear().commit()
-
-        try {
-            InstrumentationRegistry.getInstrumentation().uiAutomation.grantRuntimePermission(
-                context.packageName,
-                Manifest.permission.READ_CALENDAR
-            )
-            InstrumentationRegistry.getInstrumentation().uiAutomation.grantRuntimePermission(
-                context.packageName,
-                Manifest.permission.WRITE_CALENDAR
-            )
-        } catch (_: Exception) {
-        }
     }
 
     @Test
