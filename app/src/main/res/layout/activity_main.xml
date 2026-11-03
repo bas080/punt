@@ -57,19 +57,20 @@
                     android:paddingHorizontal="4dp"
                     android:background="@null" />
 
-                <!-- Static Enter Symbol Indicator -->
+                <!-- Clear Button replacing static enter indicator -->
                 <ImageView
-                    android:id="@+id/icon_enter_indicator"
-                    android:layout_width="20dp"
-                    android:layout_height="20dp"
-                    android:src="@drawable/ic_action_enter"
+                    android:id="@+id/btn_clear_input"
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:src="@drawable/ic_action_clear_circle"
                     app:tint="@color/text_secondary"
-                    android:contentDescription="Press Enter to create task"
+                    android:contentDescription="@string/clear"
                     android:scaleType="centerInside"
-                    android:padding="2dp"
+                    android:padding="4dp"
                     android:layout_marginStart="4dp"
-                    android:clickable="false"
-                    android:focusable="false" />
+                    android:visibility="gone"
+                    android:clickable="true"
+                    android:focusable="true" />
 
                 <!-- Menu Action Button replacing old filter button -->
                 <ImageView

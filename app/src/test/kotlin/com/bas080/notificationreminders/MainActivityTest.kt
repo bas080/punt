@@ -596,6 +596,37 @@ class MainActivityTest {
     }
 
     @Test
+    fun testClearInputButtonClickClearsInputAndResetsFilter() {
+        val context = RuntimeEnvironment.getApplication()
+        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
+        prefs.edit().clear().putStringSet("key_reminders_list", setOf("Buy milk", "Clean garage")).commit()
+
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = controller.get()
+
+        val input = activity.findViewById<EditText>(R.id.search_reminder_input)
+        val btnClear = activity.findViewById<ImageView>(R.id.btn_clear_input)
+        val recyclerView = activity.findViewById<RecyclerView>(R.id.reminders_list)
+
+        assertNotNull(btnClear)
+        assertEquals(View.GONE, btnClear.visibility)
+
+        // Type "milk"
+        input.setText("milk")
+        shadowOf(android.os.Looper.getMainLooper()).idleFor(250, java.util.concurrent.TimeUnit.MILLISECONDS)
+        assertEquals(View.VISIBLE, btnClear.visibility)
+        assertEquals(3, recyclerView.adapter!!.itemCount)
+
+        // Click clear button
+        btnClear.performClick()
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        assertEquals("", input.text.toString())
+        assertEquals(View.GONE, btnClear.visibility)
+        assertEquals(4, recyclerView.adapter!!.itemCount)
+    }
+
+    @Test
     fun testSearchQueryIsPersistedAndRestoredAcrossActivityRecreation() {
         val context = RuntimeEnvironment.getApplication()
         val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
@@ -798,28 +829,6 @@ class MainActivityTest {
 
         val savedSet = prefs.getStringSet("key_reminders_list", emptySet()) ?: emptySet()
         assertTrue("Saved set should contain 'Task 1 #done'", savedSet.contains("Task 1 #done"))
-    }
-
-    @Test
-    fun testMarkingPuntedRecurringReminderDoneMarksDoneInsteadOfPuntingAgain() {
-        val context = RuntimeEnvironment.getApplication()
-        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
-        val futureSnooze = System.currentTimeMillis() + 3600000L
-        prefs.edit().clear()
-            .putStringSet("key_reminders_list", setOf("Water plants #every 1w"))
-            .putLong("snooze_water plants #every 1w", futureSnooze)
-            .commit()
-
-        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
-        val activity = controller.get()
-
-        val markDoneMethod = MainActivity::class.java.getDeclaredMethod("markReminderDone", String::class.java)
-        markDoneMethod.isAccessible = true
-        markDoneMethod.invoke(activity, "Water plants #every 1w")
-        shadowOf(android.os.Looper.getMainLooper()).idle()
-
-        val savedSet = prefs.getStringSet("key_reminders_list", emptySet()) ?: emptySet()
-        assertTrue("Saved set should contain 'Water plants #every 1w #done'", savedSet.contains("Water plants #every 1w #done"))
     }
 
     @Test
@@ -1265,33 +1274,20 @@ class MainActivityTest {
     @Test
     fun testSwipePeekingIconForRecurringTask() {
         val prefs = RuntimeEnvironment.getApplication().getSharedPreferences("reminders_prefs", android.content.Context.MODE_PRIVATE)
-        val futureSnooze = System.currentTimeMillis() + 3600000L
-        prefs.edit()
-            .putStringSet("key_reminders_list", setOf("Water plants #every 1d", "Punted recurring #every 1d"))
-            .putLong("snooze_punted recurring #every 1d", futureSnooze)
-            .apply()
+        prefs.edit().putStringSet("key_reminders_list", setOf("Water plants #every 1d", "Buy milk")).apply()
 
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
 
         val swipeHandler = activity.createSwipeHandler()
         val recyclerView = activity.findViewById<androidx.recyclerview.widget.RecyclerView>(R.id.reminders_list)
+        val holder = recyclerView.findViewHolderForAdapterPosition(1)!!
 
         val canvas = android.graphics.Canvas()
+        swipeHandler.onChildDraw(canvas, recyclerView, holder, 100f, 0f, ItemTouchHelper.ACTION_STATE_SWIPE, true)
 
-        // Active recurring task (Position 1)
-        val activeHolder = recyclerView.findViewHolderForAdapterPosition(1)!!
-        swipeHandler.onChildDraw(canvas, recyclerView, activeHolder, 100f, 0f, ItemTouchHelper.ACTION_STATE_SWIPE, true)
-
-        val recurringResultActive = CreateReminderReceiver.parseRecurrenceDuration("Water plants #every 1d")
-        assertNotNull(recurringResultActive)
-
-        // Punted recurring task (Position 3 = ACTIVE header + active task + PUNTED header + punted task)
-        val puntedHolder = recyclerView.findViewHolderForAdapterPosition(3)!!
-        swipeHandler.onChildDraw(canvas, recyclerView, puntedHolder, 100f, 0f, ItemTouchHelper.ACTION_STATE_SWIPE, true)
-
-        val recurringResultPunted = CreateReminderReceiver.parseRecurrenceDuration("Punted recurring #every 1d")
-        assertNotNull(recurringResultPunted)
+        val recurringResult = CreateReminderReceiver.parseRecurrenceDuration("Water plants #every 1d")
+        assertNotNull(recurringResult)
     }
 
     @Test

@@ -157,6 +157,7 @@ class MainActivity : AppCompatActivity() {
         setupRecyclerView()
         setupSwipeRefresh()
         setupSwipeGestures()
+        setupClearInputButton()
         loadReminders()
 
         checkAndShowCrashReportDialog()
@@ -458,6 +459,21 @@ class MainActivity : AppCompatActivity() {
         dialog.show()
     }
 
+    private fun setupClearInputButton() {
+        markAsButtonAccessibility(binding.btnClearInput)
+        binding.btnClearInput.setOnClickListener {
+            binding.searchReminderInput.setText("")
+            searchRunnable?.let { searchHandler.removeCallbacks(it) }
+            currentSearchQuery = ""
+            getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
+                .edit()
+                .putString(KEY_SEARCH_QUERY, "")
+                .apply()
+            recentlyDoneReminders.clear()
+            updateSummaryAndAdapter()
+        }
+    }
+
     private fun setupSearchInput() {
         binding.searchReminderInput.setOnFocusChangeListener { _, hasFocus ->
             binding.searchReminderInput.maxLines = if (hasFocus) Int.MAX_VALUE else 4
@@ -539,7 +555,9 @@ class MainActivity : AppCompatActivity() {
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
                 searchRunnable?.let { searchHandler.removeCallbacks(it) }
                 val query = s?.toString() ?: ""
-                searchRunnable = Runnable {
+                binding.btnClearInput.visibility = if (query.isNotEmpty()) View.VISIBLE else View.GONE
+                val delay = 200L
+                val runnable = Runnable {
                     if (currentSearchQuery != query) {
                         recentlyDoneReminders.clear()
                     }
@@ -550,7 +568,8 @@ class MainActivity : AppCompatActivity() {
                         .apply()
                     updateSummaryAndAdapter()
                 }
-                searchHandler.postDelayed(searchRunnable!!, 200L)
+                searchRunnable = runnable
+                searchHandler.postDelayed(runnable, delay)
             }
             override fun afterTextChanged(s: Editable?) {}
         })
@@ -567,6 +586,7 @@ class MainActivity : AppCompatActivity() {
             .apply()
         recentlyDoneReminders.clear()
         binding.searchReminderInput.setText("")
+        binding.btnClearInput.visibility = View.GONE
         updateSearchInputHint()
         updateSummaryAndAdapter()
     }
@@ -927,22 +947,13 @@ class MainActivity : AppCompatActivity() {
                         background.setBounds(itemView.left, itemView.top, itemView.left + dX.toInt(), itemView.bottom)
                         background.draw(c)
 
-                        val isRecurringAndActive = if (position in displayedReminders.indices) {
-                            val reminderText = displayedReminders[position]
-                            val cleanTrimmed = getCleanTrimmed(reminderText)
-                            val prefs = getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
-                            val now = System.currentTimeMillis()
-                            val snoozeUntil = prefs.getLong("snooze_$cleanTrimmed", 0L).let {
-                                if (it > 0L) it else (ReminderNotificationListenerService.lastTriggeredMap["snooze_$cleanTrimmed"] ?: 0L)
-                            }
-                            val isPunted = snoozeUntil > now
-                            val isRecurring = CreateReminderReceiver.parseRecurrenceDuration(reminderText) != null
-                            isRecurring && !isPunted
+                        val isRecurring = if (position in displayedReminders.indices) {
+                            CreateReminderReceiver.parseRecurrenceDuration(displayedReminders[position]) != null
                         } else false
 
                         icon = ContextCompat.getDrawable(
                             this@MainActivity,
-                            if (isRecurringAndActive) R.drawable.ic_action_repeat else R.drawable.ic_action_done
+                            if (isRecurring) R.drawable.ic_action_repeat else R.drawable.ic_action_done
                         )
                         icon?.let {
                             val vMargin = (itemView.height - it.intrinsicHeight) / 2
@@ -1201,28 +1212,21 @@ class MainActivity : AppCompatActivity() {
         val idx = activeReminders.indexOf(reminderText)
         if (idx != -1) {
             com.bas080.notificationreminders.utils.ExperimentTracker.trackTaskLifecycle(this, "marked_done")
-            val cleanTrimmed = getCleanTrimmed(reminderText)
-            val prefs = getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
-            val now = System.currentTimeMillis()
-            val currentSnooze = prefs.getLong("snooze_$cleanTrimmed", 0L).let {
-                if (it > 0L) it else (ReminderNotificationListenerService.lastTriggeredMap["snooze_$cleanTrimmed"] ?: 0L)
-            }
-            val isPunted = currentSnooze > now
             val recurringResult = CreateReminderReceiver.parseRecurrenceDuration(reminderText)
-
-            if (recurringResult != null && !isPunted) {
+            if (recurringResult != null) {
                 val (snoozeMs, durationLabel) = recurringResult
-                val snoozeUntil = now + snoozeMs
+                val snoozeUntil = System.currentTimeMillis() + snoozeMs
                 val cleanText = reminderText.replace(Regex("(?i)\\s*#done\\b"), "").trim()
-                val cleanKey = cleanText.lowercase()
+                val cleanTrimmed = cleanText.lowercase()
 
                 activeReminders[idx] = cleanText
 
+                val prefs = getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
                 prefs.edit()
                     .putStringSet(KEY_REMINDERS, activeReminders.toSet())
-                    .putLong("snooze_$cleanKey", snoozeUntil)
+                    .putLong("snooze_$cleanTrimmed", snoozeUntil)
                     .apply()
-                ReminderNotificationListenerService.lastTriggeredMap["snooze_$cleanKey"] = snoozeUntil
+                ReminderNotificationListenerService.lastTriggeredMap["snooze_$cleanTrimmed"] = snoozeUntil
 
                 val notificationId = ReminderNotificationListenerService.getNotificationIdForReminder(reminderText)
                 val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager
@@ -1241,6 +1245,7 @@ class MainActivity : AppCompatActivity() {
                 }
                 activeReminders[idx] = doneText
                 recentlyDoneReminders.add(doneText)
+                val prefs = getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
                 prefs.edit().putStringSet(KEY_REMINDERS, activeReminders.toSet()).apply()
 
                 val notificationId = ReminderNotificationListenerService.getNotificationIdForReminder(reminderText)
@@ -1330,6 +1335,7 @@ class MainActivity : AppCompatActivity() {
         if (binding.searchReminderInput.text.toString() != savedQuery) {
             binding.searchReminderInput.setText(savedQuery)
         }
+        binding.btnClearInput.visibility = if (binding.searchReminderInput.text.isNotEmpty()) View.VISIBLE else View.GONE
         activeReminders.clear()
         activeReminders.addAll(savedSet)
         updateSummaryAndAdapter()
