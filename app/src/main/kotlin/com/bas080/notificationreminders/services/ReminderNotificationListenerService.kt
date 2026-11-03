@@ -103,7 +103,7 @@ class ReminderNotificationListenerService : NotificationListenerService() {
 
         @JvmOverloads
         fun getTopSnoozeChoices(context: Context, targetReminder: String? = null): Array<CharSequence> {
-            val defaultChoices = listOf("15m", "1h", "4h", "24h", "1w")
+            val defaultChoices = listOf("15m", "1h", "4h", "24h", "1w", "1M")
             val prefs = context.getSharedPreferences("snooze_freq_prefs", Context.MODE_PRIVATE)
             val allEntries = prefs.all
 
