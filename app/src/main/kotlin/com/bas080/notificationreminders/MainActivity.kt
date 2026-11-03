@@ -337,6 +337,7 @@ class MainActivity : AppCompatActivity() {
             setPadding((12 * density).toInt(), (4 * density).toInt(), 0, (4 * density).toInt())
             isClickable = true
             isFocusable = true
+            visibility = View.GONE
         }
 
         row2.addView(btnDonate)
