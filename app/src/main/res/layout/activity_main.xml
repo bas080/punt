@@ -57,19 +57,20 @@
                     android:paddingHorizontal="4dp"
                     android:background="@null" />
 
-                <!-- Static Enter Symbol Indicator -->
+                <!-- Clear Button replacing static enter indicator -->
                 <ImageView
-                    android:id="@+id/icon_enter_indicator"
-                    android:layout_width="20dp"
-                    android:layout_height="20dp"
-                    android:src="@drawable/ic_action_enter"
+                    android:id="@+id/btn_clear_input"
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:src="@drawable/ic_action_clear_circle"
                     app:tint="@color/text_secondary"
-                    android:contentDescription="Press Enter to create task"
+                    android:contentDescription="@string/clear"
                     android:scaleType="centerInside"
-                    android:padding="2dp"
+                    android:padding="4dp"
                     android:layout_marginStart="4dp"
-                    android:clickable="false"
-                    android:focusable="false" />
+                    android:visibility="gone"
+                    android:clickable="true"
+                    android:focusable="true" />
 
                 <!-- Menu Action Button replacing old filter button -->
                 <ImageView
@@ -162,160 +163,161 @@
 
         </LinearLayout>
 
-        <!-- Top Menu Pill Overlay Container -->
+        <!-- Top Menu Dropdown Overlay Container -->
         <LinearLayout
             android:id="@+id/menu_container"
-            android:layout_width="wrap_content"
+            android:layout_width="160dp"
             android:layout_height="wrap_content"
             android:layout_gravity="top|end"
             android:layout_marginTop="50dp"
             android:layout_marginEnd="4dp"
             android:orientation="vertical"
-            android:gravity="end"
             android:visibility="gone"
+            android:background="@drawable/bg_card"
             android:elevation="12dp"
-            android:translationZ="12dp">
+            android:translationZ="12dp"
+            android:paddingVertical="4dp">
 
-            <!-- Action Pill: Focus -->
+            <!-- Menu Item: Focus -->
             <LinearLayout
                 android:id="@+id/btn_menu_focus_profiles"
-                android:layout_width="wrap_content"
-                android:layout_height="40dp"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
                 android:orientation="horizontal"
-                android:gravity="center"
-                android:paddingHorizontal="18dp"
-                android:elevation="12dp"
-                android:translationZ="12dp"
+                android:gravity="center_vertical"
+                android:paddingHorizontal="16dp"
                 android:clickable="true"
                 android:focusable="true"
-                android:background="@drawable/bg_pill_inverted"
-                android:layout_marginBottom="8dp">
+                android:background="?attr/selectableItemBackground">
 
                 <ImageView
                     android:layout_width="18dp"
                     android:layout_height="18dp"
                     android:src="@drawable/ic_action_search"
-                    app:tint="@color/bg_dark"
+                    app:tint="@color/text_primary"
                     android:contentDescription="Focus"
                     android:scaleType="centerInside"
-                    android:layout_marginEnd="8dp" />
+                    android:layout_marginEnd="12dp" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Focus"
                     android:textSize="14sp"
-                    android:textStyle="bold"
                     android:maxLines="1"
                     android:singleLine="true"
-                    android:textColor="@color/bg_dark" />
+                    android:textColor="@color/text_primary" />
 
             </LinearLayout>
 
-            <!-- Action Pill: Punt -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="@color/divider_color" />
+
+            <!-- Menu Item: Punt -->
             <LinearLayout
                 android:id="@+id/btn_menu_punt_all"
-                android:layout_width="wrap_content"
-                android:layout_height="40dp"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
                 android:orientation="horizontal"
-                android:gravity="center"
-                android:paddingHorizontal="18dp"
-                android:elevation="12dp"
-                android:translationZ="12dp"
+                android:gravity="center_vertical"
+                android:paddingHorizontal="16dp"
                 android:clickable="true"
                 android:focusable="true"
-                android:background="@drawable/bg_pill_inverted"
-                android:layout_marginBottom="8dp">
+                android:background="?attr/selectableItemBackground">
 
                 <ImageView
                     android:layout_width="18dp"
                     android:layout_height="18dp"
                     android:src="@drawable/ic_action_snooze"
-                    app:tint="@color/bg_dark"
+                    app:tint="@color/text_primary"
                     android:contentDescription="Punt"
                     android:scaleType="centerInside"
-                    android:layout_marginEnd="8dp" />
+                    android:layout_marginEnd="12dp" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Punt"
                     android:textSize="14sp"
-                    android:textStyle="bold"
                     android:maxLines="1"
                     android:singleLine="true"
-                    android:textColor="@color/bg_dark" />
+                    android:textColor="@color/text_primary" />
 
             </LinearLayout>
 
-            <!-- Action Pill: Share -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="@color/divider_color" />
+
+            <!-- Menu Item: Share -->
             <LinearLayout
                 android:id="@+id/btn_menu_share_matching"
-                android:layout_width="wrap_content"
-                android:layout_height="40dp"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
                 android:orientation="horizontal"
-                android:gravity="center"
-                android:paddingHorizontal="18dp"
-                android:elevation="12dp"
-                android:translationZ="12dp"
+                android:gravity="center_vertical"
+                android:paddingHorizontal="16dp"
                 android:clickable="true"
                 android:focusable="true"
-                android:background="@drawable/bg_pill_inverted"
-                android:layout_marginBottom="8dp">
+                android:background="?attr/selectableItemBackground">
 
                 <ImageView
                     android:layout_width="18dp"
                     android:layout_height="18dp"
                     android:src="@drawable/ic_action_share"
-                    app:tint="@color/bg_dark"
+                    app:tint="@color/text_primary"
                     android:contentDescription="Share"
                     android:scaleType="centerInside"
-                    android:layout_marginEnd="8dp" />
+                    android:layout_marginEnd="12dp" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Share"
                     android:textSize="14sp"
-                    android:textStyle="bold"
                     android:maxLines="1"
                     android:singleLine="true"
-                    android:textColor="@color/bg_dark" />
+                    android:textColor="@color/text_primary" />
 
             </LinearLayout>
 
-            <!-- Action Pill: About -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="@color/divider_color" />
+
+            <!-- Menu Item: About -->
             <LinearLayout
                 android:id="@+id/btn_menu_about"
-                android:layout_width="wrap_content"
-                android:layout_height="40dp"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
                 android:orientation="horizontal"
-                android:gravity="center"
-                android:paddingHorizontal="18dp"
-                android:elevation="12dp"
-                android:translationZ="12dp"
+                android:gravity="center_vertical"
+                android:paddingHorizontal="16dp"
                 android:clickable="true"
                 android:focusable="true"
-                android:background="@drawable/bg_pill_inverted">
+                android:background="?attr/selectableItemBackground">
 
                 <ImageView
                     android:layout_width="18dp"
                     android:layout_height="18dp"
                     android:src="@drawable/ic_notification_reminder"
-                    app:tint="@color/bg_dark"
+                    app:tint="@color/text_primary"
                     android:contentDescription="About"
                     android:scaleType="centerInside"
-                    android:layout_marginEnd="8dp" />
+                    android:layout_marginEnd="12dp" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="About"
                     android:textSize="14sp"
-                    android:textStyle="bold"
                     android:maxLines="1"
                     android:singleLine="true"
-                    android:textColor="@color/bg_dark" />
+                    android:textColor="@color/text_primary" />
 
             </LinearLayout>
 

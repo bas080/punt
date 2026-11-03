@@ -411,6 +411,12 @@ class CreateReminderReceiverTest {
         assertEquals("1w", CreateReminderReceiver.canonicalizeSnoozeChoice("1 week"))
         assertEquals("1w", CreateReminderReceiver.canonicalizeSnoozeChoice("1week"))
         assertEquals("1w", CreateReminderReceiver.canonicalizeSnoozeChoice("w"))
+        assertEquals("1M", CreateReminderReceiver.canonicalizeSnoozeChoice("1M"))
+        assertEquals("1M", CreateReminderReceiver.canonicalizeSnoozeChoice("1 month"))
+        assertEquals("1M", CreateReminderReceiver.canonicalizeSnoozeChoice("1month"))
+        assertEquals("1M", CreateReminderReceiver.canonicalizeSnoozeChoice("M"))
+        assertEquals("3M", CreateReminderReceiver.canonicalizeSnoozeChoice("3M"))
+        assertEquals("3M", CreateReminderReceiver.canonicalizeSnoozeChoice("3 months"))
         assertEquals("00:00", CreateReminderReceiver.canonicalizeSnoozeChoice("12am"))
         assertEquals("12:00", CreateReminderReceiver.canonicalizeSnoozeChoice("12pm"))
         assertEquals("09:00", CreateReminderReceiver.canonicalizeSnoozeChoice("900"))
@@ -453,6 +459,23 @@ class CreateReminderReceiverTest {
         val parseMultiple = CreateReminderReceiver.parseRecurrenceDuration("Workout #every 2d #every 12h #repeat 1w", now)
         assertNotNull(parseMultiple)
         assertEquals(12 * 60 * 60 * 1000L, parseMultiple!!.first)
+
+        // Test month duration disambiguation: 1M (month = 30d) vs 1m (minute)
+        val parseMinute = CreateReminderReceiver.parseRecurrenceDuration("Quick check #every 1m", now)
+        assertNotNull(parseMinute)
+        assertEquals(60 * 1000L, parseMinute!!.first)
+
+        val parseMonthUpper = CreateReminderReceiver.parseRecurrenceDuration("Monthly rent #every 1M", now)
+        assertNotNull(parseMonthUpper)
+        assertEquals(30 * 24 * 60 * 60 * 1000L, parseMonthUpper!!.first)
+
+        val parseMonthParenthesis = CreateReminderReceiver.parseRecurrenceDuration("Review finances #every(1M)", now)
+        assertNotNull(parseMonthParenthesis)
+        assertEquals(30 * 24 * 60 * 60 * 1000L, parseMonthParenthesis!!.first)
+
+        val parse3Months = CreateReminderReceiver.parseRecurrenceDuration("Quarterly checkup #repeat 3M", now)
+        assertNotNull(parse3Months)
+        assertEquals(3 * 30 * 24 * 60 * 60 * 1000L, parse3Months!!.first)
 
         // Test weekday recurrence evaluation selecting nearest day
         // Fixed base timestamp at Thursday, March 13, 2025 at 10:00 AM

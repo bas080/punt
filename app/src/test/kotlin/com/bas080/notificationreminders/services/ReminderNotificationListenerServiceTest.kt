@@ -334,8 +334,9 @@ class ReminderNotificationListenerServiceTest {
     fun testGetTopSnoozeChoicesDefaultAndRecent() {
         val context = RuntimeEnvironment.getApplication()
         val defaultChoices = ReminderNotificationListenerService.getTopSnoozeChoices(context)
-        assertEquals(5, defaultChoices.size)
+        assertEquals(6, defaultChoices.size)
         assertEquals("15m", defaultChoices[0].toString())
+        assertTrue(defaultChoices.map { it.toString() }.contains("1M"))
 
         // Save custom snooze timestamps
         val prefs = context.getSharedPreferences("snooze_freq_prefs", Context.MODE_PRIVATE)

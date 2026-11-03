@@ -157,6 +157,7 @@ class MainActivity : AppCompatActivity() {
         setupRecyclerView()
         setupSwipeRefresh()
         setupSwipeGestures()
+        setupClearInputButton()
         loadReminders()
 
         checkAndShowCrashReportDialog()
@@ -336,6 +337,7 @@ class MainActivity : AppCompatActivity() {
             setPadding((12 * density).toInt(), (4 * density).toInt(), 0, (4 * density).toInt())
             isClickable = true
             isFocusable = true
+            visibility = View.GONE
         }
 
         row2.addView(btnDonate)
@@ -458,6 +460,21 @@ class MainActivity : AppCompatActivity() {
         dialog.show()
     }
 
+    private fun setupClearInputButton() {
+        markAsButtonAccessibility(binding.btnClearInput)
+        binding.btnClearInput.setOnClickListener {
+            binding.searchReminderInput.setText("")
+            searchRunnable?.let { searchHandler.removeCallbacks(it) }
+            currentSearchQuery = ""
+            getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
+                .edit()
+                .putString(KEY_SEARCH_QUERY, "")
+                .apply()
+            recentlyDoneReminders.clear()
+            updateSummaryAndAdapter()
+        }
+    }
+
     private fun setupSearchInput() {
         binding.searchReminderInput.setOnFocusChangeListener { _, hasFocus ->
             binding.searchReminderInput.maxLines = if (hasFocus) Int.MAX_VALUE else 4
@@ -539,7 +556,9 @@ class MainActivity : AppCompatActivity() {
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
                 searchRunnable?.let { searchHandler.removeCallbacks(it) }
                 val query = s?.toString() ?: ""
-                searchRunnable = Runnable {
+                binding.btnClearInput.visibility = if (query.isNotEmpty()) View.VISIBLE else View.GONE
+                val delay = 200L
+                val runnable = Runnable {
                     if (currentSearchQuery != query) {
                         recentlyDoneReminders.clear()
                     }
@@ -550,7 +569,8 @@ class MainActivity : AppCompatActivity() {
                         .apply()
                     updateSummaryAndAdapter()
                 }
-                searchHandler.postDelayed(searchRunnable!!, 200L)
+                searchRunnable = runnable
+                searchHandler.postDelayed(runnable, delay)
             }
             override fun afterTextChanged(s: Editable?) {}
         })
@@ -567,6 +587,7 @@ class MainActivity : AppCompatActivity() {
             .apply()
         recentlyDoneReminders.clear()
         binding.searchReminderInput.setText("")
+        binding.btnClearInput.visibility = View.GONE
         updateSearchInputHint()
         updateSummaryAndAdapter()
     }
@@ -1315,6 +1336,7 @@ class MainActivity : AppCompatActivity() {
         if (binding.searchReminderInput.text.toString() != savedQuery) {
             binding.searchReminderInput.setText(savedQuery)
         }
+        binding.btnClearInput.visibility = if (binding.searchReminderInput.text.isNotEmpty()) View.VISIBLE else View.GONE
         activeReminders.clear()
         activeReminders.addAll(savedSet)
         updateSummaryAndAdapter()

@@ -20,15 +20,31 @@ class CreateReminderReceiver : BroadcastReceiver() {
         fun canonicalizeSingleSnoozeChoice(raw: String): String? {
             if (raw.isEmpty()) return "1h"
 
+            val trimmed = raw.trim()
+            val lower = trimmed.lowercase()
+
             when {
-                raw == "15m" || raw == "15 mins" || raw == "15 minutes" || raw == "15min" -> return "15m"
-                raw == "1h" || raw == "1 hour" || raw == "1 hr" || raw == "1hour" -> return "1h"
-                raw == "4h" || raw == "4 hours" || raw == "4 hrs" || raw == "4hour" -> return "4h"
-                raw == "24h" || raw == "1 day" || raw == "24 hours" || raw == "24 hrs" || raw == "1day" || raw == "1d" -> return "24h"
-                raw == "1w" || raw == "1 week" || raw == "1week" || raw == "w" -> return "1w"
+                lower == "15m" || lower == "15 mins" || lower == "15 minutes" || lower == "15min" -> return "15m"
+                lower == "1h" || lower == "1 hour" || lower == "1 hr" || lower == "1hour" -> return "1h"
+                lower == "4h" || lower == "4 hours" || lower == "4 hrs" || lower == "4hour" -> return "4h"
+                lower == "24h" || lower == "1 day" || lower == "24 hours" || lower == "24 hrs" || lower == "1day" || lower == "1d" -> return "24h"
+                lower == "1w" || lower == "1 week" || lower == "1week" || lower == "w" -> return "1w"
+                trimmed == "1M" || lower == "1 month" || lower == "1month" || trimmed == "M" -> return "1M"
             }
 
-            val weekdayResult = parseWeekdaySnooze(raw, System.currentTimeMillis())
+            val monthMatch = Regex("^(\\d+)\\s*(?:months?|M)$", RegexOption.IGNORE_CASE).find(trimmed)
+            if (monthMatch != null) {
+                // If it explicitly ended in uppercase M or words "month"/"months"
+                val isExplicitMonth = trimmed.contains("month", ignoreCase = true) || trimmed.contains("M")
+                if (isExplicitMonth) {
+                    val num = monthMatch.groupValues[1].toLongOrNull()
+                    if (num != null && num > 0) {
+                        return "${num}M"
+                    }
+                }
+            }
+
+            val weekdayResult = parseWeekdaySnooze(lower, System.currentTimeMillis())
             if (weekdayResult != null) {
                 return weekdayResult.second
             }
@@ -74,7 +90,7 @@ class CreateReminderReceiver : BroadcastReceiver() {
         }
 
         fun canonicalizeSnoozeChoice(input: String?): String? {
-            val raw = input?.trim()?.lowercase() ?: ""
+            val raw = input?.trim() ?: ""
             if (raw.isEmpty()) return "1h"
 
             val single = canonicalizeSingleSnoozeChoice(raw)
@@ -125,35 +141,58 @@ class CreateReminderReceiver : BroadcastReceiver() {
         }
 
         fun parseSingleSnoozeDuration(input: String?, nowMillis: Long = System.currentTimeMillis()): Pair<Long, String>? {
-            val raw = input?.trim()?.lowercase() ?: ""
-            if (raw.isEmpty()) {
+            val trimmed = input?.trim() ?: ""
+            if (trimmed.isEmpty()) {
                 return Pair(60 * 60 * 1000L, "1 hour")
             }
+            val lower = trimmed.lowercase()
 
             when {
-                raw == "15m" || raw == "15 mins" || raw == "15 minutes" || raw == "15min" ->
+                lower == "15m" || lower == "15 mins" || lower == "15 minutes" || lower == "15min" ->
                     return Pair(15 * 60 * 1000L, "15 minutes")
-                raw == "1h" || raw == "1 hour" || raw == "1 hr" || raw == "1hour" ->
+                lower == "1h" || lower == "1 hour" || lower == "1 hr" || lower == "1hour" ->
                     return Pair(60 * 60 * 1000L, "1 hour")
-                raw == "4h" || raw == "4 hours" || raw == "4 hrs" || raw == "4hour" ->
+                lower == "4h" || lower == "4 hours" || lower == "4 hrs" || lower == "4hour" ->
                     return Pair(4 * 60 * 60 * 1000L, "4 hours")
-                raw == "24h" || raw == "1 day" || raw == "24 hours" || raw == "24 hrs" || raw == "1day" || raw == "1d" ->
+                lower == "24h" || lower == "1 day" || lower == "24 hours" || lower == "24 hrs" || lower == "1day" || lower == "1d" ->
                     return Pair(24 * 60 * 60 * 1000L, "24 hours")
-                raw == "1w" || raw == "1 week" || raw == "1week" || raw == "w" ->
+                lower == "1w" || lower == "1 week" || lower == "1week" || lower == "w" ->
                     return Pair(7 * 24 * 60 * 60 * 1000L, "1 week")
+                trimmed == "1M" || lower == "1 month" || lower == "1month" || trimmed == "M" ->
+                    return Pair(30 * 24 * 60 * 60 * 1000L, "1 month")
             }
 
-            val weekdayResult = parseWeekdaySnooze(raw, nowMillis)
+            val monthMatch = Regex("^(\\d+)\\s*(?:months?|M)$").find(trimmed)
+            if (monthMatch != null) {
+                val num = monthMatch.groupValues[1].toLongOrNull()
+                if (num != null && num > 0) {
+                    val ms = num * 30 * 24 * 60 * 60 * 1000L
+                    val label = if (num == 1L) "1 month" else "$num months"
+                    return Pair(ms, label)
+                }
+            }
+
+            val monthWordsMatch = Regex("^(\\d+)\\s*months?$", RegexOption.IGNORE_CASE).find(lower)
+            if (monthWordsMatch != null) {
+                val num = monthWordsMatch.groupValues[1].toLongOrNull()
+                if (num != null && num > 0) {
+                    val ms = num * 30 * 24 * 60 * 60 * 1000L
+                    val label = if (num == 1L) "1 month" else "$num months"
+                    return Pair(ms, label)
+                }
+            }
+
+            val weekdayResult = parseWeekdaySnooze(lower, nowMillis)
             if (weekdayResult != null) {
                 return weekdayResult.first
             }
 
-            val dateResult = parseDateSnooze(raw, nowMillis)
+            val dateResult = parseDateSnooze(lower, nowMillis)
             if (dateResult != null) {
                 return dateResult
             }
 
-            val amPmMatch = Regex("^(\\d{1,2})(?::(\\d{2}))?\\s*(am|pm)$").find(raw)
+            val amPmMatch = Regex("^(\\d{1,2})(?::(\\d{2}))?\\s*(am|pm)$").find(lower)
             if (amPmMatch != null) {
                 var hour = amPmMatch.groupValues[1].toInt()
                 val min = amPmMatch.groupValues[2].let { if (it.isEmpty()) 0 else it.toInt() }
@@ -166,7 +205,7 @@ class CreateReminderReceiver : BroadcastReceiver() {
                 }
             }
 
-            val timeColonMatch = Regex("^(\\d{1,2}):(\\d{2})$").find(raw)
+            val timeColonMatch = Regex("^(\\d{1,2}):(\\d{2})$").find(lower)
             if (timeColonMatch != null) {
                 val hour = timeColonMatch.groupValues[1].toInt()
                 val min = timeColonMatch.groupValues[2].toInt()
@@ -175,15 +214,15 @@ class CreateReminderReceiver : BroadcastReceiver() {
                 }
             }
 
-            if (raw.length in 3..4 && raw.all { it.isDigit() }) {
-                val hour = if (raw.length == 4) raw.substring(0, 2).toInt() else raw.substring(0, 1).toInt()
-                val min = if (raw.length == 4) raw.substring(2, 4).toInt() else raw.substring(1, 3).toInt()
+            if (lower.length in 3..4 && lower.all { it.isDigit() }) {
+                val hour = if (lower.length == 4) lower.substring(0, 2).toInt() else lower.substring(0, 1).toInt()
+                val min = if (lower.length == 4) lower.substring(2, 4).toInt() else lower.substring(1, 3).toInt()
                 if (hour in 0..23 && min in 0..59) {
                     return calculateAbsoluteTimeSnooze(hour, min, nowMillis)
                 }
             }
 
-            val numberMatch = Regex("^(\\d+)\\s*([mhdw]?)$").find(raw)
+            val numberMatch = Regex("^(\\d+)\\s*([mhdw]?)$").find(trimmed)
             if (numberMatch != null) {
                 val num = numberMatch.groupValues[1].toLongOrNull() ?: return null
                 val unit = numberMatch.groupValues[2]
@@ -200,7 +239,7 @@ class CreateReminderReceiver : BroadcastReceiver() {
         }
 
         fun parseSnoozeDuration(input: String?, nowMillis: Long = System.currentTimeMillis()): Pair<Long, String>? {
-            val raw = input?.trim()?.lowercase() ?: ""
+            val raw = input?.trim() ?: ""
             if (raw.isEmpty()) {
                 return Pair(60 * 60 * 1000L, "1 hour")
             }

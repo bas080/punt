@@ -596,6 +596,37 @@ class MainActivityTest {
     }
 
     @Test
+    fun testClearInputButtonClickClearsInputAndResetsFilter() {
+        val context = RuntimeEnvironment.getApplication()
+        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
+        prefs.edit().clear().putStringSet("key_reminders_list", setOf("Buy milk", "Clean garage")).commit()
+
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = controller.get()
+
+        val input = activity.findViewById<EditText>(R.id.search_reminder_input)
+        val btnClear = activity.findViewById<ImageView>(R.id.btn_clear_input)
+        val recyclerView = activity.findViewById<RecyclerView>(R.id.reminders_list)
+
+        assertNotNull(btnClear)
+        assertEquals(View.GONE, btnClear.visibility)
+
+        // Type "milk"
+        input.setText("milk")
+        shadowOf(android.os.Looper.getMainLooper()).idleFor(250, java.util.concurrent.TimeUnit.MILLISECONDS)
+        assertEquals(View.VISIBLE, btnClear.visibility)
+        assertEquals(3, recyclerView.adapter!!.itemCount)
+
+        // Click clear button
+        btnClear.performClick()
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        assertEquals("", input.text.toString())
+        assertEquals(View.GONE, btnClear.visibility)
+        assertEquals(4, recyclerView.adapter!!.itemCount)
+    }
+
+    @Test
     fun testSearchQueryIsPersistedAndRestoredAcrossActivityRecreation() {
         val context = RuntimeEnvironment.getApplication()
         val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
