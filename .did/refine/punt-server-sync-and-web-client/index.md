@@ -17,6 +17,7 @@ Enable phone-to-browser task access and management over the local network (HTTP/
    - The phone generates a random **4-digit one-time pairing code** (e.g. `4829`) valid for 15 minutes, and displays the phone's current Wi-Fi IP address.
 2. **Server Startup**:
    - Running `punt serve [--code <code>] [--open]` starts the server on distinct default port 7868 (configurable via `PUNT_PORT` / `--port`), logs the local web URL (`http://localhost:7868`), and optionally opens the browser.
+   - The CLI binary is defined as `"bin": { "punt": "./dist/server/cli.js" }` in `package.json`.
 3. **Manual-Only Discovery on Android**:
    - The Android app does NOT run automatic background subnet scans.
    - On app launch/Wi-Fi connection, if previously connected, it directly pings the last known server IP/port. If the phone is on a different subnet, the ping is skipped.
@@ -24,16 +25,19 @@ Enable phone-to-browser task access and management over the local network (HTTP/
 4. **Automatic Web & CLI Authorization**:
    - Because the server is authenticated with the phone, the web client served directly from that origin inherits **Browser Origin Authentication** (instant access without secondary logins).
    - The CLI (`punt`) communicates directly through the running server.
-5. **Progressive Web App (PWA)**:
-   - The web client includes a `manifest.json` and service worker so users can install Punt as a standalone desktop app on macOS, Linux, or Windows. Standard browser interactions are used without custom single-key shortcuts.
+5. **Progressive Web App (PWA) & Build Pipeline**:
+   - Written in **TypeScript** using **`lit-html` functional templates** (no Custom Elements / Web Components).
+   - Built with **`esbuild`** producing static artifacts in `dist/web/` (`index.html`, `app.js`, `style.css`, `manifest.json`, `sw.js`) served by the backend server.
+   - Installable as a desktop app with dark theme matching Android. Standard browser interactions are used without custom single-key shortcuts.
 
 ## Recommended Implementation Order (Subissues)
 1. **Phase 1: Backend Server (`subissues/punt-server-sync-backend.md`)**
    - Node.js & TypeScript in-memory HTTP and WebSocket server running on distinct default port 7868 (or `PUNT_PORT`).
    - Ping endpoint (`GET /api/ping`), pair endpoint (`POST /api/pair`), WebSocket handling (`WS /api/ws`), task hydration, mutation relay, and PWA static asset serving.
 2. **Phase 2: Server CLI (`subissues/punt-server-cli.md`)**
+   - `package.json` with `"bin": { "punt": "./dist/server/cli.js" }`.
    - `yargs`-based command-line runner (`punt serve [--code <code>] [--open]`, `punt status`, `punt tasks list|add|done|punt`) with stdin pipe support for task creation.
 3. **Phase 3: Android Client Integration (`subissues/punt-server-android-sync.md`)**
    - 4-digit code generator (15m validity), direct ping of last known server, manual-only "Scan for Server" button with fast abort on match, local Wi-Fi IP display, WebSocket connection, and full task dump pushes.
-4. **Phase 4: Web Client PWA with lit-html (`subissues/punt-server-web-client.md`)**
-   - Lightweight `lit-html` web UI matching the Android theme, desktop PWA installability, live WebSocket task mirroring from server in-memory state, and fail-fast task mutations (standard browser interactions, no custom keybindings).
+4. **Phase 4: Web Client PWA with TypeScript & lit-html (`subissues/punt-server-web-client.md`)**
+   - Functional `lit-html` templates (no custom elements), `esbuild` build to `dist/web/`, desktop PWA installability, live WebSocket task mirroring from server in-memory state, and fail-fast task mutations (standard browser interactions, no custom keybindings).
