@@ -148,6 +148,27 @@ class SnoozeDialogActivity : AppCompatActivity() {
             ReminderNotificationListenerService.activePostedReminders.remove(target)
             editor.putLong("snooze_$trimmed", snoozeUntil)
             ReminderNotificationListenerService.recordTaskSnoozeChoice(this, target, durationChoice)
+
+            kotlinx.coroutines.runBlocking {
+                val db = com.bas080.notificationreminders.data.PuntDatabase.getInstance(this@SnoozeDialogActivity)
+                val cleanText = target.replace(Regex("(?i)\\s*#done\\b"), "").trim()
+                val existing = db.reminderDao().getReminderByText(cleanText)
+                if (existing != null) {
+                    db.reminderDao().update(
+                        existing.copy(
+                            snoozeUntil = snoozeUntil,
+                            updatedAt = System.currentTimeMillis()
+                        )
+                    )
+                } else {
+                    db.reminderDao().insert(
+                        com.bas080.notificationreminders.data.ReminderEntity(
+                            text = cleanText,
+                            snoozeUntil = snoozeUntil
+                        )
+                    )
+                }
+            }
         }
         editor.apply()
 

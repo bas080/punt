@@ -39,6 +39,19 @@ class ProcessTextActivity : AppCompatActivity() {
             savedSet.add(selectedText)
             prefs.edit().putStringSet(KEY_REMINDERS, savedSet).apply()
 
+            kotlinx.coroutines.runBlocking {
+                val db = com.bas080.notificationreminders.data.PuntDatabase.getInstance(this@ProcessTextActivity)
+                val cleanText = selectedText.replace(Regex("(?i)\\s*#done\\b"), "").trim()
+                val parsed = com.bas080.notificationreminders.receivers.CreateReminderReceiver
+                    .parseRecurrenceDuration(cleanText)
+                db.reminderDao().insert(
+                    com.bas080.notificationreminders.data.ReminderEntity(
+                        text = cleanText,
+                        recurrenceInterval = parsed?.second
+                    )
+                )
+            }
+
             ReminderNotificationListenerService.instance?.postMatchNotification(selectedText)
             ReminderNotificationListenerService.instance?.showStatusNotification()
                 ?: ReminderNotificationListenerService.startService(this)

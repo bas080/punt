@@ -100,6 +100,18 @@ class PickNotificationActivity : AppCompatActivity() {
         savedSet.add(reminderText)
         prefs.edit().putStringSet(KEY_REMINDERS, savedSet).apply()
 
+        kotlinx.coroutines.runBlocking {
+            val db = com.bas080.notificationreminders.data.PuntDatabase.getInstance(this@PickNotificationActivity)
+            val cleanText = reminderText.replace(Regex("(?i)\\s*#done\\b"), "").trim()
+            val recurrence = com.bas080.notificationreminders.receivers.CreateReminderReceiver.parseRecurrenceDuration(cleanText)?.second
+            db.reminderDao().insert(
+                com.bas080.notificationreminders.data.ReminderEntity(
+                    text = cleanText,
+                    recurrenceInterval = recurrence
+                )
+            )
+        }
+
         ReminderNotificationListenerService.instance?.postMatchNotification(reminderText)
         ReminderNotificationListenerService.startService(this)
         Toast.makeText(this, R.string.toast_reminder_created, Toast.LENGTH_SHORT).show()

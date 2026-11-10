@@ -131,6 +131,8 @@ class CreateReminderActivity : AppCompatActivity() {
         val now = System.currentTimeMillis()
         val editor = prefs.edit().putStringSet(KEY_REMINDERS, savedSet)
 
+        val snoozeUntilValue = if (targetTimeMillis > now) targetTimeMillis else null
+
         com.bas080.notificationreminders.utils.ExperimentTracker.trackCreation(this, "create_intent")
         if (targetTimeMillis > now) {
             val trimmed = reminderString.trim().lowercase()
@@ -143,6 +145,19 @@ class CreateReminderActivity : AppCompatActivity() {
         }
 
         editor.apply()
+
+        kotlinx.coroutines.runBlocking {
+            val db = com.bas080.notificationreminders.data.PuntDatabase.getInstance(this@CreateReminderActivity)
+            val cleanText = reminderString.replace(Regex("(?i)\\s*#done\\b"), "").trim()
+            val recurrence = com.bas080.notificationreminders.receivers.CreateReminderReceiver.parseRecurrenceDuration(cleanText)?.second
+            db.reminderDao().insert(
+                com.bas080.notificationreminders.data.ReminderEntity(
+                    text = cleanText,
+                    snoozeUntil = snoozeUntilValue,
+                    recurrenceInterval = recurrence
+                )
+            )
+        }
 
         ReminderNotificationListenerService.instance?.showStatusNotification()
             ?: ReminderNotificationListenerService.startService(this)
