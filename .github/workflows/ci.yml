@@ -35,6 +35,21 @@ jobs:
           distribution: 'temurin'
           cache: gradle
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install Node Dependencies
+        run: npm ci
+
+      - name: Run TypeScript & CLI Tests
+        run: npm test
+
+      - name: Build Web Client & CLI Bundle
+        run: npm run build
+
       - name: Update App Version & Create Tag
         if: github.event_name == 'workflow_dispatch'
         run: |
