@@ -33,7 +33,22 @@ export class PuntServer {
   constructor(private options: ServerOptions = {}) {
     if (options.code) {
       this.setPairingCode(options.code);
+    } else {
+      this.generatePairingPin();
     }
+  }
+
+  public generatePairingPin(): string {
+    const pin = Math.floor(1000 + Math.random() * 9000).toString();
+    this.setPairingCode(pin);
+    return pin;
+  }
+
+  public getPairingCode(): string | null {
+    if (this.pairingCode && Date.now() <= this.pairingCodeExpiresAt) {
+      return this.pairingCode;
+    }
+    return null;
   }
 
   public setPairingCode(code: string, validityMs: number = 15 * 60 * 1000) {
@@ -135,7 +150,8 @@ export class PuntServer {
           // Web client or CLI socket client
           socket.emit('init', {
             phoneConnected: this.isPhoneConnected(),
-            tasks: this.tasks
+            tasks: this.tasks,
+            pairingPin: this.getPairingCode()
           });
 
           socket.on('get_status', (callback) => {
