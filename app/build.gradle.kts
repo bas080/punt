@@ -103,7 +103,8 @@ val fileFilter = listOf(
     "**/BR.class",
     "**/DataBinderMapperImpl*.class",
     "**/DataBindingInfo.class",
-    "**/*_Impl*.*"
+    "**/*_Impl*.*",
+    "**/sync/*.*"
 )
 
 tasks.register<JacocoReport>("jacocoTestReport") {
@@ -176,6 +177,11 @@ dependencies {
     implementation("androidx.room:room-ktx:$roomVersion")
     ksp("androidx.room:room-compiler:$roomVersion")
     testImplementation("androidx.room:room-testing:$roomVersion")
+
+    // Socket.IO
+    implementation("io.socket:socket.io-client:2.1.0") {
+        exclude(group = "org.json", module = "json")
+    }
 
     // Testing
     testImplementation("junit:junit:4.13.2")
