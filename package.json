@@ -14,7 +14,7 @@
     "build:server": "esbuild src/server/cli.ts --bundle --platform=node --target=node18 --outfile=dist/server/cli.js",
     "build": "npm run build:web && npm run build:server",
     "prepare": "npm run build",
-    "test": "node --import tsx --test 'test/**/*.test.ts'"
+    "test": "node --import tsx --test test/*.test.ts"
   },
   "dependencies": {
     "@types/socket.io": "^3.0.1",
