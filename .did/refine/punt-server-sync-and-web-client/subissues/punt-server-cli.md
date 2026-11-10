@@ -23,3 +23,17 @@ The CLI has two primary roles:
 - `punt tasks add [text]`: Dispatches task creation to the server from argument or piped `stdin`, which propagates to the Android phone (fails if phone is disconnected).
 - `punt tasks done <id/text>`: Marks a task done on the phone via the server.
 - `punt tasks punt <id/text> <duration>`: Punts a task on the phone via the server.
+
+### Automated Tests to Write
+1. **Option & Environment Parsing Tests**:
+   - `testDefaultPortIs7868`: Verifies default port evaluates to 7868 when neither flag nor env var is set.
+   - `testPuntPortEnvVar`: Sets `PUNT_PORT=9000` and verifies CLI parses port as 9000.
+   - `testPortFlagOverridesEnvVar`: Sets `PUNT_PORT=9000` with `--port 8080` and verifies port is 8080.
+   - `testCodeArgumentParsing`: Verifies `--code 1234` correctly populates the pairing parameter.
+2. **Stdin & Pipe Input Tests**:
+   - `testTasksAddFromArgument`: Runs `punt tasks add "Test reminder #tag"` and verifies payload dispatched to server.
+   - `testTasksAddFromStdinPipe`: Pipes `"Piped task text"` via simulated stdin stream and verifies identical task dispatch.
+   - `testTasksAddFailsGracefullyWhenEmpty`: Verifies error exit code (1) and descriptive error message if text is empty.
+3. **Server Offline Error Handling Tests**:
+   - `testTasksListWhenServerNotRunning`: Verifies clear error output (*"Unable to connect to Punt server at localhost:7868. Is 'punt serve' running?"*) without unhandled stack traces.
+   - `testTasksAddWhenPhoneDisconnected`: Verifies CLI receives and prints the server error (*"Failed to add task: Phone is unreachable"*).

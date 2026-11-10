@@ -27,3 +27,19 @@ The server functions purely as an in-memory relay and temporary cache between th
   - `WS /api/ws`: Authenticated WebSocket connection endpoint for the phone and web clients for real-time list hydration, mutation dispatching, and broadcast.
   - `GET /api/tasks`: Returns current in-memory mirrored tasks to web clients and CLI commands.
   - `POST /api/tasks/mutate`: HTTP endpoint for CLI commands to dispatch task mutations to the phone through the server.
+
+### Automated Tests to Write
+1. **Pairing & Token Validation Tests**:
+   - `testPairingWithValid4DigitCode`: Confirms code is accepted, burned (cannot be reused), and returns session token.
+   - `testPairingWithExpiredCode`: Confirms code older than 15 minutes is rejected with `401 Unauthorized`.
+   - `testPairingWithInvalidCode`: Confirms non-matching codes are rejected.
+2. **WebSocket Connection & Hydration Tests**:
+   - `testWebSocketConnectionWithoutAuth`: Confirms connection is rejected if session token is missing or invalid.
+   - `testFullTaskListHydration`: Pushes task array over phone WebSocket; confirms in-memory store updates and `GET /api/tasks` returns identical tasks.
+   - `testBroadcastToConnectedClients`: Confirms when phone updates tasks, all active web WebSockets receive the updated list.
+3. **Mutation Relay & Timeout Tests**:
+   - `testMutationRelayedToPhone`: Sends mutation from web/HTTP; verifies message arrives on phone WebSocket.
+   - `testMutationTimeoutWhenPhoneDisconnected`: Sends mutation when phone WebSocket is closed; verifies immediate 504 / fail-fast error returned within timeout window.
+4. **Static PWA Serving Tests**:
+   - `testServesIndexHtml`: Verifies `GET /` returns the web client HTML.
+   - `testServesManifestAndServiceWorker`: Verifies `GET /manifest.json` returns valid JSON with correct app name and icons.

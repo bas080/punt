@@ -19,3 +19,17 @@ Task mutations (creating, editing, punting, marking done) initiated in the web i
 - **WebSocket Live Updates**: Maintains a WebSocket connection (`WS /api/ws`) to receive real-time full list updates whenever the Android phone pushes state changes.
 - **Fail-Fast UI**: Adding, editing, punting, or marking done sends a mutation message. If the phone is not connected or does not respond within a short timeout, the action is rejected in the UI with a notification that the phone is unreachable.
 - **UI Design**: Adheres to Punt's minimal text interface guidelines (`bg_card`, high-contrast typography, collapsible active/punted sections, and search filter input).
+
+### Automated Tests to Write
+1. **lit-html Rendering & Theme Tests**:
+   - `testRendersActiveAndPuntedSections`: Provides mock task array; verifies `lit-html` renders separate Active and Punted card containers.
+   - `testAppliesDarkThemeProperties`: Verifies CSS variables match `#121212` background and `#1E1E1E` surface colors.
+   - `testFilterInputNarrowsDisplayedTasks`: Enters search text into query input; verifies displayed DOM elements filter dynamically.
+2. **WebSocket Live Updates Tests**:
+   - `testWebSocketReceivesFullListUpdate`: Emits updated task list from simulated WebSocket; verifies DOM immediately re-renders to reflect changes.
+   - `testDisconnectedStateBanner`: Simulates WebSocket disconnect; verifies UI displays *"Phone disconnected / Server offline"* banner.
+3. **Fail-Fast Mutation Feedback Tests**:
+   - `testMutationRejectedDisplaysError`: Submits task creation when phone is disconnected; verifies error notification is displayed in UI and optimistic item is removed.
+4. **PWA Manifest & Service Worker Tests**:
+   - `testManifestContainsRequiredProperties`: Validates `name`, `short_name`, `start_url`, `display: standalone`, and icons array.
+   - `testServiceWorkerRegistersSuccessfully`: Confirms service worker file parses without errors and registers with browser cache.
