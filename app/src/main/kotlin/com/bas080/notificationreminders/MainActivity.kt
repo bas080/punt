@@ -1350,6 +1350,25 @@ class MainActivity : AppCompatActivity() {
             ReminderNotificationListenerService.instance?.showStatusNotification()
         }
         com.bas080.notificationreminders.providers.RemindersContentProvider.notifyChange(this)
+        kotlinx.coroutines.runBlocking {
+            try {
+                val db = com.bas080.notificationreminders.data.PuntDatabase.getInstance(this@MainActivity)
+                val entities = activeReminders.map { rem ->
+                    val cleanKey = rem.replace(Regex("(?i)\\s*#done\\b"), "").trim()
+                    val isDone = rem.contains(Regex("(?i)(?<=^|\\s)#done(?=\\s|$)"))
+                    val snooze = prefs.getLong("snooze_${cleanKey.lowercase()}", 0L).takeIf { it > 0L }
+                    val recurrence = com.bas080.notificationreminders.receivers.CreateReminderReceiver.parseRecurrenceDuration(cleanKey)?.second
+                    com.bas080.notificationreminders.data.ReminderEntity(
+                        text = cleanKey,
+                        snoozeUntil = snooze,
+                        isDone = isDone,
+                        recurrenceInterval = recurrence
+                    )
+                }
+                db.reminderDao().deleteAll()
+                db.reminderDao().insertAll(entities)
+            } catch (_: Exception) {}
+        }
         com.bas080.notificationreminders.utils.TaskBackupManager.backupTasks(this)
     }
 
