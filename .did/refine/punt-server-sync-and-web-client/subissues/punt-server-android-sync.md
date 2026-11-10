@@ -1,17 +1,23 @@
 Add Punt server synchronization support to Android client
 
 Integrate the Android Punt client with the Punt backend server over local network HTTP.
-The Android phone maintains the authoritative source of truth (`reminders_prefs` and `punt_tasks_backup.md`).
-The phone mirrors its state to the local server and receives/applies mutation requests initiated from the web or CLI.
-Users configure where the server lives (endpoint host and port) and pair once using single-use setup codes (no QR codes required).
-Operates strictly over local network: if local network connection fails, there is no remote/cloud fallback.
+The Android phone is the sole authoritative source of truth. Its local data (`reminders_prefs` and `punt_tasks_backup.md`) is the ground truth.
+Other clients (server, web, CLI) do not persist data; they simply receive and display data from the Android phone.
+
+### Synchronization & Data Flow Model
+- **No Complex Deltas**: When connected to the local server, the Android app dumps its complete list of reminders to the server upon initial connection.
+- **Push on Change**: Whenever a reminder change occurs locally while connected (created, edited, punted, marked done), the Android app pushes the complete updated list to the server.
+- **Mutation Ingestion**: The phone listens for mutation requests relayed from the server (originating from web or CLI). Upon receiving a mutation:
+  1. The phone applies the change to its local state (`reminders_prefs` and `TaskBackupManager`).
+  2. The phone sends acknowledgment and pushes the updated complete list back to the server.
+- **Data Flow Cycle**:
+  `android -> server -> web/cli -> server -> android -> server`
+- **Strictly Local Network**: Local Wi-Fi connection only; if the local server is unreachable, server sync is paused without falling back to cloud/remote services.
 
 ### Android Integration Specifications
-- **Setup UI**: A "Server Sync" option in MainActivity's About dialog (`showAboutDialog()`) opening a dialog to enter Endpoint URL (`http://<host>:<port>`) and single-use setup code.
-- **Persistence**: Store `server_endpoint` and `server_token` in `reminders_prefs`.
-- **Mirror Sync**: Pushes task updates to `POST /api/sync/phone` whenever tasks are created, edited, punted, or marked done.
-- **Mutation Listener**: Listens for incoming task commands from the server while connected to the local network and commits them to `reminders_prefs` and `TaskBackupManager`.
+- **Setup Dialog**: Accessible from the About dialog (`showAboutDialog()`) in `MainActivity`. Prompts for Server Endpoint URL (`http://<host>:<port>`) and single-use pairing code.
+- **Connection Storage**: Stores `server_endpoint` and `server_token` in `reminders_prefs`.
+- **Connection LifeCycle**: Automatically detects local network availability and connects to the server mirror when present.
 
 ## Questions for @bas080
-1. Should the phone use a foreground WebSocket / Server-Sent Events (SSE) connection while the app is active, or use periodic polling?
-2. When the phone is disconnected from the local network, should the Android app display an unobtrusive status dot indicating the server mirror is offline?
+1. Should the Android client connect to the server via an active WebSocket connection while the app is in the foreground, or use periodic HTTP long-polling?
