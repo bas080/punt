@@ -2,7 +2,7 @@
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import { PuntServer } from './server';
-import readline from 'readline';
+import { io, Socket } from 'socket.io-client';
 
 async function readStdin(): Promise<string> {
   if (process.stdin.isTTY) return '';
@@ -12,6 +12,33 @@ async function readStdin(): Promise<string> {
     process.stdin.on('data', chunk => { data += chunk; });
     process.stdin.on('end', () => { resolve(data.trim()); });
     process.stdin.on('error', () => { resolve(''); });
+  });
+}
+
+function connectToCliSocket(port: number, timeoutMs: number = 2000): Promise<Socket> {
+  return new Promise((resolve, reject) => {
+    const socket = io(`http://localhost:${port}`, {
+      query: { client: 'cli' },
+      transports: ['websocket', 'polling'],
+      timeout: timeoutMs,
+      reconnection: false
+    });
+
+    const timer = setTimeout(() => {
+      socket.disconnect();
+      reject(new Error(`Unable to connect to Punt server at localhost:${port}. Is 'punt serve' running?`));
+    }, timeoutMs);
+
+    socket.on('connect', () => {
+      clearTimeout(timer);
+      resolve(socket);
+    });
+
+    socket.on('connect_error', () => {
+      clearTimeout(timer);
+      socket.disconnect();
+      reject(new Error(`Unable to connect to Punt server at localhost:${port}. Is 'punt serve' running?`));
+    });
   });
 }
 
@@ -86,19 +113,17 @@ export function createCli() {
       async (argv) => {
         const port = argv.port as number;
         try {
-          const res = await fetch(`http://localhost:${port}/api/tasks`);
-          if (!res.ok) {
-            console.error(`Unable to connect to Punt server at localhost:${port}.`);
-            process.exit(1);
-          }
-          const data = await res.json();
-          console.log(`Server Status: Online (port ${port})`);
-          console.log(`Phone Connected: ${data.phoneConnected ? 'Yes' : 'No'}`);
-          console.log(`Active Tasks: ${data.tasks.filter((t: any) => !t.isDone && (!t.snoozeUntil || t.snoozeUntil <= Date.now())).length}`);
-          console.log(`Punted Tasks: ${data.tasks.filter((t: any) => !t.isDone && t.snoozeUntil && t.snoozeUntil > Date.now()).length}`);
-          console.log(`Total Tasks: ${data.tasks.length}`);
-        } catch (_) {
-          console.error(`Unable to connect to Punt server at localhost:${port}. Is 'punt serve' running?`);
+          const socket = await connectToCliSocket(port);
+          socket.emit('get_status', (data: any) => {
+            console.log(`Server Status: Online (port ${port})`);
+            console.log(`Phone Connected: ${data.phoneConnected ? 'Yes' : 'No'}`);
+            console.log(`Active Tasks: ${data.tasks.filter((t: any) => !t.isDone && (!t.snoozeUntil || t.snoozeUntil <= Date.now())).length}`);
+            console.log(`Punted Tasks: ${data.tasks.filter((t: any) => !t.isDone && t.snoozeUntil && t.snoozeUntil > Date.now()).length}`);
+            console.log(`Total Tasks: ${data.tasks.length}`);
+            socket.disconnect();
+          });
+        } catch (err: any) {
+          console.error(err.message);
           process.exit(1);
         }
       }
@@ -115,20 +140,21 @@ export function createCli() {
             async (argv) => {
               const port = argv.port as number;
               try {
-                const res = await fetch(`http://localhost:${port}/api/tasks`);
-                if (!res.ok) throw new Error();
-                const data = await res.json();
-                if (!data.tasks || data.tasks.length === 0) {
-                  console.log('No tasks found.');
-                  return;
-                }
-                for (const t of data.tasks) {
-                  const check = t.isDone ? '[x]' : '[ ]';
-                  const punted = t.snoozeUntil && t.snoozeUntil > Date.now() ? ` (punted until ${new Date(t.snoozeUntil).toLocaleTimeString()})` : '';
-                  console.log(`${check} ${t.id != null ? `${t.id}: ` : ''}${t.text}${punted}`);
-                }
-              } catch (_) {
-                console.error(`Unable to connect to Punt server at localhost:${port}. Is 'punt serve' running?`);
+                const socket = await connectToCliSocket(port);
+                socket.emit('get_status', (data: any) => {
+                  if (!data.tasks || data.tasks.length === 0) {
+                    console.log('No tasks found.');
+                  } else {
+                    for (const t of data.tasks) {
+                      const check = t.isDone ? '[x]' : '[ ]';
+                      const punted = t.snoozeUntil && t.snoozeUntil > Date.now() ? ` (punted until ${new Date(t.snoozeUntil).toLocaleTimeString()})` : '';
+                      console.log(`${check} ${t.id != null ? `${t.id}: ` : ''}${t.text}${punted}`);
+                    }
+                  }
+                  socket.disconnect();
+                });
+              } catch (err: any) {
+                console.error(err.message);
                 process.exit(1);
               }
             }
@@ -150,19 +176,18 @@ export function createCli() {
                 process.exit(1);
               }
               try {
-                const res = await fetch(`http://localhost:${port}/api/tasks/mutate`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ action: 'create', payload: { text: text.trim() } })
+                const socket = await connectToCliSocket(port);
+                socket.emit('mutate', { action: 'create', payload: { text: text.trim() } }, (res: any) => {
+                  if (!res.success) {
+                    console.error(`Failed to add task: ${res.error || 'Server error'}`);
+                    socket.disconnect();
+                    process.exit(1);
+                  }
+                  console.log(`Task added: "${text.trim()}"`);
+                  socket.disconnect();
                 });
-                const data = await res.json();
-                if (!res.ok || !data.success) {
-                  console.error(`Failed to add task: ${data.error || 'Server error'}`);
-                  process.exit(1);
-                }
-                console.log(`Task added: "${text.trim()}"`);
-              } catch (_) {
-                console.error(`Unable to connect to Punt server at localhost:${port}. Is 'punt serve' running?`);
+              } catch (err: any) {
+                console.error(err.message);
                 process.exit(1);
               }
             }
@@ -177,19 +202,18 @@ export function createCli() {
               const port = argv.port as number;
               const target = argv.idOrText as string;
               try {
-                const res = await fetch(`http://localhost:${port}/api/tasks/mutate`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ action: 'done', payload: { target } })
+                const socket = await connectToCliSocket(port);
+                socket.emit('mutate', { action: 'done', payload: { target } }, (res: any) => {
+                  if (!res.success) {
+                    console.error(`Failed to mark task done: ${res.error || 'Server error'}`);
+                    socket.disconnect();
+                    process.exit(1);
+                  }
+                  console.log(`Task marked done: ${target}`);
+                  socket.disconnect();
                 });
-                const data = await res.json();
-                if (!res.ok || !data.success) {
-                  console.error(`Failed to mark task done: ${data.error || 'Server error'}`);
-                  process.exit(1);
-                }
-                console.log(`Task marked done: ${target}`);
-              } catch (_) {
-                console.error(`Unable to connect to Punt server at localhost:${port}. Is 'punt serve' running?`);
+              } catch (err: any) {
+                console.error(err.message);
                 process.exit(1);
               }
             }
@@ -206,19 +230,18 @@ export function createCli() {
               const target = argv.idOrText as string;
               const duration = argv.duration as string;
               try {
-                const res = await fetch(`http://localhost:${port}/api/tasks/mutate`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ action: 'punt', payload: { target, duration } })
+                const socket = await connectToCliSocket(port);
+                socket.emit('mutate', { action: 'punt', payload: { target, duration } }, (res: any) => {
+                  if (!res.success) {
+                    console.error(`Failed to punt task: ${res.error || 'Server error'}`);
+                    socket.disconnect();
+                    process.exit(1);
+                  }
+                  console.log(`Task punted: ${target} for ${duration}`);
+                  socket.disconnect();
                 });
-                const data = await res.json();
-                if (!res.ok || !data.success) {
-                  console.error(`Failed to punt task: ${data.error || 'Server error'}`);
-                  process.exit(1);
-                }
-                console.log(`Task punted: ${target} for ${duration}`);
-              } catch (_) {
-                console.error(`Unable to connect to Punt server at localhost:${port}. Is 'punt serve' running?`);
+              } catch (err: any) {
+                console.error(err.message);
                 process.exit(1);
               }
             }

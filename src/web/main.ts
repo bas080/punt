@@ -43,50 +43,53 @@ export function showNotification(msg: string, isError: boolean = false) {
   updateView();
 }
 
+import { io, Socket as ClientSocket } from 'socket.io-client';
+
+let socket: ClientSocket | null = null;
+
 export function sendMutation(action: string, payload: any) {
   if (!state.phoneConnected) {
     showNotification('Phone is unreachable', true);
     return;
   }
   const mutationId = 'web_mut_' + Math.random().toString(36).substring(2, 9);
-  if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({ type: 'mutate', action, payload, mutationId }));
+  if (socket && socket.connected) {
+    socket.emit('mutate', { action, payload, mutationId }, (res: any) => {
+      if (res && !res.success) {
+        showNotification(res.error || 'Action failed', true);
+      }
+    });
   } else {
     showNotification('Server disconnected', true);
   }
 }
 
 export function initWebSocket() {
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const wsUrl = `${protocol}//${window.location.host}/api/ws?client=web`;
-  ws = new WebSocket(wsUrl);
+  socket = io({
+    query: { client: 'web' },
+    transports: ['websocket', 'polling']
+  });
 
-  ws.onmessage = (event) => {
-    try {
-      const data = JSON.parse(event.data);
-      if (data.type === 'init') {
-        state.phoneConnected = data.phoneConnected;
-        state.tasks = data.tasks || [];
-        updateView();
-      } else if (data.type === 'phone_status') {
-        state.phoneConnected = data.connected;
-        updateView();
-      } else if (data.type === 'tasks_updated') {
-        state.tasks = data.tasks || [];
-        updateView();
-      } else if (data.type === 'mutation_ack') {
-        if (!data.success) {
-          showNotification(data.error || 'Action failed', true);
-        }
-      }
-    } catch (_) {}
-  };
+  socket.on('init', (data: any) => {
+    state.phoneConnected = data.phoneConnected;
+    state.tasks = data.tasks || [];
+    updateView();
+  });
 
-  ws.onclose = () => {
+  socket.on('phone_status', (data: any) => {
+    state.phoneConnected = data.connected;
+    updateView();
+  });
+
+  socket.on('tasks_updated', (data: any) => {
+    state.tasks = data.tasks || [];
+    updateView();
+  });
+
+  socket.on('disconnect', () => {
     state.phoneConnected = false;
     updateView();
-    setTimeout(initWebSocket, 2000);
-  };
+  });
 }
 
 export const taskCardView = (task: Task): TemplateResult => {
