@@ -39,5 +39,20 @@ Migrate Punt's underlying persistence layer on Android from key-value `SharedPre
   - Full-fidelity data exchange designed to backup and restore the entire database state.
   - Preserves exact primary keys (`id`), creation dates (`createdAt`), punt timestamps (`snoozeUntil`), and completion states (`isDone`).
 
-## Questions for @bas080
-1. What format should the full-fidelity backup file use (e.g., a structured JSON backup file `punt_backup.json` or an enhanced markdown schema with structured metadata)?
+### Automated Test Approach for Migration & Database
+1. **Migration Verification Tests (`LegacyStorageMigrationTest`)**:
+   - `testMigratesRemindersAndSnoozesFromPrefs`: Populates `reminders_prefs` with active, punted, and completed (`#done`) reminders and snooze timestamps; triggers migration; verifies:
+     - All records exist in Room database with correct `isDone` boolean.
+     - Clean `text` column has `#done` stripped.
+     - `snoozeUntil` timestamps match legacy `snooze_$cleanTrimmed` values.
+     - Legacy migration flag `key_legacy_migration_done` is set to `true`.
+   - `testMigrationRunsOnlyOnce`: Re-runs migration check when `key_legacy_migration_done` is `true`; verifies existing Room records are not duplicated.
+   - `testMigrationWithEmptyLegacyPrefs`: Verifies clean initialization when starting fresh with no legacy data.
+2. **Room DAO CRUD & Reactive Query Tests (`ReminderDaoTest`)**:
+   - `testInsertAndQueryActiveReminders`: Verifies inserting reminders and querying active items (`isDone == false && (snoozeUntil == null || snoozeUntil <= now)`).
+   - `testPuntReminderUpdatesSnoozeUntil`: Verifies punting updates `snoozeUntil` timestamp.
+   - `testMarkDoneUpdatesIsDoneColumn`: Verifies marking done updates `isDone = true` without modifying text.
+   - `testFlowEmitsUpdatesOnDatabaseChange`: Verifies reactive `Flow<List<ReminderEntity>>` emits new lists on insertion/deletion.
+3. **Backup Import / Export Tests (`TaskBackupManagerTest`)**:
+   - `testExportMarkdownVsBackupExport`: Verifies Markdown export produces human-readable markdown with `- [x]`, while backup export produces full-fidelity database state with IDs and timestamps.
+   - `testBackupRestoreReconstitutesRoomDatabase`: Restores a backup file into an empty Room database; verifies exact ID and timestamp fidelity.
