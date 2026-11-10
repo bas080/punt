@@ -67,6 +67,18 @@ header {
   padding: 12px;
 }
 
+.pin-banner {
+  text-align: center;
+  border-color: var(--accent);
+}
+
+.pin-display {
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: 4px;
+  color: var(--accent);
+}
+
 .search-input {
   width: 100%;
   background: transparent;

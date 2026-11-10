@@ -326,6 +326,18 @@ class MainActivity : AppCompatActivity() {
             isFocusable = true
         }
 
+        val btnServerSync = TextView(this).apply {
+            id = R.id.btn_server_sync
+            text = getString(R.string.server_sync)
+            setTextColor(accentColor)
+            setTextAppearance(android.R.style.TextAppearance_Small)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setPadding((12 * density).toInt(), (4 * density).toInt(), (12 * density).toInt(), (4 * density).toInt())
+            isClickable = true
+            isFocusable = true
+            setOnClickListener { showServerSyncDialog() }
+        }
+
         val isSyncEnabled = com.bas080.notificationreminders.utils.CalendarSyncManager.isCalendarSyncEnabled(this)
         val syncText = if (isSyncEnabled) getString(R.string.calendar_sync_enabled) else getString(R.string.calendar_sync_disabled)
 
@@ -341,6 +353,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         row2.addView(btnDonate)
+        row2.addView(btnServerSync)
         row2.addView(btnCalendarSync)
         container.addView(row2)
 
@@ -458,6 +471,95 @@ class MainActivity : AppCompatActivity() {
         }
 
         dialog.show()
+    }
+
+    fun showServerSyncDialog() {
+        val density = resources.displayMetrics.density
+        val padding = (20 * density).toInt()
+
+        val container = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            setPadding(padding, padding / 2, padding, padding / 2)
+        }
+
+        val ipInput = EditText(this).apply {
+            hint = getString(R.string.server_sync_host_hint)
+            setText("10.0.2.2:7868")
+            setTextAppearance(android.R.style.TextAppearance_Small)
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_primary))
+        }
+
+        val pinInput = EditText(this).apply {
+            id = R.id.import_input
+            hint = getString(R.string.server_sync_pin_hint)
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            setTextAppearance(android.R.style.TextAppearance_Large)
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_primary))
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            gravity = android.view.Gravity.CENTER
+        }
+
+        container.addView(ipInput)
+        container.addView(pinInput)
+
+        val dialog = AlertDialog.Builder(this, R.style.Theme_Punt_Dialog)
+            .setTitle(R.string.server_sync_title)
+            .setView(container)
+            .setPositiveButton(R.string.server_sync_connect, null)
+            .setNegativeButton(R.string.cancel) { d, _ -> d.dismiss() }
+            .create()
+
+        dialog.setOnShowListener {
+            val connectBtn = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+            connectBtn.setOnClickListener {
+                val host = ipInput.text.toString().trim()
+                val pin = pinInput.text.toString().trim()
+                if (pin.length != 4) {
+                    Toast.makeText(this, "PIN must be 4 digits", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                val serverUrl = if (host.startsWith("http://") || host.startsWith("https://")) host else "http://$host"
+                connectServerWithPin(serverUrl, pin, dialog)
+            }
+        }
+
+        dialog.show()
+    }
+
+    private fun connectServerWithPin(serverUrl: String, pin: String, dialog: AlertDialog) {
+        Thread {
+            try {
+                val pairUrl = java.net.URL("$serverUrl/api/pair")
+                val conn = pairUrl.openConnection() as java.net.HttpURLConnection
+                conn.requestMethod = "POST"
+                conn.setRequestProperty("Content-Type", "application/json")
+                conn.doOutput = true
+                conn.outputStream.use { os ->
+                    os.write("{\"code\":\"$pin\"}".toByteArray(Charsets.UTF_8))
+                }
+                if (conn.responseCode == 200) {
+                    val res = conn.inputStream.bufferedReader().use { it.readText() }
+                    val token = org.json.JSONObject(res).optString("token")
+                    com.bas080.notificationreminders.sync.ServerSyncManager.connect(
+                        this@MainActivity,
+                        serverUrl,
+                        token
+                    )
+                    runOnUiThread {
+                        Toast.makeText(this@MainActivity, R.string.server_sync_connected, Toast.LENGTH_SHORT).show()
+                        dialog.dismiss()
+                    }
+                } else {
+                    runOnUiThread {
+                        Toast.makeText(this@MainActivity, R.string.server_sync_failed, Toast.LENGTH_SHORT).show()
+                    }
+                }
+            } catch (e: java.io.IOException) {
+                runOnUiThread {
+                    Toast.makeText(this@MainActivity, "Connection failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }.start()
     }
 
     private fun setupClearInputButton() {

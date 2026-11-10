@@ -238,6 +238,18 @@ class MainActivityTest {
     }
 
     @Test
+    fun testServerSyncDialog() {
+        val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+        activity.showServerSyncDialog()
+        val dialog = ShadowAlertDialog.getLatestDialog() as? AlertDialog
+        assertNotNull(dialog)
+        assertTrue(dialog?.isShowing == true)
+        val pinInput = dialog?.findViewById<EditText>(R.id.import_input)
+        assertNotNull(pinInput)
+        dialog?.dismiss()
+    }
+
+    @Test
     fun testClearLogsShowsToastInAboutDialog() {
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()

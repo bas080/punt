@@ -84,9 +84,10 @@ export function createCli() {
         const server = new PuntServer({ port, host, code });
         try {
           const actualPort = await server.start();
+          const pairingPin = server.getPairingCode();
           console.log(`Punt server listening on http://${host === '0.0.0.0' ? 'localhost' : host}:${actualPort}`);
-          if (code) {
-            console.log(`Pairing code set: ${code}`);
+          if (pairingPin) {
+            console.log(`Pairing PIN: ${pairingPin} (enter this in Punt Android app)`);
           }
           if (argv.open) {
             const { exec } = await import('child_process');

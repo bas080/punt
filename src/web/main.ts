@@ -12,6 +12,7 @@ export interface Task {
 export interface AppState {
   tasks: Task[];
   phoneConnected: boolean;
+  pairingPin: string | null;
   filterQuery: string;
   activeCollapsed: boolean;
   puntedCollapsed: boolean;
@@ -22,6 +23,7 @@ export interface AppState {
 export const state: AppState = {
   tasks: [],
   phoneConnected: false,
+  pairingPin: null,
   filterQuery: '',
   activeCollapsed: false,
   puntedCollapsed: false,
@@ -73,6 +75,7 @@ export function initWebSocket() {
   socket.on('init', (data: any) => {
     state.phoneConnected = data.phoneConnected;
     state.tasks = data.tasks || [];
+    state.pairingPin = data.pairingPin || null;
     updateView();
   });
 
@@ -129,6 +132,15 @@ export const appView = (s: AppState): TemplateResult => {
         ${s.phoneConnected ? 'Phone Connected' : 'Phone Offline'}
       </span>
     </header>
+
+    ${!s.phoneConnected && s.pairingPin ? html`
+      <div class="card pin-banner">
+        <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 6px;">
+          Waiting for phone... Enter PIN in Punt Android app:
+        </div>
+        <div class="pin-display">${s.pairingPin}</div>
+      </div>
+    ` : ''}
 
     <div class="card">
       <input
