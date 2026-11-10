@@ -4,6 +4,10 @@ app/build/
 *.iml
 .idea/
 
+# Node and build outputs
+node_modules/
+dist/
+
 # F-Droid build server temporary output directories & local config
 config.yml
 logs/

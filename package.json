@@ -1,0 +1,32 @@
+{
+  "name": "punt",
+  "version": "0.0.7",
+  "description": "Minimal Android task and reminder app with companion server, CLI, and web interface",
+  "bin": {
+    "punt": "./dist/server/cli.js"
+  },
+  "files": [
+    "dist/server",
+    "dist/web"
+  ],
+  "scripts": {
+    "build:web": "esbuild src/web/main.ts --bundle --minify --outdir=dist/web && cp src/web/index.html src/web/style.css src/web/manifest.json src/web/sw.js dist/web/ 2>/dev/null || true",
+    "build:server": "esbuild src/server/cli.ts --bundle --platform=node --target=node18 --outfile=dist/server/cli.js",
+    "build": "npm run build:web && npm run build:server",
+    "prepare": "npm run build",
+    "test": "node --import tsx --test 'test/**/*.test.ts'"
+  },
+  "dependencies": {
+    "lit-html": "^3.2.1",
+    "ws": "^8.18.0",
+    "yargs": "^17.7.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/ws": "^8.5.10",
+    "@types/yargs": "^17.0.32",
+    "esbuild": "^0.21.5",
+    "tsx": "^4.23.15",
+    "typescript": "^5.4.5"
+  }
+}

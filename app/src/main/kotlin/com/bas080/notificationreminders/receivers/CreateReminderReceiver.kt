@@ -648,6 +648,18 @@ class CreateReminderReceiver : BroadcastReceiver() {
                         savedSet.add(reminderText)
                         prefs.edit().putStringSet(KEY_REMINDERS, savedSet).apply()
 
+                        kotlinx.coroutines.runBlocking {
+                            val db = com.bas080.notificationreminders.data.PuntDatabase.getInstance(context)
+                            val cleanText = reminderText.replace(Regex("(?i)\\s*#done\\b"), "").trim()
+                            val recurrence = parseRecurrenceDuration(cleanText)?.second
+                            db.reminderDao().insert(
+                                com.bas080.notificationreminders.data.ReminderEntity(
+                                    text = cleanText,
+                                    recurrenceInterval = recurrence
+                                )
+                            )
+                        }
+
                         ReminderNotificationListenerService.instance?.postMatchNotification(reminderText)
                         ReminderNotificationListenerService.instance?.showStatusNotification()
                             ?: ReminderNotificationListenerService.startService(context)
@@ -687,6 +699,29 @@ class CreateReminderReceiver : BroadcastReceiver() {
                             .apply()
                         ReminderNotificationListenerService.lastTriggeredMap["snooze_$cleanTrimmed"] = snoozeUntil
 
+                        kotlinx.coroutines.runBlocking {
+                            val db = com.bas080.notificationreminders.data.PuntDatabase.getInstance(context)
+                            val existing = db.reminderDao().getReminderByText(cleanText)
+                            if (existing != null) {
+                                db.reminderDao().update(
+                                    existing.copy(
+                                        snoozeUntil = snoozeUntil,
+                                        isDone = false,
+                                        updatedAt = System.currentTimeMillis()
+                                    )
+                                )
+                            } else {
+                                db.reminderDao().insert(
+                                    com.bas080.notificationreminders.data.ReminderEntity(
+                                        text = cleanText,
+                                        snoozeUntil = snoozeUntil,
+                                        isDone = false,
+                                        recurrenceInterval = durationLabel
+                                    )
+                                )
+                            }
+                        }
+
                         val notificationId = ReminderNotificationListenerService.getNotificationIdForReminder(reminderText)
                         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                         notificationManager.cancel(notificationId)
@@ -711,6 +746,27 @@ class CreateReminderReceiver : BroadcastReceiver() {
                             }
                             savedSet.add(doneText)
                             prefs.edit().putStringSet(KEY_REMINDERS, savedSet).apply()
+                        }
+
+                        kotlinx.coroutines.runBlocking {
+                            val db = com.bas080.notificationreminders.data.PuntDatabase.getInstance(context)
+                            val cleanText = reminderText.replace(Regex("(?i)\\s*#done\\b"), "").trim()
+                            val existing = db.reminderDao().getReminderByText(cleanText)
+                            if (existing != null) {
+                                db.reminderDao().update(
+                                    existing.copy(
+                                        isDone = true,
+                                        updatedAt = System.currentTimeMillis()
+                                    )
+                                )
+                            } else {
+                                db.reminderDao().insert(
+                                    com.bas080.notificationreminders.data.ReminderEntity(
+                                        text = cleanText,
+                                        isDone = true
+                                    )
+                                )
+                            }
                         }
 
                         val notificationId = ReminderNotificationListenerService.getNotificationIdForReminder(reminderText)
@@ -759,6 +815,27 @@ class CreateReminderReceiver : BroadcastReceiver() {
                     prefs.edit().putLong("snooze_$trimmed", snoozeUntil).apply()
                     if (!chosenDurationStr.isNullOrBlank()) {
                         ReminderNotificationListenerService.recordTaskSnoozeChoice(context, reminderText, chosenDurationStr)
+                    }
+
+                    kotlinx.coroutines.runBlocking {
+                        val db = com.bas080.notificationreminders.data.PuntDatabase.getInstance(context)
+                        val cleanText = reminderText.replace(Regex("(?i)\\s*#done\\b"), "").trim()
+                        val existing = db.reminderDao().getReminderByText(cleanText)
+                        if (existing != null) {
+                            db.reminderDao().update(
+                                existing.copy(
+                                    snoozeUntil = snoozeUntil,
+                                    updatedAt = System.currentTimeMillis()
+                                )
+                            )
+                        } else {
+                            db.reminderDao().insert(
+                                com.bas080.notificationreminders.data.ReminderEntity(
+                                    text = cleanText,
+                                    snoozeUntil = snoozeUntil
+                                )
+                            )
+                        }
                     }
 
                     val notificationId = ReminderNotificationListenerService.getNotificationIdForReminder(reminderText)
