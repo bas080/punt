@@ -1,12 +1,20 @@
-Build lightweight Progressive Web App (PWA) client for Punt server using lit-html
+Build lightweight Progressive Web App (PWA) client for Punt server using lit-html and TypeScript
 
-Develop a lightweight, installable Progressive Web App (PWA) web interface served directly by the Punt backend server over local network HTTP.
+Develop a lightweight, installable Progressive Web App (PWA) web interface written in **TypeScript** served directly as a static build artifact by the Punt backend server over local network HTTP.
 The web client acts as an interactive mirror of the user's Android phone.
 Task mutations (creating, editing, punting, marking done) initiated in the web interface are sent over WebSockets to the server to be applied to the phone. If the phone is offline or unreachable on the local network, the mutation fails immediately and the user is informed.
 
 ### Technical Stack & Architecture
-- **Templating**: `lit-html` for high-performance, lightweight HTML rendering.
-- **Frontend Core**: Vanilla TypeScript, HTML, and CSS (no heavyweight frameworks or bundler overhead).
+- **Language**: TypeScript (`.ts`).
+- **Templating**: `lit-html` using tagged template literals (`html` and `render()`).
+- **No Custom Elements / Web Components**: All components are structured as simple, pure functions returning `TemplateResult` (e.g. `const reminderCard = (task: Task) => html\`...\``) composed into a root template, rendered via `render(appView(state), container)`. Avoids Custom Element lifecycle and Shadow DOM complexity.
+- **Build & Artifact Pipeline**:
+  - Uses `esbuild` for ultra-fast, zero-config bundling:
+    ```bash
+    esbuild src/web/main.ts --bundle --minify --sourcemap --outdir=dist/web
+    ```
+  - Copies `index.html`, `style.css`, and `manifest.json` into `dist/web/`.
+  - The server statically serves this `dist/web/` artifact directory at `/`.
 - **Progressive Web App (PWA)**: Includes `manifest.json` and a minimal service worker, allowing users to install Punt as a standalone desktop windowed application from their browser on desktop OSs.
 - **Standard Interactions (No Custom Keybindings)**: Uses standard browser form inputs and explicit click/tap controls without custom global single-key shortcuts.
 - **Theme Matching Android App**: The web client visual styles match the Punt Android application theme precisely:
