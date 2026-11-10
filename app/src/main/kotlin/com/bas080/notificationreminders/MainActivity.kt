@@ -131,18 +131,6 @@ class MainActivity : AppCompatActivity() {
             checkAndRequestNotificationListenerPermission()
         }
 
-    private val requestCalendarPermissionLauncher =
-        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
-            val allGranted = permissions.values.all { it }
-            if (allGranted) {
-                com.bas080.notificationreminders.utils.CalendarSyncManager.setCalendarSyncEnabled(this, true)
-                com.bas080.notificationreminders.utils.CalendarSyncManager.syncRemindersToCalendar(this)
-                Toast.makeText(this, "Calendar Sync enabled", Toast.LENGTH_SHORT).show()
-            } else {
-                com.bas080.notificationreminders.utils.CalendarSyncManager.setCalendarSyncEnabled(this, false)
-                showCalendarPermissionSettingsDialog()
-            }
-        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -338,23 +326,8 @@ class MainActivity : AppCompatActivity() {
             setOnClickListener { showServerSyncDialog() }
         }
 
-        val isSyncEnabled = com.bas080.notificationreminders.utils.CalendarSyncManager.isCalendarSyncEnabled(this)
-        val syncText = if (isSyncEnabled) getString(R.string.calendar_sync_enabled) else getString(R.string.calendar_sync_disabled)
-
-        val btnCalendarSync = TextView(this).apply {
-            text = syncText
-            setTextColor(accentColor)
-            setTextAppearance(android.R.style.TextAppearance_Small)
-            setTypeface(null, android.graphics.Typeface.BOLD)
-            setPadding((12 * density).toInt(), (4 * density).toInt(), 0, (4 * density).toInt())
-            isClickable = true
-            isFocusable = true
-            visibility = View.GONE
-        }
-
         row2.addView(btnDonate)
         row2.addView(btnServerSync)
-        row2.addView(btnCalendarSync)
         container.addView(row2)
 
         val logsHeaderRow = android.widget.LinearLayout(this).apply {
@@ -443,26 +416,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        btnCalendarSync.setOnClickListener {
-            val currentlyEnabled = com.bas080.notificationreminders.utils.CalendarSyncManager.isCalendarSyncEnabled(this)
-            if (currentlyEnabled) {
-                com.bas080.notificationreminders.utils.CalendarSyncManager.setCalendarSyncEnabled(this, false)
-                btnCalendarSync.text = getString(R.string.calendar_sync_disabled)
-                Toast.makeText(this, "Calendar Sync disabled", Toast.LENGTH_SHORT).show()
-            } else {
-                if (com.bas080.notificationreminders.utils.CalendarSyncManager.hasCalendarPermission(this)) {
-                    com.bas080.notificationreminders.utils.CalendarSyncManager.setCalendarSyncEnabled(this, true)
-                    btnCalendarSync.text = getString(R.string.calendar_sync_enabled)
-                    com.bas080.notificationreminders.utils.CalendarSyncManager.syncRemindersToCalendar(this)
-                    Toast.makeText(this, "Calendar Sync enabled", Toast.LENGTH_SHORT).show()
-                } else {
-                    dialog.dismiss()
-                    requestCalendarPermissionLauncher.launch(
-                        arrayOf(Manifest.permission.READ_CALENDAR, Manifest.permission.WRITE_CALENDAR)
-                    )
-                }
-            }
-        }
 
         btnClearLogs.setOnClickListener {
             AppLogger.clearLogs(this)
@@ -856,23 +809,6 @@ class MainActivity : AppCompatActivity() {
         })
     }
 
-    private fun showCalendarPermissionSettingsDialog() {
-        AlertDialog.Builder(this, R.style.Theme_Punt_Dialog)
-            .setTitle(R.string.calendar_sync_title)
-            .setMessage(R.string.calendar_permission_required)
-            .setPositiveButton("Open Settings") { _, _ ->
-                val intent = Intent(
-                    Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                    android.net.Uri.fromParts("package", packageName, null)
-                )
-                try {
-                    startActivity(intent)
-                } catch (_: Exception) {
-                }
-            }
-            .setNegativeButton(R.string.cancel, null)
-            .show()
-    }
 
     private fun setupRecyclerView() {
         adapter = RemindersAdapter(
@@ -1628,7 +1564,6 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        com.bas080.notificationreminders.utils.CalendarSyncManager.syncCalendarChangesToReminders(this)
         loadReminders()
         if (isNotificationListenerEnabled()) {
             startReminderService()
