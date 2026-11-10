@@ -1,6 +1,7 @@
 plugins {
     id("com.android.application")
     kotlin("android")
+    id("com.google.devtools.ksp")
     jacoco
     id("io.gitlab.arturbosch.detekt")
 }
@@ -101,7 +102,8 @@ val fileFilter = listOf(
     "**/*_MembersInjector.*",
     "**/BR.class",
     "**/DataBinderMapperImpl*.class",
-    "**/DataBindingInfo.class"
+    "**/DataBindingInfo.class",
+    "**/*_Impl*.*"
 )
 
 tasks.register<JacocoReport>("jacocoTestReport") {
@@ -167,6 +169,13 @@ dependencies {
 
     // Lifecycle
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.6.1")
+
+    // Room
+    val roomVersion = "2.6.1"
+    implementation("androidx.room:room-runtime:$roomVersion")
+    implementation("androidx.room:room-ktx:$roomVersion")
+    ksp("androidx.room:room-compiler:$roomVersion")
+    testImplementation("androidx.room:room-testing:$roomVersion")
 
     // Testing
     testImplementation("junit:junit:4.13.2")
