@@ -1,7 +1,7 @@
 import http from 'http';
 import fs from 'fs';
 import path from 'path';
-import { WebSocketServer, WebSocket } from 'ws';
+import { Server as SocketIOServer, Socket } from 'socket.io';
 
 export interface TaskItem {
   id?: number | string;
@@ -22,13 +22,12 @@ export interface ServerOptions {
 
 export class PuntServer {
   private server: http.Server | null = null;
-  private wss: WebSocketServer | null = null;
+  private io: SocketIOServer | null = null;
   private pairingCode: string | null = null;
   private pairingCodeExpiresAt: number = 0;
   private sessionToken: string | null = null;
   private tasks: TaskItem[] = [];
-  private phoneWs: WebSocket | null = null;
-  private webClients: Set<WebSocket> = new Set();
+  private phoneSocket: Socket | null = null;
   private pendingMutations: Map<string, { resolve: (res: any) => void; reject: (err: any) => void; timeout: NodeJS.Timeout }> = new Map();
 
   constructor(private options: ServerOptions = {}) {
@@ -47,7 +46,7 @@ export class PuntServer {
   }
 
   public isPhoneConnected(): boolean {
-    return this.phoneWs !== null && this.phoneWs.readyState === WebSocket.OPEN;
+    return this.phoneSocket !== null && this.phoneSocket.connected;
   }
 
   public getTasks(): TaskItem[] {
@@ -56,16 +55,7 @@ export class PuntServer {
 
   public setTasks(tasks: TaskItem[]) {
     this.tasks = tasks;
-    this.broadcastToWeb({ type: 'tasks_updated', tasks: this.tasks });
-  }
-
-  private broadcastToWeb(message: any) {
-    const payload = JSON.stringify(message);
-    for (const ws of this.webClients) {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(payload);
-      }
-    }
+    this.io?.emit('tasks_updated', { tasks: this.tasks });
   }
 
   public start(): Promise<number> {
@@ -78,99 +68,98 @@ export class PuntServer {
         this.handleHttpRequest(req, res, webDist);
       });
 
-      this.wss = new WebSocketServer({ noServer: true });
-
-      this.server.on('upgrade', (req, socket, head) => {
-        const url = new URL(req.url || '', `http://${req.headers.host || 'localhost'}`);
-        if (url.pathname === '/api/ws') {
-          const token = url.searchParams.get('token') || req.headers['sec-websocket-protocol'];
-          const isPhone = url.searchParams.get('client') === 'phone';
-
-          // Authenticate WebSocket connection
-          if (this.sessionToken && isPhone) {
-            const clientToken = url.searchParams.get('token') || token;
-            if (clientToken !== this.sessionToken) {
-              socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
-              socket.destroy();
-              return;
-            }
-          }
-
-          this.wss?.handleUpgrade(req, socket, head, (ws) => {
-            this.wss?.emit('connection', ws, req);
-          });
-        } else {
-          socket.write('HTTP/1.1 404 Not Found\r\n\r\n');
-          socket.destroy();
+      this.io = new SocketIOServer(this.server, {
+        cors: {
+          origin: '*',
+          methods: ['GET', 'POST']
         }
       });
 
-      this.wss.on('connection', (ws, req) => {
-        const url = new URL(req.url || '', `http://${req.headers.host || 'localhost'}`);
-        const isPhone = url.searchParams.get('client') === 'phone';
+      this.io.use((socket, next) => {
+        const clientType = socket.handshake.query.client as string;
+        const token = socket.handshake.query.token as string;
+        if (this.sessionToken && clientType === 'phone' && token !== this.sessionToken) {
+          return next(new Error('unauthorized'));
+        }
+        next();
+      });
 
-        if (isPhone) {
-          if (this.phoneWs && this.phoneWs !== ws) {
-            try { this.phoneWs.close(); } catch (_) {}
+      this.io.on('connection', (socket) => {
+        const clientType = socket.handshake.query.client as string;
+
+        if (clientType === 'phone') {
+          if (this.phoneSocket && this.phoneSocket !== socket) {
+            try { this.phoneSocket.disconnect(true); } catch (_) {}
           }
-          this.phoneWs = ws;
-          this.broadcastToWeb({ type: 'phone_status', connected: true });
+          this.phoneSocket = socket;
+          this.io?.emit('phone_status', { connected: true });
 
-          ws.on('message', (data) => {
-            try {
-              const msg = JSON.parse(data.toString());
-              if (msg.type === 'tasks_dump') {
-                this.tasks = msg.tasks || [];
-                this.broadcastToWeb({ type: 'tasks_updated', tasks: this.tasks });
-              } else if (msg.type === 'mutation_response') {
-                const pending = this.pendingMutations.get(msg.mutationId);
-                if (pending) {
-                  clearTimeout(pending.timeout);
-                  this.pendingMutations.delete(msg.mutationId);
-                  if (msg.success) {
-                    if (msg.tasks) {
-                      this.tasks = msg.tasks;
-                      this.broadcastToWeb({ type: 'tasks_updated', tasks: this.tasks });
-                    }
-                    pending.resolve(msg);
-                  } else {
-                    pending.reject(new Error(msg.error || 'Mutation failed on phone'));
-                  }
-                }
-              }
-            } catch (_) {}
+          socket.on('tasks_dump', (data) => {
+            const list = Array.isArray(data) ? data : (data?.tasks || []);
+            this.tasks = list;
+            this.io?.emit('tasks_updated', { tasks: this.tasks });
           });
 
-          ws.on('close', () => {
-            if (this.phoneWs === ws) {
-              this.phoneWs = null;
-              this.broadcastToWeb({ type: 'phone_status', connected: false });
+          socket.on('mutation_response', (msg) => {
+            if (!msg || !msg.mutationId) return;
+            const pending = this.pendingMutations.get(msg.mutationId);
+            if (pending) {
+              clearTimeout(pending.timeout);
+              this.pendingMutations.delete(msg.mutationId);
+              if (msg.success) {
+                if (msg.tasks) {
+                  this.tasks = msg.tasks;
+                  this.io?.emit('tasks_updated', { tasks: this.tasks });
+                }
+                pending.resolve(msg);
+              } else {
+                pending.reject(new Error(msg.error || 'Mutation failed on phone'));
+              }
+            }
+          });
+
+          socket.on('disconnect', () => {
+            if (this.phoneSocket === socket) {
+              this.phoneSocket = null;
+              this.io?.emit('phone_status', { connected: false });
+            }
+          });
+
+          socket.conn.on('close', () => {
+            if (this.phoneSocket === socket) {
+              this.phoneSocket = null;
+              this.io?.emit('phone_status', { connected: false });
             }
           });
         } else {
-          this.webClients.add(ws);
-          ws.send(JSON.stringify({
-            type: 'init',
+          // Web client or CLI socket client
+          socket.emit('init', {
             phoneConnected: this.isPhoneConnected(),
             tasks: this.tasks
-          }));
-
-          ws.on('message', async (data) => {
-            try {
-              const msg = JSON.parse(data.toString());
-              if (msg.type === 'mutate') {
-                try {
-                  const result = await this.dispatchMutationToPhone(msg.action, msg.payload);
-                  ws.send(JSON.stringify({ type: 'mutation_ack', mutationId: msg.mutationId, success: true, result }));
-                } catch (err: any) {
-                  ws.send(JSON.stringify({ type: 'mutation_ack', mutationId: msg.mutationId, success: false, error: err.message }));
-                }
-              }
-            } catch (_) {}
           });
 
-          ws.on('close', () => {
-            this.webClients.delete(ws);
+          socket.on('get_status', (callback) => {
+            if (typeof callback === 'function') {
+              callback({
+                phoneConnected: this.isPhoneConnected(),
+                tasks: this.tasks
+              });
+            }
+          });
+
+          socket.on('mutate', async (msg, callback) => {
+            try {
+              const result = await this.dispatchMutationToPhone(msg.action, msg.payload);
+              if (typeof callback === 'function') {
+                callback({ success: true, result });
+              }
+              socket.emit('mutation_ack', { mutationId: msg.mutationId, success: true, result });
+            } catch (err: any) {
+              if (typeof callback === 'function') {
+                callback({ success: false, error: err.message });
+              }
+              socket.emit('mutation_ack', { mutationId: msg.mutationId, success: false, error: err.message });
+            }
           });
         }
       });
@@ -200,12 +189,11 @@ export class PuntServer {
 
       this.pendingMutations.set(mutationId, { resolve, reject, timeout: timer });
 
-      this.phoneWs?.send(JSON.stringify({
-        type: 'mutation_request',
+      this.phoneSocket?.emit('mutation_request', {
         mutationId,
         action,
         payload
-      }));
+      });
     });
   }
 
@@ -213,7 +201,7 @@ export class PuntServer {
     const parsedUrl = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
     const pathname = parsedUrl.pathname;
 
-    // CORS headers for local subnet development
+    // CORS headers
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -224,12 +212,19 @@ export class PuntServer {
       return;
     }
 
+    if (pathname.startsWith('/socket.io/')) {
+      // Let Socket.IO engine handle it
+      return;
+    }
+
+    // Ping endpoint for fast network discovery
     if (pathname === '/api/ping' && req.method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ app: 'punt-server', version: '0.0.7' }));
       return;
     }
 
+    // Handshake/Pairing endpoint
     if (pathname === '/api/pair' && req.method === 'POST') {
       let body = '';
       req.on('data', chunk => { body += chunk; });
@@ -259,65 +254,39 @@ export class PuntServer {
       return;
     }
 
-    if (pathname === '/api/tasks' && req.method === 'GET') {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({
-        tasks: this.tasks,
-        phoneConnected: this.isPhoneConnected()
-      }));
+    // Serve static files from root
+    const knownStaticFiles = ['/style.css', '/main.js', '/manifest.json', '/sw.js', '/favicon.ico', '/icon.png'];
+    if (pathname === '/' || pathname === '/index.html') {
+      this.serveFile(path.join(webDist, 'index.html'), 'text/html', res);
       return;
     }
 
-    if (pathname === '/api/tasks/mutate' && req.method === 'POST') {
-      let body = '';
-      req.on('data', chunk => { body += chunk; });
-      req.on('end', async () => {
-        try {
-          const data = JSON.parse(body || '{}');
-          if (!this.isPhoneConnected()) {
-            res.writeHead(504, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ success: false, error: 'Phone is unreachable' }));
-            return;
-          }
-          const result = await this.dispatchMutationToPhone(data.action, data.payload);
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ success: true, result }));
-        } catch (err: any) {
-          res.writeHead(500, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ success: false, error: err.message }));
-        }
-      });
-      return;
+    if (knownStaticFiles.includes(pathname)) {
+      const filePath = path.join(webDist, pathname);
+      if (fs.existsSync(filePath)) {
+        const ext = path.extname(filePath).toLowerCase();
+        const mimeTypes: Record<string, string> = {
+          '.css': 'text/css',
+          '.js': 'application/javascript',
+          '.json': 'application/json',
+          '.png': 'image/png'
+        };
+        this.serveFile(filePath, mimeTypes[ext] || 'application/octet-stream', res);
+        return;
+      }
     }
 
-    // Static asset serving from webDist
-    this.serveStaticFile(pathname, res, webDist);
+    // Temporary redirect (302) any other visits back to root /
+    res.writeHead(302, { Location: '/' });
+    res.end();
   }
 
-  private serveStaticFile(pathname: string, res: http.ServerResponse, webDist: string) {
-    let filePath = pathname === '/' ? path.join(webDist, 'index.html') : path.join(webDist, pathname);
-
-    if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
-      filePath = path.join(webDist, 'index.html');
-    }
-
+  private serveFile(filePath: string, contentType: string, res: http.ServerResponse) {
     if (!fs.existsSync(filePath)) {
       res.writeHead(404, { 'Content-Type': 'text/plain' });
       res.end('Not Found');
       return;
     }
-
-    const ext = path.extname(filePath).toLowerCase();
-    const mimeTypes: Record<string, string> = {
-      '.html': 'text/html',
-      '.css': 'text/css',
-      '.js': 'application/javascript',
-      '.json': 'application/json',
-      '.png': 'image/png',
-      '.svg': 'image/svg+xml'
-    };
-    const contentType = mimeTypes[ext] || 'application/octet-stream';
-
     res.writeHead(200, { 'Content-Type': contentType });
     fs.createReadStream(filePath).pipe(res);
   }
@@ -330,24 +299,10 @@ export class PuntServer {
       }
       this.pendingMutations.clear();
 
-      if (this.phoneWs) {
-        try { this.phoneWs.close(); } catch (_) {}
-        this.phoneWs = null;
+      if (this.io) {
+        this.io.close();
       }
-      for (const ws of this.webClients) {
-        try { ws.close(); } catch (_) {}
-      }
-      this.webClients.clear();
-
-      if (this.wss) {
-        this.wss.close(() => {
-          if (this.server) {
-            this.server.close(() => resolve());
-          } else {
-            resolve();
-          }
-        });
-      } else if (this.server) {
+      if (this.server) {
         this.server.close(() => resolve());
       } else {
         resolve();
