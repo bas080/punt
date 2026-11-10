@@ -1,26 +1,29 @@
 Build Punt backend synchronization server in Node.js and TypeScript
 
-Implement a lightweight Punt backend server in Node.js and TypeScript over local network HTTP.
+Implement a lightweight Punt backend server in Node.js and TypeScript over local network HTTP and WebSockets.
 The server functions purely as an in-memory relay and temporary cache between the Android phone, the web client, and the CLI.
 
 ### Architectural Model
 - **Pure In-Memory State (No Database)**: The server does NOT persist data to a database. All task data is stored in memory in Node.js while the server is running. When the Android phone connects, it hydrates the server's memory with the current state.
 - **Phone as Sole Source of Truth**: The phone's local storage (`reminders_prefs` / `punt_tasks_backup.md`) is the only permanent persistence.
-- **Full Task List Dumps (No Deltas)**: The phone pushes its complete list of reminders to the server upon connecting and whenever a local change occurs while connected.
+- **Full Task List Dumps (No Deltas)**: The phone pushes its complete list of reminders to the server over WebSockets upon connecting and whenever a local change occurs while connected.
 - **Data Flow**:
-  `android -> server -> web/cli -> server -> android -> server`
-  When web or CLI mutates a task, the command is forwarded through the server to the phone. Once the phone updates its state and confirms, the phone pushes the updated complete list back to the server, which broadcasts to connected web clients.
-- **Local Network Scope**: Strictly local network HTTP; fails immediately if local network communication fails.
+  `android -> server (WebSocket) -> web/cli -> server (WebSocket) -> android -> server`
+- **Port Configuration**: Defaults to port `7868` (mnemonic for "PUNT"). Configurable via `PUNT_PORT` environment variable or `--port` CLI flag.
+- **Authentication**:
+  - The Android app generates a 4-digit code (valid 15m).
+  - The server receives this code via `--code <code>` or prompt when started.
+  - The server pairs with the phone, burns the 4-digit code, and establishes an authorized session token.
+- **PWA Asset Serving**: Serves static web assets including `manifest.json` and a minimal service worker enabling standalone desktop app installation.
+- **Strictly Local Network**: Fails immediately if local network communication fails.
 
 ### Technical Specifications
 - **Runtime**: Node.js & TypeScript.
+- **Default Port**: 7868 (configurable via `PUNT_PORT` env var or `--port` option).
 - **Persistence**: None (in-memory state only).
-- **Endpoints**:
-  - `POST /api/pair`: Accepts `{ code: string, client_name: string }`. Validates single-use setup code, burns it, and issues session token for the phone.
-  - `POST /api/sync/phone`: Authenticated endpoint for the phone to dump its complete task list and receive pending mutations.
+- **Endpoints & Protocols**:
+  - `GET /api/ping`: Fast discovery ping endpoint returning `{ "app": "punt-server", "version": "..." }`.
+  - `POST /api/pair`: Handshake endpoint accepting the 4-digit code from the phone or server to issue session tokens.
+  - `WS /api/ws`: Authenticated WebSocket connection endpoint for the phone and web clients for real-time list hydration, mutation dispatching, and broadcast.
   - `GET /api/tasks`: Returns current in-memory mirrored tasks to web clients and CLI commands.
-  - `POST /api/tasks/mutate`: Receives mutation requests from web or CLI, forwards to the phone, and waits for phone acknowledgment. Fails if the phone is disconnected.
-
-## Questions for @bas080
-1. Should the connection between phone and server use WebSockets or Server-Sent Events (SSE) + HTTP POST for real-time mutation forwarding and list updates?
-2. How long should the single-use pairing code remain active before expiring (e.g. 10 minutes)?
+  - `POST /api/tasks/mutate`: HTTP endpoint for CLI commands to dispatch task mutations to the phone through the server.
