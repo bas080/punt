@@ -1,22 +1,40 @@
-Build Punt server command-line interface (CLI) using yargs
+Build Punt server command-line interface (CLI) using yargs with npx readiness
 
 Implement a companion command-line interface (`punt`) in Node.js and TypeScript using `yargs`.
 The CLI has two primary roles:
 1. Spawning and running the in-memory Punt server in the foreground (`punt serve`).
 2. Interacting with the running server as an HTTP/WebSocket client to view and mutate task data currently mirrored from the Android phone.
 
-### Package & Executable Binary (`bin`)
-- The server project defines a `bin` entry in its `package.json`:
+### npx Distribution & Packaging (`package.json`)
+To enable users to run `npx punt serve --code <code> --open` with zero installation steps and have the web artifacts served immediately:
+- The package configuration specifies:
   ```json
   {
-    "name": "punt-server",
+    "name": "punt",
     "bin": {
       "punt": "./dist/server/cli.js"
+    },
+    "files": [
+      "dist/server",
+      "dist/web"
+    ],
+    "scripts": {
+      "build:web": "esbuild src/web/main.ts --bundle --minify --outdir=dist/web && cp src/web/index.html src/web/style.css src/web/manifest.json dist/web/",
+      "build:server": "esbuild src/server/cli.ts --bundle --platform=node --target=node18 --outfile=dist/server/cli.js",
+      "build": "npm run build:web && npm run build:server",
+      "prepare": "npm run build"
     }
   }
   ```
-  This makes the command `punt` globally executable (or executable via `npx punt` / local scripts).
-- Uses standard Shebang `#!/usr/bin/env node` in `cli.js`.
+- **Pre-Built Web Bundling**: `"files": ["dist/server", "dist/web"]` ensures npm packages and tarballs include the compiled web UI artifacts.
+- **Automated Prepack**: `"prepare": "npm run build"` guarantees that both the server and the web client are built before publishing.
+- **Executable Shebang**: The entry script begins with `#!/usr/bin/env node` and has executable file permissions.
+- **Co-located Artifact Resolution**: The server resolves the web assets relative to its own script location:
+  ```typescript
+  const webArtifactPath = path.resolve(__dirname, '../web');
+  app.use(express.static(webArtifactPath));
+  ```
+  This ensures static web assets are served reliably when invoked via `npx punt`, `npm install -g punt`, or local repository runs.
 
 ### Design Principles
 - **Simple, Non-REPL CLI**: No interactive shell or REPL. Standard command execution.
@@ -43,10 +61,13 @@ The CLI has two primary roles:
    - `testPuntPortEnvVar`: Sets `PUNT_PORT=9000` and verifies CLI parses port as 9000.
    - `testPortFlagOverridesEnvVar`: Sets `PUNT_PORT=9000` with `--port 8080` and verifies port is 8080.
    - `testCodeArgumentParsing`: Verifies `--code 1234` correctly populates the pairing parameter.
-2. **Stdin & Pipe Input Tests**:
+2. **Package & Path Resolution Tests**:
+   - `testWebArtifactsDirectoryExists`: Asserts that `dist/web/index.html` exists alongside `dist/server/cli.js`.
+   - `testStaticPathResolution`: Verifies server resolves static directory to existing `../web` path without throwing.
+3. **Stdin & Pipe Input Tests**:
    - `testTasksAddFromArgument`: Runs `punt tasks add "Test reminder #tag"` and verifies payload dispatched to server.
    - `testTasksAddFromStdinPipe`: Pipes `"Piped task text"` via simulated stdin stream and verifies identical task dispatch.
    - `testTasksAddFailsGracefullyWhenEmpty`: Verifies error exit code (1) and descriptive error message if text is empty.
-3. **Server Offline Error Handling Tests**:
+4. **Server Offline Error Handling Tests**:
    - `testTasksListWhenServerNotRunning`: Verifies clear error output (*"Unable to connect to Punt server at localhost:7868. Is 'punt serve' running?"*) without unhandled stack traces.
    - `testTasksAddWhenPhoneDisconnected`: Verifies CLI receives and prints the server error (*"Failed to add task: Phone is unreachable"*).
