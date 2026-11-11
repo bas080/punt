@@ -23,13 +23,11 @@ class ServerSyncManagerTest {
     }
 
     @Test
-    fun testGenerateAndRetrievePairingCode() {
-        val code = ServerSyncManager.generatePairingCode(context)
-        assertEquals(4, code.length)
-        assertTrue(code.all { it.isDigit() })
-
-        val retrieved = ServerSyncManager.getPairingCode(context)
-        assertEquals(code, retrieved)
+    fun testDiscoverAndConnectFallback() {
+        ServerSyncManager.discoverAndConnect(context, "", "1234") { _, url ->
+            assertNotNull(url)
+            assertTrue(url.startsWith("http://"))
+        }
     }
 
     @Test
