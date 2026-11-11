@@ -14,9 +14,17 @@ test('CLI Use Cases - All Commands and Flags', async (t) => {
   const server = new PuntServer({ port: testPort });
   await server.start();
 
+  const pairingResponse = await fetch(`http://localhost:${testPort}/api/pair`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code: server.getPairingCode() })
+  });
+  const pairingData = await pairingResponse.json();
+  assert.equal(pairingData.success, true);
+
   let phoneTasks: any[] = [];
   const phoneSocket = ClientIO(`http://localhost:${testPort}`, {
-    query: { client: 'phone', version: '0.0.7' },
+    query: { client: 'phone', token: pairingData.token, version: '0.0.7' },
     transports: ['websocket']
   });
 

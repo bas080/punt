@@ -14,13 +14,21 @@ test('End-to-end sync between Server, Android app, Web client, and CLI', async (
   const server = new PuntServer({ port });
   await server.start();
 
+  const pairingResponse = await fetch(`http://localhost:${port}/api/pair`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code: server.getPairingCode() })
+  });
+  const pairingData = await pairingResponse.json();
+  assert.equal(pairingData.success, true);
+
   // Simulated Android phone client
   let phoneTasks: TaskItem[] = [
     { id: 1, text: 'Initial Android task', createdAt: Date.now(), isDone: false, snoozeUntil: null }
   ];
 
   const phoneSocket = ClientIO(`http://localhost:${port}`, {
-    query: { client: 'phone', version: '0.0.7' },
+    query: { client: 'phone', token: pairingData.token, version: '0.0.7' },
     transports: ['websocket']
   });
 

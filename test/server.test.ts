@@ -27,6 +27,28 @@ test('Server endpoints, Socket.IO task sync, and root routing', async (t) => {
     assert.equal(res.headers.get('location'), '/');
   });
 
+  await t.test('Phone sockets are rejected before PIN pairing', async () => {
+    const phoneSocket = ClientIO(`http://127.0.0.1:${port}`, {
+      query: { client: 'phone' },
+      transports: ['websocket'],
+      reconnection: false
+    });
+
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('Phone connection was not rejected')), 1000);
+        phoneSocket.once('connect_error', (error) => {
+          clearTimeout(timer);
+          assert.match(error.message, /unauthorized/);
+          resolve();
+        });
+        phoneSocket.once('connect', () => reject(new Error('Unpaired phone connected')));
+      });
+    } finally {
+      phoneSocket.disconnect();
+    }
+  });
+
   await t.test('POST /api/pair accepts valid code, burns it, and rejects reuse/invalid', async () => {
     server.setPairingCode('4829');
 

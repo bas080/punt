@@ -2,7 +2,9 @@ package com.bas080.notificationreminders.sync
 
 import android.content.Context
 import com.sun.net.httpserver.HttpServer
+import org.json.JSONObject
 import java.net.InetSocketAddress
+import java.util.concurrent.atomic.AtomicReference
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -25,10 +27,26 @@ class ServerSyncManagerTest {
     }
 
     @Test
-    fun testDiscoverAndConnectFallback() {
-        ServerSyncManager.discoverAndConnect(context, "", "1234") { _, url, _ ->
-            assertNotNull(url)
-            assertTrue(url.startsWith("http://"))
+    fun testPairWithServerExchangesPinForSessionToken() {
+        val receivedPin = AtomicReference<String>()
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0).apply {
+            createContext("/api/pair") { exchange ->
+                val request = exchange.requestBody.bufferedReader().use { it.readText() }
+                receivedPin.set(JSONObject(request).optString("code"))
+                val response = """{"success":true,"token":"session-token"}""".toByteArray()
+                exchange.sendResponseHeaders(200, response.size.toLong())
+                exchange.responseBody.use { it.write(response) }
+            }
+            start()
+        }
+
+        try {
+            val result = pairWithServer("http://127.0.0.1:${server.address.port}", "4829")
+            assertTrue(result.isSuccess)
+            assertEquals("4829", receivedPin.get())
+            assertEquals("session-token", result.getOrNull())
+        } finally {
+            server.stop(0)
         }
     }
 
