@@ -28,6 +28,9 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.core.view.AccessibilityDelegateCompat
 import androidx.core.view.ViewCompat
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import androidx.recyclerview.widget.ItemTouchHelper
@@ -1332,11 +1335,38 @@ class MainActivity : AppCompatActivity() {
     private fun saveRemindersToPrefs(updateStatusNotification: Boolean = true) {
         val prefs = getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
         prefs.edit().putStringSet(KEY_REMINDERS, activeReminders.toSet()).apply()
+        syncActiveRemindersToRoom()
         if (updateStatusNotification) {
             ReminderNotificationListenerService.instance?.showStatusNotification()
         }
         com.bas080.notificationreminders.providers.RemindersContentProvider.notifyChange(this)
         com.bas080.notificationreminders.utils.TaskBackupManager.backupTasks(this)
+    }
+
+    private fun syncActiveRemindersToRoom() {
+        val context = applicationContext
+        val currentSet = activeReminders.toList()
+        val prefs = getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+            try {
+                val db = com.bas080.notificationreminders.data.PuntDatabase.getInstance(context)
+                val entities = currentSet.map { raw ->
+                    val isDone = raw.contains("#done", ignoreCase = true)
+                    val clean = raw.replace(Regex("(?i)\\s*#done\\b"), "").trim()
+                    val cleanLower = clean.lowercase()
+                    val snoozeUntil = prefs.getLong("snooze_$cleanLower", 0L).takeIf { it > 0L }
+                    val recurrence = CreateReminderReceiver.parseRecurrenceDuration(clean)?.second
+                    com.bas080.notificationreminders.data.ReminderEntity(
+                        text = clean,
+                        isDone = isDone,
+                        snoozeUntil = snoozeUntil,
+                        recurrenceInterval = recurrence
+                    )
+                }
+                db.reminderDao().deleteAll()
+                db.reminderDao().insertAll(entities)
+            } catch (_: Exception) {}
+        }
     }
 
     private fun updateSummaryAndAdapter() {

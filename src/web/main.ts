@@ -12,6 +12,8 @@ export interface Task {
 export interface AppState {
   tasks: Task[];
   phoneConnected: boolean;
+  phoneVersion: string | null;
+  serverVersion: string | null;
   pairingPin: string | null;
   filterQuery: string;
   activeCollapsed: boolean;
@@ -23,6 +25,8 @@ export interface AppState {
 export const state: AppState = {
   tasks: [],
   phoneConnected: false,
+  phoneVersion: null,
+  serverVersion: '0.0.7',
   pairingPin: null,
   filterQuery: '',
   activeCollapsed: false,
@@ -74,6 +78,8 @@ export function initWebSocket() {
 
   socket.on('init', (data: any) => {
     state.phoneConnected = data.phoneConnected;
+    if (data.phoneVersion) state.phoneVersion = data.phoneVersion;
+    if (data.serverVersion) state.serverVersion = data.serverVersion;
     state.tasks = data.tasks || [];
     state.pairingPin = data.pairingPin || null;
     updateView();
@@ -81,10 +87,14 @@ export function initWebSocket() {
 
   socket.on('phone_status', (data: any) => {
     state.phoneConnected = data.connected;
+    if (data.phoneVersion) state.phoneVersion = data.phoneVersion;
+    if (data.serverVersion) state.serverVersion = data.serverVersion;
     updateView();
   });
 
   socket.on('tasks_updated', (data: any) => {
+    if (data.phoneVersion) state.phoneVersion = data.phoneVersion;
+    if (data.serverVersion) state.serverVersion = data.serverVersion;
     state.tasks = data.tasks || [];
     updateView();
   });
@@ -150,12 +160,21 @@ export const appView = (s: AppState): TemplateResult => {
   const activeTasks = filtered.filter(t => !t.isDone && (!t.snoozeUntil || t.snoozeUntil <= now));
   const puntedTasks = filtered.filter(t => !t.isDone && t.snoozeUntil && t.snoozeUntil > now);
 
+  const isVersionMismatch = s.phoneConnected && s.phoneVersion && s.serverVersion && s.phoneVersion !== s.serverVersion;
+
   return html`
     <header>
       <span class="title">Punt</span>
-      <span class="status-badge ${s.phoneConnected ? 'connected' : ''}">
-        ${s.phoneConnected ? 'Phone Connected' : 'Phone Offline'}
-      </span>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        ${isVersionMismatch ? html`
+          <span class="version-mismatch" title="App version (${s.phoneVersion}) differs from server (${s.serverVersion})">
+            v${s.phoneVersion} ≠ v${s.serverVersion}
+          </span>
+        ` : ''}
+        <span class="status-badge ${s.phoneConnected ? 'connected' : ''}">
+          ${s.phoneConnected ? 'Phone Connected' : 'Phone Offline'}
+        </span>
+      </div>
     </header>
 
     ${!s.phoneConnected && s.pairingPin ? html`
