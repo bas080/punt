@@ -52,8 +52,9 @@ object ServerSyncManager {
     fun connect(context: Context, serverUrl: String, token: String? = null) {
         disconnect()
         try {
+            val version = "0.0.7"
             val opts = IO.Options().apply {
-                query = "client=phone" + (if (!token.isNullOrBlank()) "&token=$token" else "")
+                query = "client=phone&version=$version" + (if (!token.isNullOrBlank()) "&token=$token" else "")
                 transports = arrayOf("websocket", "polling")
                 reconnection = true
             }
@@ -93,7 +94,11 @@ object ServerSyncManager {
                 val db = PuntDatabase.getInstance(context)
                 val reminders = db.reminderDao().getAllReminders()
                 val jsonArray = serializeReminders(reminders)
-                s.emit("tasks_dump", jsonArray)
+                val payload = JSONObject().apply {
+                    put("version", "0.0.7")
+                    put("tasks", jsonArray)
+                }
+                s.emit("tasks_dump", payload)
             } catch (_: Exception) {}
         }
     }
@@ -153,6 +158,7 @@ object ServerSyncManager {
             try {
                 val db = PuntDatabase.getInstance(context)
                 applyAction(db.reminderDao(), action, payload)
+                syncRoomToPrefsCache(context, db)
                 TaskBackupManager.backupTasks(context)
                 val jsonArray = serializeReminders(db.reminderDao().getAllReminders())
 
@@ -171,5 +177,24 @@ object ServerSyncManager {
                 s.emit("mutation_response", errorResponse)
             }
         }
+    }
+
+    private suspend fun syncRoomToPrefsCache(context: Context, db: PuntDatabase) {
+        val reminders = db.reminderDao().getAllReminders()
+        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
+        val editor = prefs.edit()
+        val set = mutableSetOf<String>()
+        for (r in reminders) {
+            val text = if (r.isDone) "${r.text} #done" else r.text
+            set.add(text)
+            val cleanLower = r.text.lowercase()
+            if (r.snoozeUntil != null && r.snoozeUntil > 0L) {
+                editor.putLong("snooze_$cleanLower", r.snoozeUntil)
+            } else {
+                editor.remove("snooze_$cleanLower")
+            }
+        }
+        editor.putStringSet("key_reminders_list", set).apply()
+        com.bas080.notificationreminders.providers.RemindersContentProvider.notifyChange(context)
     }
 }

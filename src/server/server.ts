@@ -28,6 +28,8 @@ export class PuntServer {
   private sessionToken: string | null = null;
   private tasks: TaskItem[] = [];
   private phoneSocket: Socket | null = null;
+  private phoneVersion: string | null = null;
+  public static readonly VERSION: string = '0.0.7';
   private pendingMutations: Map<string, { resolve: (res: any) => void; reject: (err: any) => void; timeout: NodeJS.Timeout }> = new Map();
 
   constructor(private options: ServerOptions = {}) {
@@ -107,12 +109,24 @@ export class PuntServer {
             try { this.phoneSocket.disconnect(true); } catch (_) {}
           }
           this.phoneSocket = socket;
-          this.io?.emit('phone_status', { connected: true });
+          this.phoneVersion = (socket.handshake.query.version as string) || null;
+          this.io?.emit('phone_status', {
+            connected: true,
+            phoneVersion: this.phoneVersion,
+            serverVersion: PuntServer.VERSION
+          });
 
           socket.on('tasks_dump', (data) => {
             const list = Array.isArray(data) ? data : (data?.tasks || []);
+            if (!Array.isArray(data) && data?.version) {
+              this.phoneVersion = data.version;
+            }
             this.tasks = list;
-            this.io?.emit('tasks_updated', { tasks: this.tasks });
+            this.io?.emit('tasks_updated', {
+              tasks: this.tasks,
+              phoneVersion: this.phoneVersion,
+              serverVersion: PuntServer.VERSION
+            });
           });
 
           socket.on('mutation_response', (msg) => {
@@ -136,6 +150,7 @@ export class PuntServer {
           socket.on('disconnect', () => {
             if (this.phoneSocket === socket) {
               this.phoneSocket = null;
+              this.phoneVersion = null;
               this.io?.emit('phone_status', { connected: false });
             }
           });
@@ -143,6 +158,7 @@ export class PuntServer {
           socket.conn.on('close', () => {
             if (this.phoneSocket === socket) {
               this.phoneSocket = null;
+              this.phoneVersion = null;
               this.io?.emit('phone_status', { connected: false });
             }
           });
@@ -150,6 +166,8 @@ export class PuntServer {
           // Web client or CLI socket client
           socket.emit('init', {
             phoneConnected: this.isPhoneConnected(),
+            phoneVersion: this.phoneVersion,
+            serverVersion: PuntServer.VERSION,
             tasks: this.tasks,
             pairingPin: this.getPairingCode()
           });
