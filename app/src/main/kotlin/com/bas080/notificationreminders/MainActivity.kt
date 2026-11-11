@@ -431,6 +431,23 @@ class MainActivity : AppCompatActivity() {
 
     private fun showServerSyncDialog() {
         val density = resources.displayMetrics.density
+        val localIp = com.bas080.notificationreminders.sync.ServerSyncManager.getLocalIpAddress() ?: "10.0.2.2"
+        val defaultHint = "http://$localIp:7868"
+
+        val descriptionText = TextView(this).apply {
+            text = "Optional. Defaults to local network ($defaultHint). Fill in only when deviating from default."
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_secondary))
+            setTextAppearance(android.R.style.TextAppearance_Small)
+            setPadding(0, 0, 0, (8 * density).toInt())
+        }
+
+        val urlInput = EditText(this).apply {
+            hint = defaultHint
+            setText("")
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_primary))
+            setHintTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_secondary))
+        }
+
         val input = EditText(this).apply {
             hint = "4-digit Pairing PIN"
             inputType = android.text.InputType.TYPE_CLASS_NUMBER
@@ -438,16 +455,10 @@ class MainActivity : AppCompatActivity() {
             setHintTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_secondary))
         }
 
-        val urlInput = EditText(this).apply {
-            hint = "http://10.0.2.2:7868 or LAN IP"
-            setText("http://10.0.2.2:7868")
-            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_primary))
-            setHintTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_secondary))
-        }
-
         val container = android.widget.LinearLayout(this).apply {
             orientation = android.widget.LinearLayout.VERTICAL
             setPadding((24 * density).toInt(), (16 * density).toInt(), (24 * density).toInt(), 0)
+            addView(descriptionText)
             addView(urlInput)
             addView(input)
         }
@@ -458,9 +469,13 @@ class MainActivity : AppCompatActivity() {
             .setPositiveButton("Connect") { _, _ ->
                 val pin = input.text.toString().trim()
                 val url = urlInput.text.toString().trim()
-                if (url.isNotEmpty()) {
-                    com.bas080.notificationreminders.sync.ServerSyncManager.connect(this, url, pin)
-                    Toast.makeText(this, "Connecting to server...", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Connecting to server...", Toast.LENGTH_SHORT).show()
+                com.bas080.notificationreminders.sync.ServerSyncManager.discoverAndConnect(this, url, pin) { success, connectedUrl ->
+                    if (success) {
+                        Toast.makeText(this, "Connected to $connectedUrl", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(this, "Connected to default $connectedUrl", Toast.LENGTH_SHORT).show()
+                    }
                 }
             }
             .setNegativeButton(R.string.cancel, null)
