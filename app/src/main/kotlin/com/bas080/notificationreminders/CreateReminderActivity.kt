@@ -1,6 +1,7 @@
 @file:Suppress("ComplexCondition", "CyclomaticComplexMethod", "EmptyFunctionBlock", "LargeClass", "LongMethod", "LoopWithTooManyJumpStatements", "MagicNumber", "MaxLineLength", "NestedBlockDepth", "ReturnCount", "TooManyFunctions", "UnusedPrivateMember", "UseRequire")
 package com.bas080.notificationreminders
 
+import kotlinx.coroutines.launch
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
@@ -127,11 +128,11 @@ class CreateReminderActivity : AppCompatActivity() {
         val prefs = getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
         val savedSet = prefs.getStringSet(KEY_REMINDERS, emptySet())?.toMutableSet() ?: mutableSetOf()
         savedSet.add(reminderString)
-
         val now = System.currentTimeMillis()
         val editor = prefs.edit().putStringSet(KEY_REMINDERS, savedSet)
 
         val snoozeUntilValue = if (targetTimeMillis > now) targetTimeMillis else null
+        val cleanText = reminderString.replace(Regex("(?i)\\s*#done\\b"), "").trim()
 
         com.bas080.notificationreminders.utils.ExperimentTracker.trackCreation(this, "create_intent")
         if (targetTimeMillis > now) {
@@ -143,13 +144,11 @@ class CreateReminderActivity : AppCompatActivity() {
             ReminderNotificationListenerService.instance?.postMatchNotification(reminderString)
             AppLogger.log(this, "CreateReminderActivity", "Created immediate reminder via ACTION_CREATE_REMINDER")
         }
-
         editor.apply()
 
-        kotlinx.coroutines.runBlocking {
+        val recurrence = com.bas080.notificationreminders.receivers.CreateReminderReceiver.parseRecurrenceDuration(cleanText)?.second
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
             val db = com.bas080.notificationreminders.data.PuntDatabase.getInstance(this@CreateReminderActivity)
-            val cleanText = reminderString.replace(Regex("(?i)\\s*#done\\b"), "").trim()
-            val recurrence = com.bas080.notificationreminders.receivers.CreateReminderReceiver.parseRecurrenceDuration(cleanText)?.second
             db.reminderDao().insert(
                 com.bas080.notificationreminders.data.ReminderEntity(
                     text = cleanText,

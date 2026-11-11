@@ -51,7 +51,9 @@ object LegacyStorageMigration {
         }
 
         database.withTransaction {
-            dao.insertAll(entities)
+            for (entity in entities) {
+                dao.insert(entity)
+            }
         }
         prefs.edit().putBoolean(KEY_LEGACY_MIGRATION_DONE, true).apply()
     }

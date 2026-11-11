@@ -156,7 +156,7 @@ object ServerSyncManager {
     private suspend fun applyAction(dao: ReminderDao, action: String, payload: JSONObject?) {
         val target = payload?.optString("target") ?: ""
         val id = target.toLongOrNull()
-        val entity = if (id != null) dao.getReminderById(id) else dao.getReminderByText(target)
+        val entity = if (id != null) dao.getAllReminders().find { it.id == id } else dao.getReminderByText(target)
 
         when (action) {
             "create" -> {
@@ -176,7 +176,7 @@ object ServerSyncManager {
                 dao.update(entity.copy(snoozeUntil = snoozeUntil, updatedAt = System.currentTimeMillis()))
             }
             "delete" -> if (entity != null) {
-                dao.deleteById(entity.id)
+                dao.deleteByText(entity.text)
             }
         }
     }
