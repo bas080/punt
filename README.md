@@ -28,10 +28,38 @@ The app is named **Punt** after the verb *to punt*—meaning to defer, postpone,
 ## Features
 
 - **Clean Minimalist Design**: High-contrast, text-first interface that automatically adapts to your system dark or light theme.
+- **Room Database Storage**: Robust structured SQLite persistence powered by Android Jetpack Room with automatic migration from legacy storage.
 - **Quick Reminder Creation**: Add reminders directly from the main screen or inline from the notification shade without switching apps.
 - **Grouped Notification Alerts**: Matched reminders are neatly organized together in your notification center.
 - **In-App Activity Logs**: Easily view app activity logs directly inside the app.
 - **Automatic Crash Reporting**: Includes a simple optional crash report helper if something unexpected occurs.
+
+## Companion CLI, Server & Web Interface
+
+Punt includes a companion CLI and local synchronization server that pairs with the Punt Android app via Socket.IO, treating your phone as the authoritative source of truth.
+
+### CLI & Server Commands
+- **Start Server & Web Interface**:
+  ```bash
+  npx punt serve
+  ```
+  Runs a lightweight Node.js/TypeScript server (default port `7868` or configured via `PUNT_PORT` / `--port`), displays a 4-digit pairing PIN in the terminal and on the served web UI, and listens for phone connections.
+
+- **Check Server Status**:
+  ```bash
+  npx punt status
+  ```
+
+- **Manage Tasks from Terminal**:
+  ```bash
+  npx punt tasks list
+  npx punt tasks add "Buy groceries #home"
+  npx punt tasks done "Buy groceries"
+  npx punt tasks punt "Review PR" --duration 4h
+  ```
+
+### Web Interface (PWA)
+Navigating to `http://localhost:7868` opens Punt's progressive web app, styled to match the Android dark theme with dedicated SVG action buttons for marking tasks done, punting (snoozing), sharing, and deleting. Enter the 4-digit pairing PIN displayed on the screen into your Punt Android app to synchronize tasks across devices in real time.
 
 To view screenshots of the app features, check out the [Screenshots Gallery](fastlane/metadata/android/en-US/images/phoneScreenshots/).
 

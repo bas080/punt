@@ -117,35 +117,28 @@ object ServerSyncManager {
 
     private suspend fun applyAction(dao: ReminderDao, action: String, payload: JSONObject?) {
         val target = payload?.optString("target") ?: ""
+        val id = target.toLongOrNull()
+        val entity = if (id != null) dao.getReminderById(id) else dao.getReminderByText(target)
+
         when (action) {
             "create" -> {
-                val text = payload?.optString("text")?.trim() ?: ""
+                val text = payload?.optString("text")?.trim().orEmpty()
                 if (text.isNotBlank()) {
                     val recurrence = CreateReminderReceiver.parseRecurrenceDuration(text)?.second
                     dao.insert(ReminderEntity(text = text, recurrenceInterval = recurrence))
                 }
             }
-            "done" -> {
-                val id = target.toLongOrNull()
-                val entity = if (id != null) dao.getReminderById(id) else dao.getReminderByText(target)
-                if (entity != null) dao.update(entity.copy(isDone = true, updatedAt = System.currentTimeMillis()))
+            "done" -> if (entity != null) {
+                dao.update(entity.copy(isDone = true, updatedAt = System.currentTimeMillis()))
             }
-            "punt" -> {
+            "punt" -> if (entity != null) {
                 val durationStr = payload?.optString("duration") ?: "1h"
                 val snoozeMs = CreateReminderReceiver.parseSnoozeDuration(durationStr)?.first ?: DEFAULT_PUNT_MS
                 val snoozeUntil = System.currentTimeMillis() + snoozeMs
-                val id = target.toLongOrNull()
-                val entity = if (id != null) dao.getReminderById(id) else dao.getReminderByText(target)
-                if (entity != null) {
-                    dao.update(entity.copy(snoozeUntil = snoozeUntil, updatedAt = System.currentTimeMillis()))
-                }
+                dao.update(entity.copy(snoozeUntil = snoozeUntil, updatedAt = System.currentTimeMillis()))
             }
-            "delete" -> {
-                val id = target.toLongOrNull()
-                val entity = if (id != null) dao.getReminderById(id) else dao.getReminderByText(target)
-                if (entity != null) {
-                    dao.delete(entity)
-                }
+            "delete" -> if (entity != null) {
+                dao.deleteById(entity.id)
             }
         }
     }
