@@ -2,6 +2,7 @@
 package com.bas080.notificationreminders.services
 
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -14,6 +15,7 @@ import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import androidx.core.app.NotificationCompat
 import androidx.core.app.RemoteInput
+import com.bas080.notificationreminders.data.PuntDatabase
 import com.bas080.notificationreminders.PickNotificationActivity
 import com.bas080.notificationreminders.R
 import com.bas080.notificationreminders.receivers.CreateReminderReceiver
@@ -35,7 +37,6 @@ class ReminderNotificationListenerService : NotificationListenerService() {
         const val KEY_TEXT_REPLY = "key_text_reply"
         const val KEY_SNOOZE_REPLY = "key_snooze_reply"
         private const val PREFS_REMINDERS = "reminders_prefs"
-        private const val KEY_REMINDERS = "key_reminders_list"
         private const val COOL_DOWN_MS = 10 * 60 * 1000L // 10 minutes cool-down per notification match
 
         var instance: ReminderNotificationListenerService? = null
@@ -245,25 +246,23 @@ class ReminderNotificationListenerService : NotificationListenerService() {
     }
 
     private fun checkAndTriggerReminderMatch(fullContent: String, sbnKey: String) {
-        val prefs = getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
-        val savedReminders = prefs.getStringSet(KEY_REMINDERS, emptySet()) ?: emptySet()
+        val dao = PuntDatabase.getInstance(this).reminderDao()
+        val savedReminders = runBlocking { dao.getAllReminders() }
         val now = System.currentTimeMillis()
 
         val commonWordsStr = getString(R.string.common_words)
         val commonWordsSet = ReminderMatcher.parseCommonWords(commonWordsStr)
 
         for (reminder in savedReminders) {
-            if (reminder.contains("#done", ignoreCase = true)) {
+            if (reminder.isDone) {
                 continue
             }
 
-            val trimmed = reminder.trim()
+            val trimmed = reminder.text.trim()
             val lower = trimmed.lowercase()
             val trackingKey = "${sbnKey}_$lower"
             val lastTime = lastTriggeredMap[trackingKey] ?: 0L
-            val snoozeUntil = prefs.getLong("snooze_$lower", 0L).let {
-                if (it > 0L) it else (lastTriggeredMap["snooze_$lower"] ?: 0L)
-            }
+            val snoozeUntil = reminder.snoozeUntil ?: (lastTriggeredMap["snooze_$lower"] ?: 0L)
 
             val isSnoozed = (snoozeUntil > 0L && now < snoozeUntil)
             if (isSnoozed) {
@@ -273,7 +272,7 @@ class ReminderNotificationListenerService : NotificationListenerService() {
 
             val isSnoozeExpired = (snoozeUntil > 0L && now >= snoozeUntil)
             if (isSnoozeExpired) {
-                prefs.edit().remove("snooze_$lower").apply()
+                runBlocking { dao.updateSnooze(trimmed, null) }
                 lastTriggeredMap.remove("snooze_$lower")
             }
 
@@ -294,54 +293,6 @@ class ReminderNotificationListenerService : NotificationListenerService() {
     }
 
     private fun checkAndTriggerReminderMatchLegacy(fullContent: String, sbnKey: String) {
-        val prefs = getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
-        val savedReminders = prefs.getStringSet(KEY_REMINDERS, emptySet()) ?: emptySet()
-        val now = System.currentTimeMillis()
-
-        val commonWordsStr = getString(R.string.common_words)
-        val commonWordsSet = ReminderMatcher.parseCommonWords(commonWordsStr)
-
-        for (reminder in savedReminders) {
-            if (reminder.contains("#done", ignoreCase = true)) {
-                continue
-            }
-
-            val trimmed = reminder.trim()
-            val lower = trimmed.lowercase()
-            val trackingKey = "${sbnKey}_$lower"
-            val lastTime = lastTriggeredMap[trackingKey] ?: 0L
-            val snoozeUntil = prefs.getLong("snooze_$lower", 0L).let {
-                if (it > 0L) it else (lastTriggeredMap["snooze_$lower"] ?: 0L)
-            }
-
-            val isSnoozed = (snoozeUntil > 0L && now < snoozeUntil)
-            if (isSnoozed) {
-                // Snooze overrules notification match; do not show notification while snoozed
-                continue
-            }
-
-            val isSnoozeExpired = (snoozeUntil > 0L && now >= snoozeUntil)
-            if (isSnoozeExpired) {
-                prefs.edit().remove("snooze_$lower").apply()
-                lastTriggeredMap.remove("snooze_$lower")
-            }
-
-            val isWordMatch = ReminderMatcher.matches(reminder, fullContent, commonWordsSet)
-
-            if (isWordMatch) {
-                if (now - lastTime >= COOL_DOWN_MS) {
-                    lastTriggeredMap[trackingKey] = now
-                    postMatchNotification(trimmed, isHighPriority = true)
-                    break
-                }
-            } else if (isSnoozeExpired) {
-                lastTriggeredMap[trackingKey] = now
-                postMatchNotification(trimmed, isHighPriority = false)
-                break
-            }
-        }
-    }
-
     fun postMatchNotification(matchedReminder: String, @Suppress("UNUSED_PARAMETER") isHighPriority: Boolean = true) {
         try {
             com.bas080.notificationreminders.utils.AppLogger.log(this, "NotificationListener", "Updating persistent status notification for reminder")
@@ -387,8 +338,9 @@ class ReminderNotificationListenerService : NotificationListenerService() {
     fun showStatusNotification() {
         try {
             if (baseContext == null) return
+            val dao = PuntDatabase.getInstance(this).reminderDao()
+            val savedReminders = runBlocking { dao.getAllReminders() }
             val prefs = getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
-            val savedReminders = prefs.getStringSet(KEY_REMINDERS, emptySet()) ?: emptySet()
             val now = System.currentTimeMillis()
             val activeRemindersList = mutableListOf<String>()
             var activeCount = 0
@@ -424,20 +376,18 @@ class ReminderNotificationListenerService : NotificationListenerService() {
             }
 
             for (reminder in savedReminders) {
-                if (reminder.contains("#done", ignoreCase = true)) {
+                if (reminder.isDone) {
                     continue
                 }
                 if (focusQueries.isNotEmpty()) {
                     val matchesAnyFocus = focusQueries.any { query ->
-                        com.bas080.notificationreminders.utils.ReminderMatcher.matchesSearchQuery(reminder, query)
+                        com.bas080.notificationreminders.utils.ReminderMatcher.matchesSearchQuery(reminder.text, query)
                     }
                     if (!matchesAnyFocus) continue
                 }
-                val trimmed = reminder.trim()
+                val trimmed = reminder.text.trim()
                 val lower = trimmed.lowercase()
-                val snoozeUntil = prefs.getLong("snooze_$lower", 0L).let {
-                    if (it > 0L) it else (lastTriggeredMap["snooze_$lower"] ?: 0L)
-                }
+                val snoozeUntil = reminder.snoozeUntil ?: (lastTriggeredMap["snooze_$lower"] ?: 0L)
                 if (snoozeUntil > now) {
                     snoozedCount++
                 } else {

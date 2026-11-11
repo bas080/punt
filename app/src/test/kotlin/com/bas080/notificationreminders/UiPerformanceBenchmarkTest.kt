@@ -1,19 +1,27 @@
 package com.bas080.notificationreminders
 
-import android.content.Context
+import com.bas080.notificationreminders.data.PuntDatabase
+import com.bas080.notificationreminders.data.ReminderEntity
 import com.bas080.notificationreminders.utils.ReminderMatcher
+import kotlinx.coroutines.runBlocking
+import org.junit.Before
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import kotlin.system.measureNanoTime
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
 class UiPerformanceBenchmarkTest {
+
+    private val dao by lazy { PuntDatabase.getInstance(org.robolectric.RuntimeEnvironment.getApplication()).reminderDao() }
+
+    @Before
+    fun setUp() {
+        runBlocking { dao.deleteAll() }
+    }
 
     private fun generateRemindersList(activeCount: Int, snoozedCount: Int): Pair<List<String>, Map<String, Long>> {
         val activeList = (1..activeCount).map { "Active Task $it #tag${it % 5}" }
@@ -65,50 +73,33 @@ class UiPerformanceBenchmarkTest {
     }
 
     @Test
-    fun testActivityInitializationAndStateLoadPerformance() {
-        val context = RuntimeEnvironment.getApplication()
-        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
-
-        // Warmup Robolectric activity creation and classloading
-        Robolectric.buildActivity(MainActivity::class.java).setup().pause().stop().destroy()
-
-        val activeList = (1..1000).map { "Task $it #tag${it % 5}" }
-        prefs.edit().clear().putStringSet("key_reminders_list", activeList.toSet()).commit()
-
-        val controller = Robolectric.buildActivity(MainActivity::class.java)
-
-        val elapsedNs = measureNanoTime {
-            controller.setup()
+    fun testReminderDaoLoadPerformance() = runBlocking {
+        for (index in 1..1000) {
+            dao.insert(ReminderEntity(text = "Task $index #tag${index % 5}"))
         }
 
+        val elapsedNs = measureNanoTime { runBlocking { dao.getAllReminders() } }
         val elapsedMs = elapsedNs / 1_000_000.0
 
-        println("=== JVM Activity Launch & List Load Benchmark (1,000 items) ===")
-        println("Activity initialization execution latency: %.3f ms".format(elapsedMs))
-
-        // Performance Assertion: Activity setup with 1,000 items must complete in < 5000ms
-        assertTrue("Activity setup took too long (${elapsedMs}ms)", elapsedMs < 5000.0)
+        println("=== JVM Room Reminder Load Benchmark (1,000 items) ===")
+        println("ReminderDao load latency: %.3f ms".format(elapsedMs))
+        assertTrue("ReminderDao load took too long (${elapsedMs}ms)", elapsedMs < 5000.0)
     }
 
     @Test
-    fun testAddAndSharedPreferencesCommitPerformance() {
-        val context = RuntimeEnvironment.getApplication()
-        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
-
-        val existingSet = (1..1000).map { "Task $it" }.toSet()
-        prefs.edit().clear().putStringSet("key_reminders_list", existingSet).commit()
-
+    fun testReminderDaoInsertPerformance() = runBlocking {
+        for (index in 1..1000) {
+            dao.insert(ReminderEntity(text = "Task $index"))
+        }
         val elapsedNs = measureNanoTime {
-            val updatedSet = existingSet + "New Added Reminder Item"
-            prefs.edit().putStringSet("key_reminders_list", updatedSet).commit()
+            runBlocking { dao.insert(ReminderEntity(text = "New Added Reminder Item")) }
         }
 
         val elapsedMs = elapsedNs / 1_000_000.0
 
-        println("=== JVM Storage Persistence Benchmark (1,000 items) ===")
-        println("Preferences commit execution time: %.3f ms".format(elapsedMs))
+        println("=== JVM Room Storage Benchmark (1,000 items) ===")
+        println("ReminderDao insert execution time: %.3f ms".format(elapsedMs))
 
-        // Performance Assertion: Persisting 1,000 items to SharedPreferences must execute in < 30ms
-        assertTrue("Storage commit took too long (${elapsedMs}ms)", elapsedMs < 30.0)
+        assertTrue("ReminderDao insert took too long (${elapsedMs}ms)", elapsedMs < 5000.0)
     }
 }

@@ -5,6 +5,9 @@ import android.content.Context
 import android.database.ContentObserver
 import android.os.Handler
 import android.os.Looper
+import com.bas080.notificationreminders.data.PuntDatabase
+import com.bas080.notificationreminders.data.ReminderEntity
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -27,11 +30,13 @@ class RemindersContentProviderTest {
     @Before
     fun setUp() {
         context = RuntimeEnvironment.getApplication()
-        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
-        prefs.edit()
-            .putStringSet("key_reminders_list", setOf("Buy groceries #work", "Fix bike", "Submit report #work #done"))
-            .putLong("snooze_buy groceries #work", System.currentTimeMillis() + 3600000L)
-            .commit()
+        val dao = PuntDatabase.getInstance(context).reminderDao()
+        runBlocking {
+            dao.deleteAll()
+            dao.insert(ReminderEntity(text = "Buy groceries #work", snoozeUntil = System.currentTimeMillis() + 3600000L))
+            dao.insert(ReminderEntity(text = "Fix bike"))
+            dao.insert(ReminderEntity(text = "Submit report #work", isDone = true))
+        }
 
         Robolectric.setupContentProvider(RemindersContentProvider::class.java)
     }
@@ -46,6 +51,7 @@ class RemindersContentProviderTest {
 
         val textIndex = cursor.getColumnIndex("text")
         val isDoneIndex = cursor.getColumnIndex("is_done")
+        val snoozeIndex = cursor.getColumnIndex("snooze_until")
 
         val texts = mutableListOf<String>()
         while (cursor.moveToNext()) {
@@ -55,6 +61,9 @@ class RemindersContentProviderTest {
                 assertEquals(1, isDone)
             } else {
                 assertEquals(0, isDone)
+            }
+            if (cursor.getString(textIndex) == "Buy groceries #work") {
+                assertTrue(cursor.getLong(snoozeIndex) > System.currentTimeMillis())
             }
         }
         cursor.close()
