@@ -1,7 +1,12 @@
 import http from 'http';
 import fs from 'fs';
 import path from 'path';
+import createDebug from 'debug';
 import { Server as SocketIOServer, Socket } from 'socket.io';
+
+const debugServer = createDebug('punt:server');
+const debugAuth = createDebug('punt:auth');
+const debugSync = createDebug('punt:sync');
 
 export interface TaskItem {
   id?: number | string;
@@ -43,6 +48,7 @@ export class PuntServer {
   public generatePairingPin(): string {
     const pin = Math.floor(1000 + Math.random() * 9000).toString();
     this.setPairingCode(pin);
+    debugAuth('Generated a pairing PIN');
     return pin;
   }
 
@@ -96,16 +102,20 @@ export class PuntServer {
         const clientType = socket.handshake.query.client as string;
         const token = socket.handshake.query.token as string;
         if (this.sessionToken && clientType === 'phone' && token !== this.sessionToken) {
+          debugAuth('Rejected unauthorized phone socket id=%s', socket.id);
           return next(new Error('unauthorized'));
         }
+        debugAuth('Socket authorized id=%s client=%s', socket.id, clientType || 'unknown');
         next();
       });
 
       this.io.on('connection', (socket) => {
         const clientType = socket.handshake.query.client as string;
+        debugServer('Socket connected id=%s client=%s', socket.id, clientType || 'unknown');
 
         if (clientType === 'phone') {
           if (this.phoneSocket && this.phoneSocket !== socket) {
+            debugServer('Replacing phone socket id=%s', this.phoneSocket.id);
             try { this.phoneSocket.disconnect(true); } catch (_) {}
           }
           this.phoneSocket = socket;
@@ -122,6 +132,7 @@ export class PuntServer {
               this.phoneVersion = data.version;
             }
             this.tasks = list;
+            debugSync('Received task snapshot count=%d', this.tasks.length);
             this.io?.emit('tasks_updated', {
               tasks: this.tasks,
               phoneVersion: this.phoneVersion,
@@ -136,12 +147,14 @@ export class PuntServer {
               clearTimeout(pending.timeout);
               this.pendingMutations.delete(msg.mutationId);
               if (msg.success) {
+                debugSync('Mutation completed id=%s', msg.mutationId);
                 if (msg.tasks) {
                   this.tasks = msg.tasks;
                   this.io?.emit('tasks_updated', { tasks: this.tasks });
                 }
                 pending.resolve(msg);
               } else {
+                debugSync('Mutation failed id=%s reason=%s', msg.mutationId, msg.error || 'Mutation failed on phone');
                 pending.reject(new Error(msg.error || 'Mutation failed on phone'));
               }
             }
@@ -149,6 +162,7 @@ export class PuntServer {
 
           socket.on('disconnect', () => {
             if (this.phoneSocket === socket) {
+              debugServer('Phone socket disconnected id=%s', socket.id);
               this.phoneSocket = null;
               this.phoneVersion = null;
               this.io?.emit('phone_status', { connected: false });
@@ -157,6 +171,7 @@ export class PuntServer {
 
           socket.conn.on('close', () => {
             if (this.phoneSocket === socket) {
+              debugServer('Phone socket transport closed id=%s', socket.id);
               this.phoneSocket = null;
               this.phoneVersion = null;
               this.io?.emit('phone_status', { connected: false });
@@ -182,6 +197,7 @@ export class PuntServer {
           });
 
           socket.on('mutate', async (msg, callback) => {
+            debugSync('Mutation requested action=%s id=%s', msg?.action || 'unknown', socket.id);
             try {
               const result = await this.dispatchMutationToPhone(msg.action, msg.payload);
               if (typeof callback === 'function') {
@@ -201,6 +217,7 @@ export class PuntServer {
       this.server.listen(port, host, () => {
         const address = this.server?.address();
         const actualPort = typeof address === 'object' && address ? address.port : port;
+        debugServer('Listening on %s:%d', host, actualPort);
         resolve(actualPort);
       });
 
@@ -212,6 +229,7 @@ export class PuntServer {
 
   public async dispatchMutationToPhone(action: string, payload: any, timeoutMs: number = 3000): Promise<any> {
     if (!this.isPhoneConnected()) {
+      debugSync('Cannot dispatch mutation action=%s: phone is unreachable', action);
       throw new Error('Phone is unreachable');
     }
     const mutationId = 'mut_' + Math.random().toString(36).substring(2, 9);
@@ -222,6 +240,7 @@ export class PuntServer {
       }, timeoutMs);
 
       this.pendingMutations.set(mutationId, { resolve, reject, timeout: timer });
+      debugSync('Dispatching mutation action=%s id=%s', action, mutationId);
 
       this.phoneSocket?.emit('mutation_request', {
         mutationId,
@@ -267,17 +286,20 @@ export class PuntServer {
           const data = JSON.parse(body || '{}');
           const code = data.code;
           if (!this.pairingCode || !code || code !== this.pairingCode) {
+            debugAuth('Rejected invalid pairing attempt');
             res.writeHead(401, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ success: false, error: 'Invalid pairing code' }));
             return;
           }
           if (Date.now() > this.pairingCodeExpiresAt) {
+            debugAuth('Rejected expired pairing attempt');
             res.writeHead(401, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ success: false, error: 'Pairing code expired' }));
             return;
           }
           this.pairingCode = null; // Burn code
           this.sessionToken = 'token_' + Math.random().toString(36).substring(2, 12);
+          debugAuth('Pairing succeeded');
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ success: true, token: this.sessionToken }));
         } catch (_) {
@@ -328,6 +350,7 @@ export class PuntServer {
 
   public stop(): Promise<void> {
     return new Promise((resolve) => {
+      debugServer('Stopping server');
       for (const [, mut] of this.pendingMutations) {
         clearTimeout(mut.timeout);
         mut.reject(new Error('Server stopped'));
