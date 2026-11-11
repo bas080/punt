@@ -58,6 +58,37 @@ test('Server endpoints, Socket.IO task sync, and root routing', async (t) => {
     assert.equal(resReuse.status, 401);
   });
 
+  await t.test('Expired pairing PIN is regenerated and broadcast to web clients', async () => {
+    const webSocket = ClientIO(`http://127.0.0.1:${port}`, {
+      query: { client: 'web' },
+      transports: ['websocket']
+    });
+
+    try {
+      await new Promise<void>((resolve, reject) => {
+        webSocket.once('connect', resolve);
+        webSocket.once('connect_error', reject);
+      });
+
+      const updatePromise = new Promise<string>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('Timed out waiting for pin_update')), 1000);
+        webSocket.once('pin_update', (data: { pairingPin: string }) => {
+          clearTimeout(timer);
+          resolve(data.pairingPin);
+        });
+      });
+
+      server.setPairingCode('4829', 20);
+      const newPin = await updatePromise;
+
+      assert.match(newPin, /^\d{4}$/);
+      assert.notEqual(newPin, '4829');
+      assert.equal(server.getPairingCode(), newPin);
+    } finally {
+      webSocket.disconnect();
+    }
+  });
+
   await t.test('Full task list hydration and Socket.IO sync', async () => {
     const token = server.getSessionToken();
     const phoneSocket = ClientIO(`http://127.0.0.1:${port}`, {

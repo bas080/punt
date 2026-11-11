@@ -92,6 +92,11 @@ export function initWebSocket() {
     updateView();
   });
 
+  socket.on('pin_update', (data: any) => {
+    state.pairingPin = data?.pairingPin || null;
+    updateView();
+  });
+
   socket.on('tasks_updated', (data: any) => {
     if (data.phoneVersion) state.phoneVersion = data.phoneVersion;
     if (data.serverVersion) state.serverVersion = data.serverVersion;
