@@ -30,6 +30,7 @@ export class PuntServer {
   private io: SocketIOServer | null = null;
   private pairingCode: string | null = null;
   private pairingCodeExpiresAt: number = 0;
+  private pairingCodeTimer: NodeJS.Timeout | null = null;
   private sessionToken: string | null = null;
   private tasks: TaskItem[] = [];
   private phoneSocket: Socket | null = null;
@@ -53,6 +54,9 @@ export class PuntServer {
   }
 
   public getPairingCode(): string | null {
+    if (this.pairingCode && Date.now() > this.pairingCodeExpiresAt) {
+      return this.refreshExpiredPairingPin();
+    }
     if (this.pairingCode && Date.now() <= this.pairingCodeExpiresAt) {
       return this.pairingCode;
     }
@@ -60,8 +64,32 @@ export class PuntServer {
   }
 
   public setPairingCode(code: string, validityMs: number = 15 * 60 * 1000) {
+    if (this.pairingCodeTimer) clearTimeout(this.pairingCodeTimer);
     this.pairingCode = code;
     this.pairingCodeExpiresAt = Date.now() + validityMs;
+    this.schedulePairingCodeExpiry(code);
+  }
+
+  private schedulePairingCodeExpiry(code: string) {
+    const delay = Math.max(1, this.pairingCodeExpiresAt - Date.now() + 1);
+    this.pairingCodeTimer = setTimeout(() => {
+      if (this.pairingCode !== code) return;
+      if (Date.now() <= this.pairingCodeExpiresAt) {
+        this.schedulePairingCodeExpiry(code);
+        return;
+      }
+      this.pairingCodeTimer = null;
+      this.refreshExpiredPairingPin();
+    }, delay);
+    this.pairingCodeTimer.unref();
+  }
+
+  private refreshExpiredPairingPin(): string | null {
+    if (!this.pairingCode || Date.now() <= this.pairingCodeExpiresAt) return this.pairingCode;
+    const newPin = this.generatePairingPin();
+    debugAuth('Expired pairing PIN regenerated');
+    this.io?.emit('pin_update', { pairingPin: newPin });
+    return newPin;
   }
 
   public getSessionToken(): string | null {
@@ -293,13 +321,17 @@ export class PuntServer {
           }
           if (Date.now() > this.pairingCodeExpiresAt) {
             debugAuth('Rejected expired pairing attempt');
+            this.refreshExpiredPairingPin();
             res.writeHead(401, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ success: false, error: 'Pairing code expired' }));
             return;
           }
+          if (this.pairingCodeTimer) clearTimeout(this.pairingCodeTimer);
+          this.pairingCodeTimer = null;
           this.pairingCode = null; // Burn code
           this.sessionToken = 'token_' + Math.random().toString(36).substring(2, 12);
           debugAuth('Pairing succeeded');
+          this.io?.emit('pin_update', { pairingPin: null });
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ success: true, token: this.sessionToken }));
         } catch (_) {
@@ -351,6 +383,8 @@ export class PuntServer {
   public stop(): Promise<void> {
     return new Promise((resolve) => {
       debugServer('Stopping server');
+      if (this.pairingCodeTimer) clearTimeout(this.pairingCodeTimer);
+      this.pairingCodeTimer = null;
       for (const [, mut] of this.pendingMutations) {
         clearTimeout(mut.timeout);
         mut.reject(new Error('Server stopped'));
