@@ -186,56 +186,59 @@ export const appView = (s: AppState): TemplateResult => {
       </div>
     ` : ''}
 
-    <div class="card">
-      <input
-        class="search-input"
-        type="text"
-        placeholder="Add reminder (press ↵) or search..."
-        .value=${s.filterQuery}
-        @input=${(e: Event) => {
-          s.filterQuery = (e.target as HTMLInputElement).value;
-          updateView();
-        }}
-        @keydown=${(e: KeyboardEvent) => {
-          if (e.key === 'Enter' && !e.shiftKey) {
-            const val = (e.target as HTMLInputElement).value.trim();
-            if (val) {
-              sendMutation('create', { text: val });
-              s.filterQuery = '';
-              (e.target as HTMLInputElement).value = '';
-              updateView();
+    <div class="main-content ${!s.phoneConnected ? 'offline-disabled' : ''}">
+      <div class="card">
+        <input
+          class="search-input"
+          type="text"
+          placeholder="Add reminder (press ↵) or search..."
+          ?disabled=${!s.phoneConnected}
+          .value=${s.filterQuery}
+          @input=${(e: Event) => {
+            s.filterQuery = (e.target as HTMLInputElement).value;
+            updateView();
+          }}
+          @keydown=${(e: KeyboardEvent) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              const val = (e.target as HTMLInputElement).value.trim();
+              if (val) {
+                sendMutation('create', { text: val });
+                s.filterQuery = '';
+                (e.target as HTMLInputElement).value = '';
+                updateView();
+              }
             }
-          }
-        }}
-      />
-    </div>
-
-    <div>
-      <div
-        class="section-header"
-        @click=${() => { s.activeCollapsed = !s.activeCollapsed; updateView(); }}
-      >
-        ${s.activeCollapsed ? '▶' : '▼'} ACTIVE (${activeTasks.length})
+          }}
+        />
       </div>
-      ${!s.activeCollapsed ? html`
-        <div class="task-list">
-          ${activeTasks.map(taskCardView)}
-        </div>
-      ` : ''}
-    </div>
 
-    <div>
-      <div
-        class="section-header"
-        @click=${() => { s.puntedCollapsed = !s.puntedCollapsed; updateView(); }}
-      >
-        ${s.puntedCollapsed ? '▶' : '▼'} PUNTED (${puntedTasks.length})
-      </div>
-      ${!s.puntedCollapsed ? html`
-        <div class="task-list">
-          ${puntedTasks.map(taskCardView)}
+      <div>
+        <div
+          class="section-header"
+          @click=${() => { s.activeCollapsed = !s.activeCollapsed; updateView(); }}
+        >
+          ${s.activeCollapsed ? '▶' : '▼'} ACTIVE (${activeTasks.length})
         </div>
-      ` : ''}
+        ${!s.activeCollapsed ? html`
+          <div class="task-list">
+            ${activeTasks.map(taskCardView)}
+          </div>
+        ` : ''}
+      </div>
+
+      <div>
+        <div
+          class="section-header"
+          @click=${() => { s.puntedCollapsed = !s.puntedCollapsed; updateView(); }}
+        >
+          ${s.puntedCollapsed ? '▶' : '▼'} PUNTED (${puntedTasks.length})
+        </div>
+        ${!s.puntedCollapsed ? html`
+          <div class="task-list">
+            ${puntedTasks.map(taskCardView)}
+          </div>
+        ` : ''}
+      </div>
     </div>
 
     ${s.notification ? html`

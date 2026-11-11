@@ -3,6 +3,8 @@ import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import { PuntServer } from './server';
 import { io, Socket } from 'socket.io-client';
+import path from 'path';
+import fs from 'fs';
 
 async function readStdin(): Promise<string> {
   if (process.stdin.isTTY) return '';
@@ -254,6 +256,21 @@ export function createCli() {
     .help();
 }
 
-if (process.argv[1] && (process.argv[1].endsWith('cli.ts') || process.argv[1].endsWith('cli.js'))) {
+function isCliEntrypoint(): boolean {
+  const scriptPath = process.argv[1];
+  if (!scriptPath) return false;
+  try {
+    const real = fs.realpathSync(scriptPath);
+    const base = path.basename(real);
+    if (base === 'cli.js' || base === 'cli.ts' || base === 'punt') return true;
+  } catch {
+    const base = path.basename(scriptPath);
+    if (base === 'cli.js' || base === 'cli.ts' || base === 'punt') return true;
+  }
+  const base = path.basename(scriptPath);
+  return base === 'cli.js' || base === 'cli.ts' || base === 'punt';
+}
+
+if (!process.env.PUNT_TEST && isCliEntrypoint()) {
   createCli().parse();
 }
