@@ -7,7 +7,10 @@ import android.content.UriMatcher
 import android.database.Cursor
 import android.database.MatrixCursor
 import android.net.Uri
+import com.bas080.notificationreminders.data.PuntDatabase
+import com.bas080.notificationreminders.data.ReminderEntity
 import com.bas080.notificationreminders.utils.ReminderMatcher
+import kotlinx.coroutines.runBlocking
 
 class RemindersContentProvider : ContentProvider() {
 
@@ -16,8 +19,6 @@ class RemindersContentProvider : ContentProvider() {
         val CONTENT_URI: Uri = Uri.parse("content://$AUTHORITY/reminders")
 
         private const val REMINDERS = 1
-        private const val PREFS_REMINDERS = "reminders_prefs"
-        private const val KEY_REMINDERS = "key_reminders_list"
         private const val IS_DONE_TRUE = 1
         private const val IS_DONE_FALSE = 0
 
@@ -52,9 +53,8 @@ class RemindersContentProvider : ContentProvider() {
         val ctx = context ?: return null
         require(uriMatcher.match(uri) == REMINDERS) { "Unknown URI: $uri" }
 
-        val prefs = ctx.getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
-        val rawSet = prefs.getStringSet(KEY_REMINDERS, emptySet()) ?: emptySet()
-        val allReminders = rawSet.toList()
+        val dao = PuntDatabase.getInstance(ctx).reminderDao()
+        val allReminders = runBlocking { dao.getAllReminders() }
 
         val filterQuery = selection?.takeIf { it.isNotBlank() }
             ?: uri.getQueryParameter("q")
@@ -62,14 +62,18 @@ class RemindersContentProvider : ContentProvider() {
             ?: uri.getQueryParameter("filter")
 
         val filteredReminders = if (!filterQuery.isNullOrBlank()) {
-            ReminderMatcher.filterSearchQueryTiered(allReminders, filterQuery)
+            val matchingTexts = ReminderMatcher.filterSearchQueryTiered(
+                allReminders.map { reminder -> reminder.displayText() },
+                filterQuery
+            ).toSet()
+            allReminders.filter { reminder -> reminder.displayText() in matchingTexts }
         } else {
             allReminders
         }
 
         val columns = projection ?: DEFAULT_PROJECTION
         val cursor = MatrixCursor(columns)
-        populateMatrixCursor(cursor, columns, filteredReminders, ctx)
+        populateMatrixCursor(cursor, columns, filteredReminders)
 
         cursor.setNotificationUri(ctx.contentResolver, uri)
         return cursor
@@ -78,31 +82,25 @@ class RemindersContentProvider : ContentProvider() {
     private fun populateMatrixCursor(
         cursor: MatrixCursor,
         columns: Array<out String>,
-        reminders: List<String>,
-        ctx: Context
+        reminders: List<ReminderEntity>
     ) {
-        val prefs = ctx.getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
-        var idCounter = 1L
         val now = System.currentTimeMillis()
 
         for (reminder in reminders) {
-            val trimmed = reminder.trim().lowercase()
-            val snoozeUntil = prefs.getLong("snooze_$trimmed", 0L)
-            val isDone = if (reminder.contains("#done", ignoreCase = true)) IS_DONE_TRUE else IS_DONE_FALSE
-
             val rowBuilder = cursor.newRow()
             for (col in columns) {
                 when (col) {
-                    COLUMN_ID -> rowBuilder.add(idCounter)
-                    COLUMN_TEXT -> rowBuilder.add(reminder)
-                    COLUMN_SNOOZE_UNTIL -> rowBuilder.add(if (snoozeUntil > now) snoozeUntil else 0L)
-                    COLUMN_IS_DONE -> rowBuilder.add(isDone)
+                    COLUMN_ID -> rowBuilder.add(reminder.id)
+                    COLUMN_TEXT -> rowBuilder.add(reminder.displayText())
+                    COLUMN_SNOOZE_UNTIL -> rowBuilder.add(reminder.snoozeUntil?.takeIf { it > now } ?: 0L)
+                    COLUMN_IS_DONE -> rowBuilder.add(if (reminder.isDone) IS_DONE_TRUE else IS_DONE_FALSE)
                     else -> rowBuilder.add(null)
                 }
             }
-            idCounter++
         }
     }
+
+    private fun ReminderEntity.displayText(): String = if (isDone) "$text #done" else text
 
     override fun getType(uri: Uri): String {
         require(uriMatcher.match(uri) == REMINDERS) { "Unknown URI: $uri" }

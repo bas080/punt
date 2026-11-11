@@ -6,11 +6,15 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.service.notification.StatusBarNotification
+import com.bas080.notificationreminders.data.PuntDatabase
+import com.bas080.notificationreminders.data.ReminderEntity
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
@@ -22,6 +26,27 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
 class ReminderNotificationListenerServiceTest {
+
+    @Before
+    fun setUp() {
+        val context = RuntimeEnvironment.getApplication()
+        runBlocking { PuntDatabase.getInstance(context).reminderDao().deleteAll() }
+        context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE).edit().clear().commit()
+        context.getSharedPreferences("snooze_freq_prefs", Context.MODE_PRIVATE).edit().clear().commit()
+        ReminderNotificationListenerService.lastTriggeredMap.clear()
+        ReminderNotificationListenerService.activePostedReminders.clear()
+    }
+
+    private fun insertReminder(
+        context: Context,
+        text: String,
+        snoozeUntil: Long? = null,
+        isDone: Boolean = false
+    ) = runBlocking {
+        PuntDatabase.getInstance(context).reminderDao().insert(
+            ReminderEntity(text = text, snoozeUntil = snoozeUntil, isDone = isDone)
+        )
+    }
 
     @Test
     fun testActionCreateReminderConstant() {
@@ -62,9 +87,7 @@ class ReminderNotificationListenerServiceTest {
     fun testStatusNotificationUpdatesOnReminderMatch() {
         val context = RuntimeEnvironment.getApplication()
 
-        // Set up saved reminder in SharedPreferences
-        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
-        prefs.edit().putStringSet("key_reminders_list", setOf("buy milk")).commit()
+        insertReminder(context, "buy milk")
 
         val service = Robolectric.buildService(ReminderNotificationListenerService::class.java).create().get()
 
@@ -107,11 +130,8 @@ class ReminderNotificationListenerServiceTest {
     @Test
     fun testStatusNotificationTitleTextAndContentIntent() {
         val context = RuntimeEnvironment.getApplication()
-        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
-        prefs.edit()
-            .putStringSet("key_reminders_list", setOf("Buy milk", "Call mom"))
-            .putLong("snooze_call mom", System.currentTimeMillis() + 3600000L)
-            .commit()
+        insertReminder(context, "Buy milk")
+        insertReminder(context, "Call mom", System.currentTimeMillis() + 3600000L)
 
         Robolectric.buildService(ReminderNotificationListenerService::class.java).create().get()
 
@@ -160,8 +180,7 @@ class ReminderNotificationListenerServiceTest {
         ReminderNotificationListenerService.lastTriggeredMap.clear()
         val context = RuntimeEnvironment.getApplication()
 
-        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
-        prefs.edit().putStringSet("key_reminders_list", setOf("buy milk")).commit()
+        insertReminder(context, "buy milk")
 
         val service = Robolectric.buildService(ReminderNotificationListenerService::class.java).create().get()
 
@@ -216,11 +235,7 @@ class ReminderNotificationListenerServiceTest {
         ReminderNotificationListenerService.lastTriggeredMap.clear()
         val context = RuntimeEnvironment.getApplication()
 
-        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
-        prefs.edit()
-            .putStringSet("key_reminders_list", setOf("buy milk"))
-            .putLong("snooze_buy milk", System.currentTimeMillis() + 60000L)
-            .commit()
+        insertReminder(context, "buy milk", System.currentTimeMillis() + 60000L)
 
         val service = Robolectric.buildService(ReminderNotificationListenerService::class.java).create().get()
 
@@ -261,8 +276,7 @@ class ReminderNotificationListenerServiceTest {
         ReminderNotificationListenerService.lastTriggeredMap.clear()
         val context = RuntimeEnvironment.getApplication()
 
-        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
-        prefs.edit().putStringSet("key_reminders_list", setOf("buy milk")).commit()
+        insertReminder(context, "buy milk", System.currentTimeMillis() - 1000L)
 
         val service = Robolectric.buildService(ReminderNotificationListenerService::class.java).create().get()
 
@@ -270,8 +284,6 @@ class ReminderNotificationListenerServiceTest {
         val shadowNM = Shadows.shadowOf(notificationManager)
 
         // Set snooze in the past (expired)
-        ReminderNotificationListenerService.lastTriggeredMap["snooze_buy milk"] = System.currentTimeMillis() - 1000L
-
         // Post an unrelated notification that does NOT contain "milk"
         val extras = Bundle().apply {
             putCharSequence("android.title", "Battery Low")
@@ -310,9 +322,10 @@ class ReminderNotificationListenerServiceTest {
             put(org.json.JSONObject().put("name", "Fitness").put("query", "#fitness"))
         }.toString()
 
+        insertReminder(context, "Run 5k #fitness")
+        insertReminder(context, "Gym #fitness", now + 3600000L)
+        insertReminder(context, "Work meeting #work")
         prefs.edit()
-            .putStringSet("key_reminders_list", setOf("Run 5k #fitness", "Gym #fitness", "Work meeting #work"))
-            .putLong("snooze_gym #fitness", now + 3600000L)
             .putString("key_focus_profiles", profilesJson)
             .putString("key_active_focus_profile", "Fitness")
             .apply()
@@ -449,8 +462,7 @@ class ReminderNotificationListenerServiceTest {
     @Test
     fun testPostMatchNotificationUpdatesStatusNotification() {
         val context = RuntimeEnvironment.getApplication()
-        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
-        prefs.edit().putStringSet("key_reminders_list", setOf("Buy grocers")).commit()
+        insertReminder(context, "Buy grocers")
 
         val service = Robolectric.buildService(ReminderNotificationListenerService::class.java).create().get()
 

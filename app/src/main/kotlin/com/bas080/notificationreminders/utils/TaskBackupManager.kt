@@ -41,12 +41,21 @@ object TaskBackupManager {
             val roomReminders = runBlocking { db.reminderDao().getAllReminders() }
             val prefs = context.getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
             val reminderSet = prefs.getStringSet(KEY_REMINDERS, null) ?: emptySet()
-            val list = if (roomReminders.isNotEmpty()) {
-                roomReminders.map { if (it.isDone) "${it.text} #done" else it.text }
-            } else reminderSet.toList()
+            val list = roomReminders.takeIf { it.isNotEmpty() }?.map {
+                if (it.isDone) "${it.text} #done" else it.text
+            } ?: reminderSet.toList()
+            val snoozeMap = if (roomReminders.isNotEmpty()) {
+                roomReminders.mapNotNull { reminder ->
+                    reminder.snoozeUntil?.let { reminder.text.trim().lowercase() to it }
+                }.toMap()
+            } else {
+                prefs.all.mapNotNull { (key, value) ->
+                    if (key.startsWith("snooze_") && value is Long) key.removePrefix("snooze_") to value else null
+                }.toMap()
+            }
 
             if (list.isNotEmpty()) {
-                val markdown = buildBackupMarkdown(prefs, list)
+                val markdown = buildBackupMarkdown(snoozeMap, list)
                 if (markdown.isNotBlank()) writeMarkdownToTargets(context, markdown)
             }
         } catch (_: Exception) {
@@ -54,13 +63,7 @@ object TaskBackupManager {
         }
     }
 
-    private fun buildBackupMarkdown(prefs: SharedPreferences, remindersList: List<String>): String {
-        val snoozeMap = mutableMapOf<String, Long>()
-        for ((key, value) in prefs.all) {
-            if (key.startsWith("snooze_") && value is Long) {
-                snoozeMap[key.removePrefix("snooze_")] = value
-            }
-        }
+    private fun buildBackupMarkdown(snoozeMap: Map<String, Long>, remindersList: List<String>): String {
         return MarkdownRemindersUtil.exportToMarkdown(
             reminders = remindersList,
             snoozeMap = snoozeMap,

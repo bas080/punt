@@ -1,6 +1,9 @@
 package com.bas080.notificationreminders.utils
 
 import android.content.Context
+import com.bas080.notificationreminders.data.PuntDatabase
+import com.bas080.notificationreminders.data.ReminderEntity
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -21,8 +24,8 @@ class TaskBackupManagerTest {
     @Before
     fun setUp() {
         context = RuntimeEnvironment.getApplication()
-        val db = com.bas080.notificationreminders.data.PuntDatabase.getInstance(context)
-        kotlinx.coroutines.runBlocking { db.reminderDao().deleteAll() }
+        val dao = PuntDatabase.getInstance(context).reminderDao()
+        runBlocking { dao.deleteAll() }
         val prefs = context.getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
         prefs.edit().clear().commit()
 
@@ -34,12 +37,13 @@ class TaskBackupManagerTest {
 
     @Test
     fun testBackupAndRestoreTasks() {
-        val prefs = context.getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
-        val initialSet = setOf("Buy milk", "Call mom #done", "Pay bills")
-        prefs.edit().putStringSet("key_reminders", initialSet).commit()
-
         val snoozeTime = System.currentTimeMillis() + 3600000L
-        prefs.edit().putLong("snooze_pay bills", snoozeTime).commit()
+        val dao = PuntDatabase.getInstance(context).reminderDao()
+        runBlocking {
+            dao.insert(ReminderEntity(text = "Buy milk"))
+            dao.insert(ReminderEntity(text = "Call mom", isDone = true))
+            dao.insert(ReminderEntity(text = "Pay bills", snoozeUntil = snoozeTime))
+        }
 
         TaskBackupManager.backupTasks(context)
 
@@ -50,23 +54,18 @@ class TaskBackupManagerTest {
         assertTrue(content.contains("Call mom #done"))
         assertTrue(content.contains("Pay bills"))
 
-        // Clear preferences and database to simulate fresh app launch/install under new package name
-        val db = com.bas080.notificationreminders.data.PuntDatabase.getInstance(context)
-        kotlinx.coroutines.runBlocking { db.reminderDao().deleteAll() }
+        // Clear legacy storage and database to simulate a fresh install.
+        runBlocking { dao.deleteAll() }
+        val prefs = context.getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
         prefs.edit().clear().commit()
-        val emptySet = prefs.getStringSet("key_reminders", null)
-        assertTrue(emptySet.isNullOrEmpty())
 
         val restored = TaskBackupManager.restoreIfEmpty(context)
         assertTrue(restored)
 
-        val restoredSet = prefs.getStringSet("key_reminders", null)
-        assertTrue(restoredSet != null && restoredSet.contains("Buy milk"))
-        assertTrue(restoredSet != null && restoredSet.contains("Call mom #done"))
-        assertTrue(restoredSet != null && restoredSet.contains("Pay bills"))
-
-        val restoredSnooze = prefs.getLong("snooze_pay bills", 0L)
-        assertTrue(restoredSnooze > 0L)
+        val restoredReminders = runBlocking { dao.getAllReminders() }
+        assertTrue(restoredReminders.any { it.text == "Buy milk" && !it.isDone })
+        assertTrue(restoredReminders.any { it.text == "Call mom" && it.isDone })
+        assertTrue(restoredReminders.any { it.text == "Pay bills" && it.snoozeUntil != null })
     }
 
     @Test
@@ -75,14 +74,14 @@ class TaskBackupManagerTest {
         backupFile.parentFile?.mkdirs()
         backupFile.writeText("- [ ] Old backup task\n")
 
-        val prefs = context.getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
-        prefs.edit().putStringSet("key_reminders", setOf("Existing task")).commit()
+        val dao = PuntDatabase.getInstance(context).reminderDao()
+        runBlocking { dao.insert(ReminderEntity(text = "Existing task")) }
 
         val restored = TaskBackupManager.restoreIfEmpty(context)
         assertFalse(restored)
 
-        val set = prefs.getStringSet("key_reminders", null)
-        assertEquals(1, set?.size)
-        assertTrue(set?.contains("Existing task") == true)
+        val reminders = runBlocking { dao.getAllReminders() }
+        assertEquals(1, reminders.size)
+        assertEquals("Existing task", reminders[0].text)
     }
 }
