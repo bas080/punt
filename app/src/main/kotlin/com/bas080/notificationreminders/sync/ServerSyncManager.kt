@@ -15,6 +15,8 @@ import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
 
+private fun Throwable.describe(): String = message?.let { "${javaClass.simpleName}: $it" } ?: javaClass.simpleName
+
 object ServerSyncManager {
 
     private const val DEFAULT_PUNT_MS = 3600000L
@@ -105,8 +107,6 @@ object ServerSyncManager {
             conn?.disconnect()
         }
     }
-
-    private fun Throwable.describe(): String = message?.let { "${javaClass.simpleName}: $it" } ?: javaClass.simpleName
 
     fun isConnected(): Boolean = socket?.connected() == true
 
