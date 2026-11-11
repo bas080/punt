@@ -1,6 +1,7 @@
 @file:Suppress("ComplexCondition", "CyclomaticComplexMethod", "EmptyFunctionBlock", "LargeClass", "LongMethod", "LoopWithTooManyJumpStatements", "MagicNumber", "MaxLineLength", "NestedBlockDepth", "ReturnCount", "TooManyFunctions", "UnusedPrivateMember", "UseRequire")
 package com.bas080.notificationreminders.receivers
 
+import kotlinx.coroutines.launch
 import android.app.NotificationManager
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -648,10 +649,11 @@ class CreateReminderReceiver : BroadcastReceiver() {
                         savedSet.add(reminderText)
                         prefs.edit().putStringSet(KEY_REMINDERS, savedSet).apply()
 
-                        kotlinx.coroutines.runBlocking {
+                        val cleanText = reminderText.replace(Regex("(?i)\\s*#done\\b"), "").trim()
+                        val recurrence = parseRecurrenceDuration(cleanText)?.second
+
+                        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
                             val db = com.bas080.notificationreminders.data.PuntDatabase.getInstance(context)
-                            val cleanText = reminderText.replace(Regex("(?i)\\s*#done\\b"), "").trim()
-                            val recurrence = parseRecurrenceDuration(cleanText)?.second
                             db.reminderDao().insert(
                                 com.bas080.notificationreminders.data.ReminderEntity(
                                     text = cleanText,
@@ -699,7 +701,7 @@ class CreateReminderReceiver : BroadcastReceiver() {
                             .apply()
                         ReminderNotificationListenerService.lastTriggeredMap["snooze_$cleanTrimmed"] = snoozeUntil
 
-                        kotlinx.coroutines.runBlocking {
+                        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
                             val db = com.bas080.notificationreminders.data.PuntDatabase.getInstance(context)
                             val existing = db.reminderDao().getReminderByText(cleanText)
                             if (existing != null) {
@@ -748,9 +750,10 @@ class CreateReminderReceiver : BroadcastReceiver() {
                             prefs.edit().putStringSet(KEY_REMINDERS, savedSet).apply()
                         }
 
-                        kotlinx.coroutines.runBlocking {
+                        val cleanText = reminderText.replace(Regex("(?i)\\s*#done\\b"), "").trim()
+
+                        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
                             val db = com.bas080.notificationreminders.data.PuntDatabase.getInstance(context)
-                            val cleanText = reminderText.replace(Regex("(?i)\\s*#done\\b"), "").trim()
                             val existing = db.reminderDao().getReminderByText(cleanText)
                             if (existing != null) {
                                 db.reminderDao().update(

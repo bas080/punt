@@ -1,6 +1,7 @@
 @file:Suppress("ComplexCondition", "CyclomaticComplexMethod", "EmptyFunctionBlock", "LargeClass", "LongMethod", "LoopWithTooManyJumpStatements", "MagicNumber", "MaxLineLength", "NestedBlockDepth", "ReturnCount", "TooManyFunctions", "UnusedPrivateMember", "UseRequire")
 package com.bas080.notificationreminders.services
 
+import kotlinx.coroutines.launch
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -244,6 +245,55 @@ class ReminderNotificationListenerService : NotificationListenerService() {
     }
 
     private fun checkAndTriggerReminderMatch(fullContent: String, sbnKey: String) {
+        val prefs = getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
+        val savedReminders = prefs.getStringSet(KEY_REMINDERS, emptySet()) ?: emptySet()
+        val now = System.currentTimeMillis()
+
+        val commonWordsStr = getString(R.string.common_words)
+        val commonWordsSet = ReminderMatcher.parseCommonWords(commonWordsStr)
+
+        for (reminder in savedReminders) {
+            if (reminder.contains("#done", ignoreCase = true)) {
+                continue
+            }
+
+            val trimmed = reminder.trim()
+            val lower = trimmed.lowercase()
+            val trackingKey = "${sbnKey}_$lower"
+            val lastTime = lastTriggeredMap[trackingKey] ?: 0L
+            val snoozeUntil = prefs.getLong("snooze_$lower", 0L).let {
+                if (it > 0L) it else (lastTriggeredMap["snooze_$lower"] ?: 0L)
+            }
+
+            val isSnoozed = (snoozeUntil > 0L && now < snoozeUntil)
+            if (isSnoozed) {
+                // Snooze overrules notification match; do not show notification while snoozed
+                continue
+            }
+
+            val isSnoozeExpired = (snoozeUntil > 0L && now >= snoozeUntil)
+            if (isSnoozeExpired) {
+                prefs.edit().remove("snooze_$lower").apply()
+                lastTriggeredMap.remove("snooze_$lower")
+            }
+
+            val isWordMatch = ReminderMatcher.matches(reminder, fullContent, commonWordsSet)
+
+            if (isWordMatch) {
+                if (now - lastTime >= COOL_DOWN_MS) {
+                    lastTriggeredMap[trackingKey] = now
+                    postMatchNotification(trimmed, isHighPriority = true)
+                    break
+                }
+            } else if (isSnoozeExpired) {
+                lastTriggeredMap[trackingKey] = now
+                postMatchNotification(trimmed, isHighPriority = false)
+                break
+            }
+        }
+    }
+
+    private fun checkAndTriggerReminderMatchLegacy(fullContent: String, sbnKey: String) {
         val prefs = getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
         val savedReminders = prefs.getStringSet(KEY_REMINDERS, emptySet()) ?: emptySet()
         val now = System.currentTimeMillis()

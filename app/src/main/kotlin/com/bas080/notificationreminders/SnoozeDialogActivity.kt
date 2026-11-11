@@ -1,6 +1,7 @@
 @file:Suppress("ComplexCondition", "CyclomaticComplexMethod", "EmptyFunctionBlock", "LargeClass", "LongMethod", "LoopWithTooManyJumpStatements", "MagicNumber", "MaxLineLength", "NestedBlockDepth", "ReturnCount", "TooManyFunctions", "UnusedPrivateMember", "UseRequire")
 package com.bas080.notificationreminders
 
+import kotlinx.coroutines.launch
 import android.content.Context
 import android.os.Bundle
 import android.widget.EditText
@@ -149,9 +150,9 @@ class SnoozeDialogActivity : AppCompatActivity() {
             editor.putLong("snooze_$trimmed", snoozeUntil)
             ReminderNotificationListenerService.recordTaskSnoozeChoice(this, target, durationChoice)
 
-            kotlinx.coroutines.runBlocking {
+            val cleanText = target.replace(Regex("(?i)\\s*#done\\b"), "").trim()
+            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
                 val db = com.bas080.notificationreminders.data.PuntDatabase.getInstance(this@SnoozeDialogActivity)
-                val cleanText = target.replace(Regex("(?i)\\s*#done\\b"), "").trim()
                 val existing = db.reminderDao().getReminderByText(cleanText)
                 if (existing != null) {
                     db.reminderDao().update(

@@ -1,6 +1,7 @@
 @file:Suppress("ComplexCondition", "CyclomaticComplexMethod", "EmptyFunctionBlock", "LargeClass", "LongMethod", "LoopWithTooManyJumpStatements", "MagicNumber", "MaxLineLength", "NestedBlockDepth", "ReturnCount", "TooManyFunctions", "UnusedPrivateMember", "UseRequire")
 package com.bas080.notificationreminders
 
+import kotlinx.coroutines.launch
 import android.app.Notification
 import android.content.Context
 import android.os.Bundle
@@ -100,10 +101,11 @@ class PickNotificationActivity : AppCompatActivity() {
         savedSet.add(reminderText)
         prefs.edit().putStringSet(KEY_REMINDERS, savedSet).apply()
 
-        kotlinx.coroutines.runBlocking {
+        val cleanText = reminderText.replace(Regex("(?i)\\s*#done\\b"), "").trim()
+        val recurrence = com.bas080.notificationreminders.receivers.CreateReminderReceiver.parseRecurrenceDuration(cleanText)?.second
+
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
             val db = com.bas080.notificationreminders.data.PuntDatabase.getInstance(this@PickNotificationActivity)
-            val cleanText = reminderText.replace(Regex("(?i)\\s*#done\\b"), "").trim()
-            val recurrence = com.bas080.notificationreminders.receivers.CreateReminderReceiver.parseRecurrenceDuration(cleanText)?.second
             db.reminderDao().insert(
                 com.bas080.notificationreminders.data.ReminderEntity(
                     text = cleanText,

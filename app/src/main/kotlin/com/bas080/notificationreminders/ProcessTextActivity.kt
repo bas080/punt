@@ -1,5 +1,6 @@
 package com.bas080.notificationreminders
 
+import kotlinx.coroutines.launch
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
@@ -39,11 +40,12 @@ class ProcessTextActivity : AppCompatActivity() {
             savedSet.add(selectedText)
             prefs.edit().putStringSet(KEY_REMINDERS, savedSet).apply()
 
-            kotlinx.coroutines.runBlocking {
+            val cleanText = selectedText.replace(Regex("(?i)\\s*#done\\b"), "").trim()
+            val parsed = com.bas080.notificationreminders.receivers.CreateReminderReceiver
+                .parseRecurrenceDuration(cleanText)
+
+            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
                 val db = com.bas080.notificationreminders.data.PuntDatabase.getInstance(this@ProcessTextActivity)
-                val cleanText = selectedText.replace(Regex("(?i)\\s*#done\\b"), "").trim()
-                val parsed = com.bas080.notificationreminders.receivers.CreateReminderReceiver
-                    .parseRecurrenceDuration(cleanText)
                 db.reminderDao().insert(
                     com.bas080.notificationreminders.data.ReminderEntity(
                         text = cleanText,

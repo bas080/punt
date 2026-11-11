@@ -1232,6 +1232,10 @@ class MainActivity : AppCompatActivity() {
                     .putLong("snooze_$cleanTrimmed", snoozeUntil)
                     .apply()
                 ReminderNotificationListenerService.lastTriggeredMap["snooze_$cleanTrimmed"] = snoozeUntil
+                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                    val db = com.bas080.notificationreminders.data.PuntDatabase.getInstance(this@MainActivity)
+                    db.reminderDao().updateSnooze(cleanText, snoozeUntil)
+                }
 
                 val notificationId = ReminderNotificationListenerService.getNotificationIdForReminder(reminderText)
                 val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager
@@ -1250,8 +1254,13 @@ class MainActivity : AppCompatActivity() {
                 }
                 activeReminders[idx] = doneText
                 recentlyDoneReminders.add(doneText)
+                val cleanText = reminderText.replace(Regex("(?i)\\s*#done\\b"), "").trim()
                 val prefs = getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
                 prefs.edit().putStringSet(KEY_REMINDERS, activeReminders.toSet()).apply()
+                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                    val db = com.bas080.notificationreminders.data.PuntDatabase.getInstance(this@MainActivity)
+                    db.reminderDao().markDone(cleanText, true)
+                }
 
                 val notificationId = ReminderNotificationListenerService.getNotificationIdForReminder(reminderText)
                 val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager
@@ -1274,6 +1283,10 @@ class MainActivity : AppCompatActivity() {
             recentlyDoneReminders.remove(doneReminderText)
             val prefs = getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
             prefs.edit().putStringSet(KEY_REMINDERS, activeReminders.toSet()).apply()
+            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                val db = com.bas080.notificationreminders.data.PuntDatabase.getInstance(this@MainActivity)
+                db.reminderDao().markDone(cleanText, false)
+            }
 
             ReminderNotificationListenerService.instance?.showStatusNotification()
             updateSummaryAndAdapter()
@@ -1292,6 +1305,11 @@ class MainActivity : AppCompatActivity() {
             ReminderNotificationListenerService.lastTriggeredMap.remove("snooze_$cleanTrimmed")
             val prefs = getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
             prefs.edit().putStringSet(KEY_REMINDERS, activeReminders.toSet()).remove("snooze_$cleanTrimmed").apply()
+            val cleanToDelete = reminderText.replace(Regex("(?i)\\s*#done\\b"), "").trim()
+            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                val db = com.bas080.notificationreminders.data.PuntDatabase.getInstance(this@MainActivity)
+                db.reminderDao().deleteByText(cleanToDelete)
+            }
 
             val notificationId = ReminderNotificationListenerService.getNotificationIdForReminder(reminderText)
             val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager
@@ -1320,7 +1338,6 @@ class MainActivity : AppCompatActivity() {
     private fun loadReminders() {
         com.bas080.notificationreminders.utils.TaskBackupManager.restoreIfEmpty(this)
         val prefs = getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
-        val savedSet = prefs.getStringSet(KEY_REMINDERS, emptySet()) ?: emptySet()
         val savedQuery = prefs.getString(KEY_SEARCH_QUERY, "") ?: ""
         currentSearchQuery = savedQuery
         val savedActiveSet = prefs.getStringSet(KEY_ACTIVE_FOCUS_PROFILES, null)
@@ -1341,6 +1358,8 @@ class MainActivity : AppCompatActivity() {
             binding.searchReminderInput.setText(savedQuery)
         }
         binding.btnClearInput.visibility = if (binding.searchReminderInput.text.isNotEmpty()) View.VISIBLE else View.GONE
+
+        val savedSet = prefs.getStringSet(KEY_REMINDERS, emptySet()) ?: emptySet()
         activeReminders.clear()
         activeReminders.addAll(savedSet)
         updateSummaryAndAdapter()
@@ -1348,9 +1367,42 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun saveRemindersToPrefs(updateStatusNotification: Boolean = true) {
+        val context = applicationContext
+        val currentList = activeReminders.toList()
         val prefs = getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
         prefs.edit().putStringSet(KEY_REMINDERS, activeReminders.toSet()).apply()
-        syncActiveRemindersToRoom()
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+            try {
+                val db = com.bas080.notificationreminders.data.PuntDatabase.getInstance(context)
+                for (raw in currentList) {
+                    val isDone = raw.contains("#done", ignoreCase = true)
+                    val clean = raw.replace(Regex("(?i)\\s*#done\\b"), "").trim()
+                    val lower = clean.lowercase()
+                    val snooze = prefs.getLong("snooze_$lower", 0L).let { if (it > 0L) it else null }
+                    val recurrence = com.bas080.notificationreminders.receivers.CreateReminderReceiver.parseRecurrenceDuration(clean)?.second
+                    val existing = db.reminderDao().getReminderByText(clean)
+                    if (existing != null) {
+                        db.reminderDao().update(
+                            existing.copy(
+                                isDone = isDone,
+                                snoozeUntil = snooze,
+                                recurrenceInterval = recurrence,
+                                updatedAt = System.currentTimeMillis()
+                            )
+                        )
+                    } else {
+                        db.reminderDao().insert(
+                            com.bas080.notificationreminders.data.ReminderEntity(
+                                text = clean,
+                                isDone = isDone,
+                                snoozeUntil = snooze,
+                                recurrenceInterval = recurrence
+                            )
+                        )
+                    }
+                }
+            } catch (_: Exception) {}
+        }
         if (updateStatusNotification) {
             ReminderNotificationListenerService.instance?.showStatusNotification()
         }
@@ -1378,8 +1430,9 @@ class MainActivity : AppCompatActivity() {
                         recurrenceInterval = recurrence
                     )
                 }
-                db.reminderDao().deleteAll()
-                db.reminderDao().insertAll(entities)
+                for (entity in entities) {
+                    db.reminderDao().insert(entity)
+                }
             } catch (_: Exception) {}
         }
     }

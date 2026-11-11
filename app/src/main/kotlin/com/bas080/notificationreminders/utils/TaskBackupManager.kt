@@ -159,6 +159,10 @@ object TaskBackupManager {
         editor.apply()
 
         val db = PuntDatabase.getInstance(context)
-        runBlocking { db.reminderDao().insertAll(entities) }
+        runBlocking {
+            for (entity in entities) {
+                db.reminderDao().insert(entity)
+            }
+        }
     }
 }
