@@ -69,6 +69,9 @@ class UiPerformanceBenchmarkTest {
         val context = RuntimeEnvironment.getApplication()
         val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
 
+        // Warmup Robolectric activity creation and classloading
+        Robolectric.buildActivity(MainActivity::class.java).setup().pause().stop().destroy()
+
         val activeList = (1..1000).map { "Task $it #tag${it % 5}" }
         prefs.edit().clear().putStringSet("key_reminders_list", activeList.toSet()).commit()
 

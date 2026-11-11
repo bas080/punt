@@ -140,6 +140,13 @@ object ServerSyncManager {
                     dao.update(entity.copy(snoozeUntil = snoozeUntil, updatedAt = System.currentTimeMillis()))
                 }
             }
+            "delete" -> {
+                val id = target.toLongOrNull()
+                val entity = if (id != null) dao.getReminderById(id) else dao.getReminderByText(target)
+                if (entity != null) {
+                    dao.delete(entity)
+                }
+            }
         }
     }
 
