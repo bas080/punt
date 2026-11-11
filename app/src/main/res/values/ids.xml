@@ -3,5 +3,4 @@
     <item name="import_input" type="id" />
     <item name="btn_focus_select" type="id" />
     <item name="btn_focus_edit" type="id" />
-    <item name="btn_server_sync" type="id" />
 </resources>

@@ -136,19 +136,29 @@ header {
   margin-left: 12px;
 }
 
-.btn-action {
+.btn-icon {
   background: transparent;
   border: 1px solid var(--divider-color);
   color: var(--text-secondary);
   border-radius: 4px;
-  padding: 4px 8px;
-  font-size: 12px;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
   cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
 }
 
-.btn-action:hover {
+.btn-icon:hover {
   border-color: var(--accent);
   color: var(--accent);
+}
+
+.btn-icon.delete:hover {
+  border-color: var(--accent-danger);
+  color: var(--accent-danger);
 }
 
 .toast {

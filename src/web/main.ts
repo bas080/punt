@@ -95,19 +95,44 @@ export function initWebSocket() {
   });
 }
 
+const iconDone = html`<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+const iconPunt = html`<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>`;
+const iconShare = html`<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>`;
+const iconDelete = html`<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`;
+
 export const taskCardView = (task: Task): TemplateResult => {
   const isPunted = !task.isDone && task.snoozeUntil != null && task.snoozeUntil > Date.now();
   const puntLabel = isPunted ? ` • until ${new Date(task.snoozeUntil!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : '';
   const identifier = task.id != null ? task.id : task.text;
+
+  const handleShare = () => {
+    if (navigator.share) {
+      navigator.share({ text: task.text }).catch(() => {});
+    } else if (navigator.clipboard) {
+      navigator.clipboard.writeText(task.text).then(() => {
+        showNotification('Task copied to clipboard');
+      }).catch(() => {});
+    }
+  };
 
   return html`
     <div class="task-card ${task.isDone ? 'done' : ''}">
       <span class="task-text">${task.text}${puntLabel}</span>
       <div class="task-actions">
         ${!task.isDone ? html`
-          <button class="btn-action" @click=${() => sendMutation('punt', { target: identifier, duration: '1h' })}>Punt 1h</button>
-          <button class="btn-action" @click=${() => sendMutation('done', { target: identifier })}>Done</button>
+          <button class="btn-icon" title="Mark Done" aria-label="Mark Done" @click=${() => sendMutation('done', { target: identifier })}>
+            ${iconDone}
+          </button>
+          <button class="btn-icon" title="Punt 1h" aria-label="Punt 1h" @click=${() => sendMutation('punt', { target: identifier, duration: '1h' })}>
+            ${iconPunt}
+          </button>
+          <button class="btn-icon" title="Share" aria-label="Share" @click=${handleShare}>
+            ${iconShare}
+          </button>
         ` : ''}
+        <button class="btn-icon delete" title="Delete" aria-label="Delete" @click=${() => sendMutation('delete', { target: identifier })}>
+          ${iconDelete}
+        </button>
       </div>
     </div>
   `;
