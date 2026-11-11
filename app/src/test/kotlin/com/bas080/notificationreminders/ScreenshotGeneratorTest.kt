@@ -73,22 +73,6 @@ class ScreenshotGeneratorTest {
         captureScreenshot4NotificationDrawer()
         captureScreenshot5AboutAndLogs()
         captureScreenshot6KeyboardEditing()
-        captureScreenshot7ServerSyncPinDialog()
-    }
-
-    private fun captureScreenshot7ServerSyncPinDialog() {
-        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
-        val activity = controller.get()
-        shadowOf(Looper.getMainLooper()).idle()
-
-        activity.showServerSyncDialog()
-        shadowOf(Looper.getMainLooper()).idle()
-
-        val dialog = org.robolectric.shadows.ShadowAlertDialog.getLatestDialog() as? androidx.appcompat.app.AlertDialog
-        val dialogDecorView = dialog?.window?.decorView ?: activity.window.decorView
-        val outTarget = File("/home/jules/verification/screenshots/android_pin_input.png")
-        outTarget.parentFile?.mkdirs()
-        renderAndSaveView(dialogDecorView, outTarget, 375, 667)
     }
 
     private fun captureScreenshot1Overview() {

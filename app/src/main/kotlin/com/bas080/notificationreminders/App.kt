@@ -19,6 +19,23 @@ class App : Application() {
         super.onCreate()
         AppLogger.log(this, "Application", "Application initialized")
         setupGlobalCrashHandler()
+        migrateLegacyStorageAsync()
+    }
+
+    private fun migrateLegacyStorageAsync() {
+        val prefs = getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
+        val migrationKey = com.bas080.notificationreminders.data.LegacyStorageMigration.KEY_LEGACY_MIGRATION_DONE
+        if (!prefs.getBoolean(migrationKey, false)) {
+            Thread {
+                kotlinx.coroutines.runBlocking {
+                    try {
+                        val ctx = applicationContext
+                        com.bas080.notificationreminders.data.LegacyStorageMigration.migrateIfNeeded(ctx)
+                    } catch (_: Exception) {
+                    }
+                }
+            }.start()
+        }
     }
 
     private fun setupGlobalCrashHandler() {

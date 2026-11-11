@@ -21,6 +21,8 @@ class TaskBackupManagerTest {
     @Before
     fun setUp() {
         context = RuntimeEnvironment.getApplication()
+        val db = com.bas080.notificationreminders.data.PuntDatabase.getInstance(context)
+        kotlinx.coroutines.runBlocking { db.reminderDao().deleteAll() }
         val prefs = context.getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
         prefs.edit().clear().commit()
 
@@ -48,7 +50,9 @@ class TaskBackupManagerTest {
         assertTrue(content.contains("Call mom #done"))
         assertTrue(content.contains("Pay bills"))
 
-        // Clear preferences to simulate fresh app launch/install under new package name
+        // Clear preferences and database to simulate fresh app launch/install under new package name
+        val db = com.bas080.notificationreminders.data.PuntDatabase.getInstance(context)
+        kotlinx.coroutines.runBlocking { db.reminderDao().deleteAll() }
         prefs.edit().clear().commit()
         val emptySet = prefs.getStringSet("key_reminders", null)
         assertTrue(emptySet.isNullOrEmpty())

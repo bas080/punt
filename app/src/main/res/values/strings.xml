@@ -35,17 +35,6 @@
     <string name="app_version_format">Version %s</string>
     <string name="feedback">Feedback</string>
     <string name="donate">Donate</string>
-    <string name="server_sync">Server Sync</string>
-    <string name="server_sync_title">Server Sync</string>
-    <string name="server_sync_pin_hint">Enter 4-digit PIN</string>
-    <string name="server_sync_host_hint">Server Address (e.g. 192.168.1.100:7868)</string>
-    <string name="server_sync_connect">Connect</string>
-    <string name="server_sync_connected">Connected to Server</string>
-    <string name="server_sync_failed">Pairing failed: Invalid PIN</string>
-    <string name="calendar_sync_title">Calendar Sync</string>
-    <string name="calendar_sync_disabled">Calendar Sync: Disabled</string>
-    <string name="calendar_sync_enabled">Calendar Sync: Enabled</string>
-    <string name="calendar_permission_required">Calendar Sync requires permission to access your device calendar.</string>
     <string name="snooze">Punt</string>
     <string name="snooze_upper">Punt</string>
     <string name="unsnooze">Unpunt</string>
