@@ -1,12 +1,13 @@
 :root {
-  --bg-dark: #121212;
-  --bg-surface: #1E1E1E;
+  --bg-dark: #0D0D0D;
+  --bg-surface: #1A1A1A;
   --divider-color: #2C2C2E;
   --text-primary: #FFFFFF;
   --text-secondary: #8E8E93;
-  --accent: #30D158;
+  --text-muted: #636366;
+  --accent: #00E5FF;
   --accent-subtle: #80DEEA;
-  --accent-danger: #FF453A;
+  --accent-danger: #FF5252;
 }
 
 * {
@@ -70,6 +71,20 @@ header {
   opacity: 0.8;
 }
 
+.main-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  transition: opacity 0.2s ease;
+}
+
+.main-content.offline-disabled {
+  opacity: 0.35;
+  pointer-events: none;
+  user-select: none;
+  filter: grayscale(80%);
+}
+
 .card {
   background-color: var(--bg-surface);
   border: 1px solid var(--divider-color);
@@ -80,6 +95,8 @@ header {
 .pin-banner {
   text-align: center;
   border-color: var(--accent);
+  opacity: 1 !important;
+  pointer-events: auto !important;
 }
 
 .pin-display {
