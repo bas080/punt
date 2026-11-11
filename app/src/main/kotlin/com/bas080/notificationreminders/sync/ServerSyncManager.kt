@@ -17,34 +17,67 @@ import org.json.JSONObject
 
 object ServerSyncManager {
 
-    private const val PREFS_SERVER = "server_sync_prefs"
-    private const val KEY_CODE = "key_pairing_code"
-    private const val KEY_CODE_EXPIRY = "key_pairing_code_expiry"
-    private const val EXPIRY_DURATION_MS = 15 * 60 * 1000L
-    private const val CODE_MIN = 1000
-    private const val CODE_MAX = 9999
     private const val DEFAULT_PUNT_MS = 3600000L
+    private const val PING_TIMEOUT_MS = 300
+    private const val HTTP_OK = 200
+    const val DEFAULT_PORT = 7868
 
     private var socket: Socket? = null
 
-    fun generatePairingCode(context: Context): String {
-        val code = (CODE_MIN..CODE_MAX).random().toString()
-        val expiry = System.currentTimeMillis() + EXPIRY_DURATION_MS
-        val prefs = context.getSharedPreferences(PREFS_SERVER, Context.MODE_PRIVATE)
-        prefs.edit()
-            .putString(KEY_CODE, code)
-            .putLong(KEY_CODE_EXPIRY, expiry)
-            .apply()
-        return code
-    }
+    fun getLocalIpAddress(): String? = runCatching {
+        val interfaces = java.net.NetworkInterface.getNetworkInterfaces()?.toList().orEmpty()
+        interfaces.asSequence()
+            .filter { !it.isLoopback && it.isUp }
+            .flatMap { it.inetAddresses.asSequence() }
+            .filter { !it.isLoopbackAddress && it is java.net.Inet4Address }
+            .map { it.hostAddress }
+            .firstOrNull()
+    }.getOrNull()
 
-    fun getPairingCode(context: Context): String? {
-        val prefs = context.getSharedPreferences(PREFS_SERVER, Context.MODE_PRIVATE)
-        val expiry = prefs.getLong(KEY_CODE_EXPIRY, 0L)
-        if (System.currentTimeMillis() > expiry) {
-            return null
+    fun discoverAndConnect(
+        context: Context,
+        customEndpoint: String?,
+        pin: String?,
+        onResult: ((Boolean, String) -> Unit)? = null
+    ) {
+        if (!customEndpoint.isNullOrBlank()) {
+            val url = if (!customEndpoint.startsWith("http://") && !customEndpoint.startsWith("https://")) {
+                "http://$customEndpoint"
+            } else {
+                customEndpoint
+            }
+            connect(context, url, pin)
+            onResult?.invoke(true, url)
+            return
         }
-        return prefs.getString(KEY_CODE, null)
+        val fallback = "http://10.0.2.2:$DEFAULT_PORT"
+        val localIp = getLocalIpAddress()
+        if (localIp == null) {
+            connect(context, fallback, pin)
+            onResult?.invoke(true, fallback)
+            return
+        }
+        CoroutineScope(Dispatchers.IO).launch {
+            val prefix = localIp.substringBeforeLast(".")
+            val defaultUrl = "http://$localIp:$DEFAULT_PORT"
+            val candidates = listOf(defaultUrl, "http://$prefix.1:$DEFAULT_PORT", "http://10.0.2.2:$DEFAULT_PORT")
+            val foundUrl = candidates.firstOrNull { cand ->
+                runCatching {
+                    val conn = (java.net.URL("$cand/api/ping").openConnection() as java.net.HttpURLConnection).apply {
+                        connectTimeout = PING_TIMEOUT_MS
+                        readTimeout = PING_TIMEOUT_MS
+                        requestMethod = "GET"
+                    }
+                    val ok = conn.responseCode == HTTP_OK
+                    conn.disconnect()
+                    ok
+                }.getOrDefault(false)
+            } ?: defaultUrl
+            kotlinx.coroutines.withContext(Dispatchers.Main) {
+                connect(context, foundUrl, pin)
+                onResult?.invoke(foundUrl != defaultUrl, foundUrl)
+            }
+        }
     }
 
     fun isConnected(): Boolean = socket?.connected() == true
