@@ -30,7 +30,7 @@ class ServerSyncEndToEndTest {
     @Before
     fun setUp() {
         context = RuntimeEnvironment.getApplication()
-        val pb = ProcessBuilder("node", cliFile.canonicalPath, "serve", "--port", testPort.toString())
+        val pb = ProcessBuilder("node", cliFile.canonicalPath, "serve", "--port", testPort.toString(), "--code", "4829")
         pb.redirectErrorStream(true)
         pb.directory(cliFile.parentFile?.parentFile)
         serverProcess = pb.start()
@@ -51,7 +51,7 @@ class ServerSyncEndToEndTest {
             db.reminderDao().insert(ReminderEntity(text = "Synced Android Todo", isDone = false))
         }
 
-        ServerSyncManager.connect(context, "http://localhost:$testPort")
+        ServerSyncManager.discoverAndConnect(context, "http://localhost:$testPort", "4829")
         Thread.sleep(1000)
 
         ServerSyncManager.pushTasksDump(context)

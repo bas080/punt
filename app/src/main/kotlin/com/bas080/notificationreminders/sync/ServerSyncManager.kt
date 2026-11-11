@@ -15,14 +15,73 @@ import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
 
+private const val HTTP_OK = 200
+private const val PAIR_TIMEOUT_MS = 3000
+private const val MAX_SCAN = 30
+
 private fun Throwable.describe(): String = message?.let { "${javaClass.simpleName}: $it" } ?: javaClass.simpleName
+
+private data class ServerSearchResult(val url: String?, val failure: String?)
+
+private fun scanForServer(ip: String?, fallback: String): ServerSearchResult {
+    val prefix = ip?.substringBeforeLast(".")
+    val candidates = mutableListOf(fallback)
+    if (prefix != null) {
+        candidates.add("http://$prefix.1:${ServerSyncManager.DEFAULT_PORT}")
+        for (index in 2..MAX_SCAN) candidates.add("http://$prefix.$index:${ServerSyncManager.DEFAULT_PORT}")
+    }
+
+    var failure: String? = null
+    for (candidate in candidates) {
+        val result = ServerSyncManager.pingUrl(candidate)
+        if (result.isSuccess) return ServerSearchResult(candidate, null)
+        failure = "$candidate: ${result.exceptionOrNull()?.describe()}"
+    }
+    return ServerSearchResult(null, failure)
+}
+
+
+internal fun pairWithServer(url: String, pin: String?): Result<String> {
+    if (pin.isNullOrBlank()) return Result.failure(IllegalArgumentException("Pairing PIN is required"))
+
+    var connection: java.net.HttpURLConnection? = null
+    return runCatching {
+        val pairingUrl = "${url.trimEnd('/')}/api/pair"
+        connection = (java.net.URL(pairingUrl).openConnection() as java.net.HttpURLConnection).apply {
+            connectTimeout = PAIR_TIMEOUT_MS
+            readTimeout = PAIR_TIMEOUT_MS
+            requestMethod = "POST"
+            doOutput = true
+            setRequestProperty("Content-Type", "application/json")
+        }
+        val requestBody = JSONObject().put("code", pin).toString().toByteArray(Charsets.UTF_8)
+        connection!!.outputStream.use { it.write(requestBody) }
+        val responseCode = connection!!.responseCode
+        val responseStream = if (responseCode == HTTP_OK) connection!!.inputStream else connection!!.errorStream
+        val responseBody = responseStream?.bufferedReader()?.use { it.readText() }.orEmpty()
+        val response = runCatching { JSONObject(responseBody) }.getOrNull()
+        val token = response?.optString("token").orEmpty()
+        val failure = when {
+            responseCode != HTTP_OK -> {
+                val reason = response?.optString("error").orEmpty().ifBlank { "Request failed" }
+                "HTTP response $responseCode: $reason"
+            }
+            response == null -> "Invalid pairing response"
+            !response.optBoolean("success") -> response.optString("error").ifBlank { "Pairing failed" }
+            token.isBlank() -> "Pairing response did not contain a session token"
+            else -> null
+        }
+        if (failure != null) throw java.io.IOException(failure)
+        token
+    }.also {
+        connection?.disconnect()
+    }
+}
 
 object ServerSyncManager {
 
     private const val DEFAULT_PUNT_MS = 3600000L
     private const val PING_TIMEOUT_MS = 300
-    private const val HTTP_OK = 200
-    private const val MAX_SCAN = 30
     const val DEFAULT_PORT = 7868
 
     private var socket: Socket? = null
@@ -49,73 +108,67 @@ object ServerSyncManager {
     ) {
         val raw = customEndpoint?.trim()
         if (!raw.isNullOrBlank()) {
-            val s = if (!raw.startsWith("http://") && !raw.startsWith("https://")) "http://$raw" else raw
-            val port = runCatching { java.net.URI(s).port }.getOrDefault(-1)
-            val target = if (port == -1) "$s:$DEFAULT_PORT" else s
+            val schemeUrl = if (!raw.startsWith("http://") && !raw.startsWith("https://")) "http://$raw" else raw
+            val url = schemeUrl.trimEnd('/')
+            val port = runCatching { java.net.URI(url).port }.getOrDefault(-1)
+            val target = if (port == -1) "$url:$DEFAULT_PORT" else url
             onStatus?.invoke("Connecting to $target...")
             CoroutineScope(Dispatchers.IO).launch {
-                val result = pingUrl(target)
+                val result = pingUrl(target).fold(
+                    onSuccess = { pairWithServer(target, pin) },
+                    onFailure = { Result.failure(it) }
+                )
                 kotlinx.coroutines.withContext(Dispatchers.Main) {
-                    if (result.isSuccess) connect(context, target, pin)
+                    if (result.isSuccess) connect(context, target, result.getOrNull())
                     onResult?.invoke(result.isSuccess, target, result.exceptionOrNull()?.describe())
                 }
             }
-        } else {
-            onStatus?.invoke("Scanning local network...")
-            val ip = getLocalIpAddress()
-            val fallback = if (ip != null) "http://$ip:$DEFAULT_PORT" else "http://10.0.2.2:$DEFAULT_PORT"
-            CoroutineScope(Dispatchers.IO).launch {
-                val prefix = ip?.substringBeforeLast(".")
-                val list = mutableListOf(fallback)
-                if (prefix != null) {
-                    list.add("http://$prefix.1:$DEFAULT_PORT")
-                    for (i in 2..MAX_SCAN) list.add("http://$prefix.$i:$DEFAULT_PORT")
-                }
-                var found: String? = null
-                var failure: String? = null
-                for (candidate in list) {
-                    val result = pingUrl(candidate)
-                    if (result.isSuccess) {
-                        found = candidate
-                        break
-                    }
-                    failure = "${candidate}: ${result.exceptionOrNull()?.describe()}"
-                }
-                kotlinx.coroutines.withContext(Dispatchers.Main) {
-                    if (found != null) {
-                        connect(context, found, pin)
-                        onResult?.invoke(true, found, null)
-                    } else {
-                        onResult?.invoke(false, fallback, failure ?: "No server responded")
-                    }
+            return
+        }
+
+        onStatus?.invoke("Scanning local network...")
+        val ip = getLocalIpAddress()
+        val fallback = if (ip != null) "http://$ip:$DEFAULT_PORT" else "http://10.0.2.2:$DEFAULT_PORT"
+        CoroutineScope(Dispatchers.IO).launch {
+            val search = scanForServer(ip, fallback)
+            val pairing = search.url?.let { pairWithServer(it, pin) }
+            kotlinx.coroutines.withContext(Dispatchers.Main) {
+                if (search.url == null) {
+                    onResult?.invoke(false, fallback, search.failure ?: "No server responded")
+                } else {
+                    val result = pairing ?: Result.failure(IllegalStateException("Pairing did not run"))
+                    if (result.isSuccess) connect(context, search.url, result.getOrNull())
+                    onResult?.invoke(result.isSuccess, search.url, result.exceptionOrNull()?.describe())
                 }
             }
         }
     }
 
     internal fun pingUrl(urlStr: String): Result<Unit> {
-        var conn: java.net.HttpURLConnection? = null
+        var connection: java.net.HttpURLConnection? = null
         return runCatching {
-            conn = (java.net.URL("$urlStr/api/ping").openConnection() as java.net.HttpURLConnection).apply {
+            val pingUrl = "${urlStr.trimEnd('/')}/api/ping"
+            connection = (java.net.URL(pingUrl).openConnection() as java.net.HttpURLConnection).apply {
                 connectTimeout = PING_TIMEOUT_MS
                 readTimeout = PING_TIMEOUT_MS
                 requestMethod = "GET"
             }
-            val responseCode = conn!!.responseCode
+            val responseCode = connection!!.responseCode
             if (responseCode != HTTP_OK) throw java.io.IOException("HTTP response $responseCode")
         }.also {
-            conn?.disconnect()
+            connection?.disconnect()
         }
     }
 
     fun isConnected(): Boolean = socket?.connected() == true
 
-    fun connect(context: Context, serverUrl: String, token: String? = null) {
+    fun connect(context: Context, serverUrl: String, sessionToken: String? = null) {
         disconnect()
         try {
             val version = "0.0.7"
             val opts = IO.Options().apply {
-                query = "client=phone&version=$version" + (if (!token.isNullOrBlank()) "&token=$token" else "")
+                query = "client=phone&version=$version" +
+                    (if (!sessionToken.isNullOrBlank()) "&token=$sessionToken" else "")
                 transports = arrayOf("websocket", "polling")
                 reconnection = true
             }
@@ -145,8 +198,8 @@ object ServerSyncManager {
     }
 
     fun pushTasksDump(context: Context) {
-        val s = socket ?: return
-        if (!s.connected()) return
+        val currentSocket = socket ?: return
+        if (!currentSocket.connected()) return
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
@@ -157,22 +210,22 @@ object ServerSyncManager {
                     put("version", "0.0.7")
                     put("tasks", jsonArray)
                 }
-                s.emit("tasks_dump", payload)
+                currentSocket.emit("tasks_dump", payload)
             } catch (_: Exception) {}
         }
     }
 
     private fun serializeReminders(reminders: List<ReminderEntity>): JSONArray = JSONArray().apply {
-        for (r in reminders) {
+        for (reminder in reminders) {
             put(
                 JSONObject().apply {
-                    put("id", r.id)
-                    put("text", r.text)
-                    put("createdAt", r.createdAt)
-                    if (r.snoozeUntil != null) put("snoozeUntil", r.snoozeUntil)
-                    put("isDone", r.isDone)
-                    if (r.recurrenceInterval != null) put("recurrenceInterval", r.recurrenceInterval)
-                    put("updatedAt", r.updatedAt)
+                    put("id", reminder.id)
+                    put("text", reminder.text)
+                    put("createdAt", reminder.createdAt)
+                    if (reminder.snoozeUntil != null) put("snoozeUntil", reminder.snoozeUntil)
+                    put("isDone", reminder.isDone)
+                    if (reminder.recurrenceInterval != null) put("recurrenceInterval", reminder.recurrenceInterval)
+                    put("updatedAt", reminder.updatedAt)
                 }
             )
         }
@@ -195,59 +248,54 @@ object ServerSyncManager {
                 dao.update(entity.copy(isDone = true, updatedAt = System.currentTimeMillis()))
             }
             "punt" -> if (entity != null) {
-                val durationStr = payload?.optString("duration") ?: "1h"
-                val snoozeMs = CreateReminderReceiver.parseSnoozeDuration(durationStr)?.first ?: DEFAULT_PUNT_MS
+                val duration = payload?.optString("duration") ?: "1h"
+                val snoozeMs = CreateReminderReceiver.parseSnoozeDuration(duration)?.first ?: DEFAULT_PUNT_MS
                 val snoozeUntil = System.currentTimeMillis() + snoozeMs
                 dao.update(entity.copy(snoozeUntil = snoozeUntil, updatedAt = System.currentTimeMillis()))
             }
-            "delete" -> if (entity != null) {
-                dao.deleteByText(entity.text)
-            }
+            "delete" -> if (entity != null) dao.deleteByText(entity.text)
         }
     }
 
     private fun handleMutationRequest(context: Context, request: JSONObject) {
-        val s = socket ?: return
+        val currentSocket = socket ?: return
         val mutationId = request.optString("mutationId")
         val action = request.optString("action")
         val payload = request.optJSONObject("payload")
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val db = PuntDatabase.getInstance(context)
-                applyAction(db.reminderDao(), action, payload)
-                val reminders = db.reminderDao().getAllReminders()
+                val dao = PuntDatabase.getInstance(context).reminderDao()
+                applyAction(dao, action, payload)
+                val reminders = dao.getAllReminders()
                 val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
                 val editor = prefs.edit()
-                val set = mutableSetOf<String>()
-                for (r in reminders) {
-                    val text = if (r.isDone) "${r.text} #done" else r.text
-                    set.add(text)
-                    val cleanLower = r.text.lowercase()
-                    if (r.snoozeUntil != null && r.snoozeUntil > 0L) {
-                        editor.putLong("snooze_$cleanLower", r.snoozeUntil)
+                val reminderSet = mutableSetOf<String>()
+                for (reminder in reminders) {
+                    reminderSet.add(if (reminder.isDone) "${reminder.text} #done" else reminder.text)
+                    val key = reminder.text.lowercase()
+                    if (reminder.snoozeUntil != null && reminder.snoozeUntil > 0L) {
+                        editor.putLong("snooze_$key", reminder.snoozeUntil)
                     } else {
-                        editor.remove("snooze_$cleanLower")
+                        editor.remove("snooze_$key")
                     }
                 }
-                editor.putStringSet("key_reminders_list", set).apply()
+                editor.putStringSet("key_reminders_list", reminderSet).apply()
                 com.bas080.notificationreminders.providers.RemindersContentProvider.notifyChange(context)
                 TaskBackupManager.backupTasks(context)
-                val jsonArray = serializeReminders(db.reminderDao().getAllReminders())
-
                 val response = JSONObject().apply {
                     put("mutationId", mutationId)
                     put("success", true)
-                    put("tasks", jsonArray)
+                    put("tasks", serializeReminders(dao.getAllReminders()))
                 }
-                s.emit("mutation_response", response)
+                currentSocket.emit("mutation_response", response)
             } catch (_: org.json.JSONException) {
                 val errorResponse = JSONObject().apply {
                     put("mutationId", mutationId)
                     put("success", false)
                     put("error", "Mutation failed")
                 }
-                s.emit("mutation_response", errorResponse)
+                currentSocket.emit("mutation_response", errorResponse)
             }
         }
     }

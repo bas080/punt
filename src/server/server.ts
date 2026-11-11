@@ -129,7 +129,7 @@ export class PuntServer {
       this.io.use((socket, next) => {
         const clientType = socket.handshake.query.client as string;
         const token = socket.handshake.query.token as string;
-        if (this.sessionToken && clientType === 'phone' && token !== this.sessionToken) {
+        if (clientType === 'phone' && (!this.sessionToken || token !== this.sessionToken)) {
           debugAuth('Rejected unauthorized phone socket id=%s', socket.id);
           return next(new Error('unauthorized'));
         }
