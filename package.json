@@ -10,7 +10,7 @@
     "dist/web"
   ],
   "scripts": {
-    "build:web": "esbuild src/web/main.ts src/web/index.html src/web/style.css src/web/manifest.json src/web/sw.js --bundle --minify --outdir=dist/web --loader:.html=copy --loader:.json=copy --loader:.css=copy --loader:.js=copy",
+    "build:web": "esbuild src/web/main.ts --bundle --minify --format=esm --platform=browser --outfile=dist/web/main.js && esbuild src/web/index.html src/web/style.css src/web/manifest.json src/web/sw.js --outdir=dist/web --loader:.html=copy --loader:.json=copy --loader:.css=copy --loader:.js=copy",
     "build:server": "esbuild src/server/cli.ts --bundle --platform=node --target=node18 --outfile=dist/server/cli.js",
     "build": "npm run build:web && npm run build:server",
     "prepare": "npm run build",
