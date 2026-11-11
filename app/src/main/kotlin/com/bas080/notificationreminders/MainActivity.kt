@@ -313,7 +313,18 @@ class MainActivity : AppCompatActivity() {
             isFocusable = true
         }
 
+        val btnServerSync = TextView(this).apply {
+            text = "Server Sync"
+            setTextColor(accentColor)
+            setTextAppearance(android.R.style.TextAppearance_Small)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setPadding((12 * density).toInt(), (4 * density).toInt(), 0, (4 * density).toInt())
+            isClickable = true
+            isFocusable = true
+        }
+
         row2.addView(btnDonate)
+        row2.addView(btnServerSync)
         container.addView(row2)
 
         val logsHeaderRow = android.widget.LinearLayout(this).apply {
@@ -402,6 +413,10 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        btnServerSync.setOnClickListener {
+            showServerSyncDialog()
+        }
+
         btnClearLogs.setOnClickListener {
             AppLogger.clearLogs(this)
             logsTv.text = "No logs available."
@@ -409,6 +424,44 @@ class MainActivity : AppCompatActivity() {
         }
 
         dialog.show()
+    }
+
+    private fun showServerSyncDialog() {
+        val density = resources.displayMetrics.density
+        val input = EditText(this).apply {
+            hint = "4-digit Pairing PIN"
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_primary))
+            setHintTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_secondary))
+        }
+
+        val urlInput = EditText(this).apply {
+            hint = "http://10.0.2.2:7868 or LAN IP"
+            setText("http://10.0.2.2:7868")
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_primary))
+            setHintTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_secondary))
+        }
+
+        val container = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            setPadding((24 * density).toInt(), (16 * density).toInt(), (24 * density).toInt(), 0)
+            addView(urlInput)
+            addView(input)
+        }
+
+        AlertDialog.Builder(this, R.style.Theme_Punt_Dialog)
+            .setTitle("Server Sync")
+            .setView(container)
+            .setPositiveButton("Connect") { _, _ ->
+                val pin = input.text.toString().trim()
+                val url = urlInput.text.toString().trim()
+                if (url.isNotEmpty()) {
+                    com.bas080.notificationreminders.sync.ServerSyncManager.connect(this, url, pin)
+                    Toast.makeText(this, "Connecting to server...", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
     }
 
     private fun setupClearInputButton() {
