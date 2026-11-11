@@ -529,7 +529,7 @@ class MainActivity : AppCompatActivity() {
                 url,
                 pin,
                 onStatus = { msg -> statusText.text = msg }
-            ) { success, connectedUrl ->
+            ) { success, connectedUrl, failureReason ->
                 if (success) {
                     if (url.isNotEmpty()) {
                         serverPrefs.edit().putString("key_last_server_endpoint", url).apply()
@@ -541,7 +541,7 @@ class MainActivity : AppCompatActivity() {
                     urlInput.isEnabled = true
                     input.isEnabled = true
                     statusText.setTextColor(ContextCompat.getColor(this, R.color.accent_danger))
-                    statusText.text = "Failed to connect to $connectedUrl"
+                    statusText.text = "Failed to connect to $connectedUrl: ${failureReason ?: "Unknown error"}"
                 }
             }
         }

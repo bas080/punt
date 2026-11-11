@@ -43,7 +43,7 @@ object ServerSyncManager {
         customEndpoint: String?,
         pin: String?,
         onStatus: ((String) -> Unit)? = null,
-        onResult: ((Boolean, String) -> Unit)? = null
+        onResult: ((Boolean, String, String?) -> Unit)? = null
     ) {
         val raw = customEndpoint?.trim()
         if (!raw.isNullOrBlank()) {
@@ -52,10 +52,10 @@ object ServerSyncManager {
             val target = if (port == -1) "$s:$DEFAULT_PORT" else s
             onStatus?.invoke("Connecting to $target...")
             CoroutineScope(Dispatchers.IO).launch {
-                val ok = pingUrl(target)
+                val result = pingUrl(target)
                 kotlinx.coroutines.withContext(Dispatchers.Main) {
-                    if (ok) connect(context, target, pin)
-                    onResult?.invoke(ok, target)
+                    if (result.isSuccess) connect(context, target, pin)
+                    onResult?.invoke(result.isSuccess, target, result.exceptionOrNull()?.describe())
                 }
             }
         } else {
@@ -69,26 +69,44 @@ object ServerSyncManager {
                     list.add("http://$prefix.1:$DEFAULT_PORT")
                     for (i in 2..MAX_SCAN) list.add("http://$prefix.$i:$DEFAULT_PORT")
                 }
-                val found = list.firstOrNull { pingUrl(it) } ?: fallback
-                val ok = pingUrl(found)
+                var found: String? = null
+                var failure: String? = null
+                for (candidate in list) {
+                    val result = pingUrl(candidate)
+                    if (result.isSuccess) {
+                        found = candidate
+                        break
+                    }
+                    failure = "${candidate}: ${result.exceptionOrNull()?.describe()}"
+                }
                 kotlinx.coroutines.withContext(Dispatchers.Main) {
-                    if (ok) connect(context, found, pin)
-                    onResult?.invoke(ok, found)
+                    if (found != null) {
+                        connect(context, found, pin)
+                        onResult?.invoke(true, found, null)
+                    } else {
+                        onResult?.invoke(false, fallback, failure ?: "No server responded")
+                    }
                 }
             }
         }
     }
 
-    private fun pingUrl(urlStr: String): Boolean = runCatching {
-        val conn = (java.net.URL("$urlStr/api/ping").openConnection() as java.net.HttpURLConnection).apply {
-            connectTimeout = PING_TIMEOUT_MS
-            readTimeout = PING_TIMEOUT_MS
-            requestMethod = "GET"
+    internal fun pingUrl(urlStr: String): Result<Unit> {
+        var conn: java.net.HttpURLConnection? = null
+        return runCatching {
+            conn = (java.net.URL("$urlStr/api/ping").openConnection() as java.net.HttpURLConnection).apply {
+                connectTimeout = PING_TIMEOUT_MS
+                readTimeout = PING_TIMEOUT_MS
+                requestMethod = "GET"
+            }
+            val responseCode = conn!!.responseCode
+            if (responseCode != HTTP_OK) throw java.io.IOException("HTTP response $responseCode")
+        }.also {
+            conn?.disconnect()
         }
-        val ok = conn.responseCode == HTTP_OK
-        conn.disconnect()
-        ok
-    }.getOrDefault(false)
+    }
+
+    private fun Throwable.describe(): String = message?.let { "${javaClass.simpleName}: $it" } ?: javaClass.simpleName
 
     fun isConnected(): Boolean = socket?.connected() == true
 
