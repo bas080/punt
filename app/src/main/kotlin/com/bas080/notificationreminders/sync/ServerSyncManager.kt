@@ -20,65 +20,75 @@ object ServerSyncManager {
     private const val DEFAULT_PUNT_MS = 3600000L
     private const val PING_TIMEOUT_MS = 300
     private const val HTTP_OK = 200
+    private const val MAX_SCAN = 30
     const val DEFAULT_PORT = 7868
 
     private var socket: Socket? = null
 
     fun getLocalIpAddress(): String? = runCatching {
-        val interfaces = java.net.NetworkInterface.getNetworkInterfaces()?.toList().orEmpty()
-        interfaces.asSequence()
+        val addrs = java.net.NetworkInterface.getNetworkInterfaces()?.toList().orEmpty()
             .filter { !it.isLoopback && it.isUp }
-            .flatMap { it.inetAddresses.asSequence() }
+            .flatMap { it.inetAddresses.toList() }
             .filter { !it.isLoopbackAddress && it is java.net.Inet4Address }
             .map { it.hostAddress }
-            .firstOrNull()
+
+        addrs.firstOrNull { it?.startsWith("192.168.") == true }
+            ?: addrs.firstOrNull { it?.startsWith("10.") == true && !it.startsWith("10.0.2.") }
+            ?: addrs.firstOrNull { it?.startsWith("172.") == true }
+            ?: addrs.firstOrNull()
     }.getOrNull()
 
     fun discoverAndConnect(
         context: Context,
         customEndpoint: String?,
         pin: String?,
+        onStatus: ((String) -> Unit)? = null,
         onResult: ((Boolean, String) -> Unit)? = null
     ) {
-        if (!customEndpoint.isNullOrBlank()) {
-            val url = if (!customEndpoint.startsWith("http://") && !customEndpoint.startsWith("https://")) {
-                "http://$customEndpoint"
-            } else {
-                customEndpoint
+        val raw = customEndpoint?.trim()
+        if (!raw.isNullOrBlank()) {
+            val s = if (!raw.startsWith("http://") && !raw.startsWith("https://")) "http://$raw" else raw
+            val port = runCatching { java.net.URI(s).port }.getOrDefault(-1)
+            val target = if (port == -1) "$s:$DEFAULT_PORT" else s
+            onStatus?.invoke("Connecting to $target...")
+            CoroutineScope(Dispatchers.IO).launch {
+                val ok = pingUrl(target)
+                kotlinx.coroutines.withContext(Dispatchers.Main) {
+                    if (ok) connect(context, target, pin)
+                    onResult?.invoke(ok, target)
+                }
             }
-            connect(context, url, pin)
-            onResult?.invoke(true, url)
-            return
-        }
-        val fallback = "http://10.0.2.2:$DEFAULT_PORT"
-        val localIp = getLocalIpAddress()
-        if (localIp == null) {
-            connect(context, fallback, pin)
-            onResult?.invoke(true, fallback)
-            return
-        }
-        CoroutineScope(Dispatchers.IO).launch {
-            val prefix = localIp.substringBeforeLast(".")
-            val defaultUrl = "http://$localIp:$DEFAULT_PORT"
-            val candidates = listOf(defaultUrl, "http://$prefix.1:$DEFAULT_PORT", "http://10.0.2.2:$DEFAULT_PORT")
-            val foundUrl = candidates.firstOrNull { cand ->
-                runCatching {
-                    val conn = (java.net.URL("$cand/api/ping").openConnection() as java.net.HttpURLConnection).apply {
-                        connectTimeout = PING_TIMEOUT_MS
-                        readTimeout = PING_TIMEOUT_MS
-                        requestMethod = "GET"
-                    }
-                    val ok = conn.responseCode == HTTP_OK
-                    conn.disconnect()
-                    ok
-                }.getOrDefault(false)
-            } ?: defaultUrl
-            kotlinx.coroutines.withContext(Dispatchers.Main) {
-                connect(context, foundUrl, pin)
-                onResult?.invoke(foundUrl != defaultUrl, foundUrl)
+        } else {
+            onStatus?.invoke("Scanning local network...")
+            val ip = getLocalIpAddress()
+            val fallback = if (ip != null) "http://$ip:$DEFAULT_PORT" else "http://10.0.2.2:$DEFAULT_PORT"
+            CoroutineScope(Dispatchers.IO).launch {
+                val prefix = ip?.substringBeforeLast(".")
+                val list = mutableListOf(fallback)
+                if (prefix != null) {
+                    list.add("http://$prefix.1:$DEFAULT_PORT")
+                    for (i in 2..MAX_SCAN) list.add("http://$prefix.$i:$DEFAULT_PORT")
+                }
+                val found = list.firstOrNull { pingUrl(it) } ?: fallback
+                val ok = pingUrl(found)
+                kotlinx.coroutines.withContext(Dispatchers.Main) {
+                    if (ok) connect(context, found, pin)
+                    onResult?.invoke(ok, found)
+                }
             }
         }
     }
+
+    private fun pingUrl(urlStr: String): Boolean = runCatching {
+        val conn = (java.net.URL("$urlStr/api/ping").openConnection() as java.net.HttpURLConnection).apply {
+            connectTimeout = PING_TIMEOUT_MS
+            readTimeout = PING_TIMEOUT_MS
+            requestMethod = "GET"
+        }
+        val ok = conn.responseCode == HTTP_OK
+        conn.disconnect()
+        ok
+    }.getOrDefault(false)
 
     fun isConnected(): Boolean = socket?.connected() == true
 
@@ -112,10 +122,8 @@ object ServerSyncManager {
     }
 
     fun disconnect() {
-        try {
-            socket?.disconnect()
-            socket = null
-        } catch (_: Exception) {}
+        runCatching { socket?.disconnect() }
+        socket = null
     }
 
     fun pushTasksDump(context: Context) {
@@ -136,21 +144,20 @@ object ServerSyncManager {
         }
     }
 
-    private fun serializeReminders(reminders: List<ReminderEntity>): JSONArray {
-        val jsonArray = JSONArray()
+    private fun serializeReminders(reminders: List<ReminderEntity>): JSONArray = JSONArray().apply {
         for (r in reminders) {
-            val obj = JSONObject().apply {
-                put("id", r.id)
-                put("text", r.text)
-                put("createdAt", r.createdAt)
-                if (r.snoozeUntil != null) put("snoozeUntil", r.snoozeUntil)
-                put("isDone", r.isDone)
-                if (r.recurrenceInterval != null) put("recurrenceInterval", r.recurrenceInterval)
-                put("updatedAt", r.updatedAt)
-            }
-            jsonArray.put(obj)
+            put(
+                JSONObject().apply {
+                    put("id", r.id)
+                    put("text", r.text)
+                    put("createdAt", r.createdAt)
+                    if (r.snoozeUntil != null) put("snoozeUntil", r.snoozeUntil)
+                    put("isDone", r.isDone)
+                    if (r.recurrenceInterval != null) put("recurrenceInterval", r.recurrenceInterval)
+                    put("updatedAt", r.updatedAt)
+                }
+            )
         }
-        return jsonArray
     }
 
     private suspend fun applyAction(dao: ReminderDao, action: String, payload: JSONObject?) {
@@ -191,7 +198,22 @@ object ServerSyncManager {
             try {
                 val db = PuntDatabase.getInstance(context)
                 applyAction(db.reminderDao(), action, payload)
-                syncRoomToPrefsCache(context, db)
+                val reminders = db.reminderDao().getAllReminders()
+                val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
+                val editor = prefs.edit()
+                val set = mutableSetOf<String>()
+                for (r in reminders) {
+                    val text = if (r.isDone) "${r.text} #done" else r.text
+                    set.add(text)
+                    val cleanLower = r.text.lowercase()
+                    if (r.snoozeUntil != null && r.snoozeUntil > 0L) {
+                        editor.putLong("snooze_$cleanLower", r.snoozeUntil)
+                    } else {
+                        editor.remove("snooze_$cleanLower")
+                    }
+                }
+                editor.putStringSet("key_reminders_list", set).apply()
+                com.bas080.notificationreminders.providers.RemindersContentProvider.notifyChange(context)
                 TaskBackupManager.backupTasks(context)
                 val jsonArray = serializeReminders(db.reminderDao().getAllReminders())
 
@@ -210,24 +232,5 @@ object ServerSyncManager {
                 s.emit("mutation_response", errorResponse)
             }
         }
-    }
-
-    private suspend fun syncRoomToPrefsCache(context: Context, db: PuntDatabase) {
-        val reminders = db.reminderDao().getAllReminders()
-        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
-        val editor = prefs.edit()
-        val set = mutableSetOf<String>()
-        for (r in reminders) {
-            val text = if (r.isDone) "${r.text} #done" else r.text
-            set.add(text)
-            val cleanLower = r.text.lowercase()
-            if (r.snoozeUntil != null && r.snoozeUntil > 0L) {
-                editor.putLong("snooze_$cleanLower", r.snoozeUntil)
-            } else {
-                editor.remove("snooze_$cleanLower")
-            }
-        }
-        editor.putStringSet("key_reminders_list", set).apply()
-        com.bas080.notificationreminders.providers.RemindersContentProvider.notifyChange(context)
     }
 }

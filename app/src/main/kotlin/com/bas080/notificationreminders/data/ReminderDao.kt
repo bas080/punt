@@ -11,9 +11,6 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface ReminderDao {
     @Query("SELECT * FROM reminders ORDER BY created_at DESC")
-    fun getAllRemindersFlow(): Flow<List<ReminderEntity>>
-
-    @Query("SELECT * FROM reminders ORDER BY created_at DESC")
     suspend fun getAllReminders(): List<ReminderEntity>
 
     @Query("SELECT * FROM reminders WHERE text = :text LIMIT 1")
@@ -27,6 +24,9 @@ interface ReminderDao {
 
     @Query("UPDATE reminders SET is_done = :isDone, updated_at = :updatedAt WHERE text = :text")
     suspend fun markDone(text: String, isDone: Boolean, updatedAt: Long = System.currentTimeMillis())
+
+    @Query("UPDATE reminders SET text = :newText, updated_at = :updatedAt WHERE text = :oldText")
+    suspend fun updateText(oldText: String, newText: String, updatedAt: Long = System.currentTimeMillis())
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(reminder: ReminderEntity): Long

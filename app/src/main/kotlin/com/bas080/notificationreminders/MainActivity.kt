@@ -433,6 +433,8 @@ class MainActivity : AppCompatActivity() {
         val density = resources.displayMetrics.density
         val localIp = com.bas080.notificationreminders.sync.ServerSyncManager.getLocalIpAddress() ?: "10.0.2.2"
         val defaultHint = "http://$localIp:7868"
+        val serverPrefs = getSharedPreferences("server_sync_prefs", Context.MODE_PRIVATE)
+        val savedEndpoint = serverPrefs.getString("key_last_server_endpoint", "") ?: ""
 
         val descriptionText = TextView(this).apply {
             text = "Optional. Defaults to local network ($defaultHint). Fill in only when deviating from default."
@@ -441,12 +443,42 @@ class MainActivity : AppCompatActivity() {
             setPadding(0, 0, 0, (8 * density).toInt())
         }
 
+        val urlRow = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+        }
+
         val urlInput = EditText(this).apply {
             hint = defaultHint
-            setText("")
+            setText(savedEndpoint)
             setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_primary))
             setHintTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_secondary))
+            layoutParams = android.widget.LinearLayout.LayoutParams(0, android.view.ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
         }
+
+        val btnClearUrl = android.widget.ImageButton(this).apply {
+            setImageResource(R.drawable.ic_action_clear_circle)
+            background = null
+            setColorFilter(ContextCompat.getColor(this@MainActivity, R.color.text_secondary))
+            visibility = if (savedEndpoint.isNotEmpty()) View.VISIBLE else View.GONE
+            setOnClickListener {
+                urlInput.setText("")
+                serverPrefs.edit().remove("key_last_server_endpoint").apply()
+            }
+        }
+
+        urlInput.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                val hasText = !s.isNullOrEmpty()
+                btnClearUrl.visibility = if (hasText) View.VISIBLE else View.GONE
+                if (!hasText) serverPrefs.edit().remove("key_last_server_endpoint").apply()
+            }
+            override fun afterTextChanged(s: android.text.Editable?) {}
+        })
+
+        urlRow.addView(urlInput)
+        urlRow.addView(btnClearUrl)
 
         val input = EditText(this).apply {
             hint = "4-digit Pairing PIN"
@@ -455,31 +487,64 @@ class MainActivity : AppCompatActivity() {
             setHintTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_secondary))
         }
 
+        val statusText = TextView(this).apply {
+            textSize = 12f
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.accent))
+            setPadding(0, (8 * density).toInt(), 0, 0)
+            visibility = View.GONE
+        }
+
         val container = android.widget.LinearLayout(this).apply {
             orientation = android.widget.LinearLayout.VERTICAL
             setPadding((24 * density).toInt(), (16 * density).toInt(), (24 * density).toInt(), 0)
             addView(descriptionText)
-            addView(urlInput)
+            addView(urlRow)
             addView(input)
+            addView(statusText)
         }
 
-        AlertDialog.Builder(this, R.style.Theme_Punt_Dialog)
+        val dialog = AlertDialog.Builder(this, R.style.Theme_Punt_Dialog)
             .setTitle("Server Sync")
             .setView(container)
-            .setPositiveButton("Connect") { _, _ ->
-                val pin = input.text.toString().trim()
-                val url = urlInput.text.toString().trim()
-                Toast.makeText(this, "Connecting to server...", Toast.LENGTH_SHORT).show()
-                com.bas080.notificationreminders.sync.ServerSyncManager.discoverAndConnect(this, url, pin) { success, connectedUrl ->
-                    if (success) {
-                        Toast.makeText(this, "Connected to $connectedUrl", Toast.LENGTH_SHORT).show()
-                    } else {
-                        Toast.makeText(this, "Connected to default $connectedUrl", Toast.LENGTH_SHORT).show()
+            .setPositiveButton("Connect", null)
+            .setNegativeButton(R.string.cancel, null)
+            .create()
+
+        dialog.show()
+
+        val positiveBtn = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+        positiveBtn.setOnClickListener {
+            val pin = input.text.toString().trim()
+            val url = urlInput.text.toString().trim()
+
+            positiveBtn.isEnabled = false
+            urlInput.isEnabled = false
+            input.isEnabled = false
+            statusText.visibility = View.VISIBLE
+            statusText.setTextColor(ContextCompat.getColor(this, R.color.accent))
+            statusText.text = "Connecting..."
+
+            com.bas080.notificationreminders.sync.ServerSyncManager.discoverAndConnect(
+                this,
+                url,
+                pin,
+                onStatus = { msg -> statusText.text = msg }
+            ) { success, connectedUrl ->
+                if (success) {
+                    if (url.isNotEmpty()) {
+                        serverPrefs.edit().putString("key_last_server_endpoint", url).apply()
                     }
+                    Toast.makeText(this, "Connected to $connectedUrl", Toast.LENGTH_SHORT).show()
+                    dialog.dismiss()
+                } else {
+                    positiveBtn.isEnabled = true
+                    urlInput.isEnabled = true
+                    input.isEnabled = true
+                    statusText.setTextColor(ContextCompat.getColor(this, R.color.accent_danger))
+                    statusText.text = "Failed to connect to $connectedUrl"
                 }
             }
-            .setNegativeButton(R.string.cancel, null)
-            .show()
+        }
     }
 
     private fun setupClearInputButton() {
@@ -1408,33 +1473,6 @@ class MainActivity : AppCompatActivity() {
         }
         com.bas080.notificationreminders.providers.RemindersContentProvider.notifyChange(this)
         com.bas080.notificationreminders.utils.TaskBackupManager.backupTasks(this)
-    }
-
-    private fun syncActiveRemindersToRoom() {
-        val context = applicationContext
-        val currentSet = activeReminders.toList()
-        val prefs = getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
-        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
-            try {
-                val db = com.bas080.notificationreminders.data.PuntDatabase.getInstance(context)
-                val entities = currentSet.map { raw ->
-                    val isDone = raw.contains("#done", ignoreCase = true)
-                    val clean = raw.replace(Regex("(?i)\\s*#done\\b"), "").trim()
-                    val cleanLower = clean.lowercase()
-                    val snoozeUntil = prefs.getLong("snooze_$cleanLower", 0L).takeIf { it > 0L }
-                    val recurrence = CreateReminderReceiver.parseRecurrenceDuration(clean)?.second
-                    com.bas080.notificationreminders.data.ReminderEntity(
-                        text = clean,
-                        isDone = isDone,
-                        snoozeUntil = snoozeUntil,
-                        recurrenceInterval = recurrence
-                    )
-                }
-                for (entity in entities) {
-                    db.reminderDao().insert(entity)
-                }
-            } catch (_: Exception) {}
-        }
     }
 
     private fun updateSummaryAndAdapter() {
