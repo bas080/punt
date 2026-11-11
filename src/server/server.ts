@@ -289,25 +289,26 @@ export class PuntServer {
     }
 
     // Serve static files from root
-    const knownStaticFiles = ['/style.css', '/main.js', '/manifest.json', '/sw.js', '/favicon.ico', '/icon.png'];
     if (pathname === '/' || pathname === '/index.html') {
       this.serveFile(path.join(webDist, 'index.html'), 'text/html', res);
       return;
     }
 
-    if (knownStaticFiles.includes(pathname)) {
-      const filePath = path.join(webDist, pathname);
-      if (fs.existsSync(filePath)) {
-        const ext = path.extname(filePath).toLowerCase();
-        const mimeTypes: Record<string, string> = {
-          '.css': 'text/css',
-          '.js': 'application/javascript',
-          '.json': 'application/json',
-          '.png': 'image/png'
-        };
-        this.serveFile(filePath, mimeTypes[ext] || 'application/octet-stream', res);
-        return;
-      }
+    // Serve any file existing in webDist
+    const safePath = path.normalize(pathname).replace(/^(\.\.[\/\\])+/, '');
+    const candidatePath = path.join(webDist, safePath);
+    if (fs.existsSync(candidatePath) && fs.statSync(candidatePath).isFile()) {
+      const ext = path.extname(candidatePath).toLowerCase();
+      const mimeTypes: Record<string, string> = {
+        '.html': 'text/html',
+        '.css': 'text/css',
+        '.js': 'application/javascript',
+        '.json': 'application/json',
+        '.png': 'image/png',
+        '.svg': 'image/svg+xml'
+      };
+      this.serveFile(candidatePath, mimeTypes[ext] || 'application/octet-stream', res);
+      return;
     }
 
     // Temporary redirect (302) any other visits back to root /
