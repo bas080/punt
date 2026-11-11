@@ -42,7 +42,7 @@ class ReminderDaoTest {
         val id = dao.insert(reminder)
         assertTrue(id > 0)
 
-        val retrieved = dao.getReminderById(id)
+        val retrieved = dao.getReminderByText("Test reminder #work")
         assertNotNull(retrieved)
         assertEquals("Test reminder #work", retrieved?.text)
         assertEquals(false, retrieved?.isDone)
@@ -52,17 +52,17 @@ class ReminderDaoTest {
     @Test
     fun testUpdateReminderDoneAndPunt() = runBlocking {
         val reminder = ReminderEntity(text = "Recurring #every 1d")
-        val id = dao.insert(reminder)
+        dao.insert(reminder)
 
         val now = System.currentTimeMillis()
         val puntTime = now + 86400000L
-        val updated = dao.getReminderById(id)!!.copy(
+        val updated = dao.getReminderByText("Recurring #every 1d")!!.copy(
             isDone = true,
             snoozeUntil = puntTime
         )
         dao.update(updated)
 
-        val retrieved = dao.getReminderById(id)
+        val retrieved = dao.getReminderByText("Recurring #every 1d")
         assertEquals(true, retrieved?.isDone)
         assertEquals(puntTime, retrieved?.snoozeUntil)
     }
@@ -70,11 +70,11 @@ class ReminderDaoTest {
     @Test
     fun testDeleteReminder() = runBlocking {
         val reminder = ReminderEntity(text = "To delete")
-        val id = dao.insert(reminder)
-        assertNotNull(dao.getReminderById(id))
+        dao.insert(reminder)
+        assertNotNull(dao.getReminderByText("To delete"))
 
-        dao.deleteById(id)
-        assertNull(dao.getReminderById(id))
+        dao.deleteByText("To delete")
+        assertNull(dao.getReminderByText("To delete"))
     }
 
     @Test
