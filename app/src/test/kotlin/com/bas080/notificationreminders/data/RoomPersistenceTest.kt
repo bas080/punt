@@ -77,4 +77,50 @@ class RoomPersistenceTest {
         assertEquals(1, punted.size)
         assertEquals("Punted task", punted[0].text)
     }
+
+    @Test
+    fun testLegacyStorageMigration() = runBlocking {
+        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
+        prefs.edit().clear().apply()
+
+        // Populate legacy preferences
+        val legacyTime = System.currentTimeMillis() - 50000L
+        prefs.edit()
+            .putLong("Buy milk", legacyTime)
+            .putLong("Call mom #done", legacyTime + 1000L)
+            .putLong("Weekly review #every 1w", legacyTime + 2000L)
+            .putLong("snooze_Weekly review #every 1w", System.currentTimeMillis() + 604800000L)
+            .putLong("key_ignored_metric", 123L)
+            .putString("key_active_focus_profile", "Work")
+            .apply()
+
+        LegacyStorageMigration.migrateIfNeeded(context, PuntDatabase.getInstance(context))
+
+        assertTrue(prefs.getBoolean(LegacyStorageMigration.KEY_LEGACY_MIGRATION_DONE, false))
+
+        val all = dao.getAllReminders()
+        assertTrue(all.any { it.text == "Buy milk" && !it.isDone })
+        assertTrue(all.any { it.text == "Call mom" && it.isDone })
+        val recurring = all.find { it.text == "Weekly review #every 1w" }
+        assertNotNull(recurring)
+        assertEquals("1 week", recurring?.recurrenceInterval)
+        assertNotNull(recurring?.snoozeUntil)
+
+        // Subsequent call does not duplicate
+        LegacyStorageMigration.migrateIfNeeded(context, PuntDatabase.getInstance(context))
+        assertEquals(all.size, dao.getAllReminders().size)
+    }
+
+    @Test
+    fun testRoomDaoUpdateText() = runBlocking {
+        dao.insert(ReminderEntity(text = "Initial Text", isDone = false))
+        val before = dao.getReminderByText("Initial Text")
+        assertNotNull(before)
+
+        dao.updateText("Initial Text", "Updated Text")
+        assertNull(dao.getReminderByText("Initial Text"))
+        val after = dao.getReminderByText("Updated Text")
+        assertNotNull(after)
+        assertEquals("Updated Text", after?.text)
+    }
 }
