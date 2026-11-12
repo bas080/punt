@@ -4,7 +4,11 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import androidx.core.app.RemoteInput
+import com.bas080.notificationreminders.data.PuntDatabase
 import com.bas080.notificationreminders.services.ReminderNotificationListenerService
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -23,7 +27,11 @@ class CreateReminderReceiverTest {
 
     @org.junit.Before
     fun setUp() {
+        val context = RuntimeEnvironment.getApplication()
+        runBlocking { PuntDatabase.getInstance(context).reminderDao().deleteAll() }
+        context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE).edit().clear().commit()
         ReminderNotificationListenerService.lastTriggeredMap.clear()
+        ReminderNotificationListenerService.activePostedReminders.clear()
     }
 
     @Test
@@ -66,6 +74,18 @@ class CreateReminderReceiverTest {
 
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
         val shadowNM = org.robolectric.Shadows.shadowOf(notificationManager)
+        runBlocking {
+            withTimeout(5000L) {
+                var reminderPosted = false
+                while (!reminderPosted) {
+                    org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+                    val notification = shadowNM.getNotification(ReminderNotificationListenerService.NOTIFICATION_ID)
+                    val lines = notification?.extras?.getCharSequenceArray(android.app.Notification.EXTRA_TEXT_LINES)
+                    reminderPosted = lines?.any { it.toString() == "Buy apples" } == true
+                    if (!reminderPosted) delay(10)
+                }
+            }
+        }
         val statusNotif = shadowNM.getNotification(ReminderNotificationListenerService.NOTIFICATION_ID)
         org.junit.Assert.assertNotNull("Creating a reminder should directly update status notification", statusNotif)
         val textLines = statusNotif.extras.getCharSequenceArray(android.app.Notification.EXTRA_TEXT_LINES)

@@ -40,6 +40,25 @@ private fun scanForServer(ip: String?, fallback: String): ServerSearchResult {
     return ServerSearchResult(null, failure)
 }
 
+private fun connectToCustomEndpoint(
+    context: Context,
+    endpoint: String,
+    pin: String?,
+    onResult: ((Boolean, String, String?) -> Unit)?
+) {
+    CoroutineScope(Dispatchers.IO).launch {
+        val result = ServerSyncManager.pingUrl(endpoint).fold(
+            onSuccess = { pairWithServer(endpoint, pin) },
+            onFailure = { Result.failure(it) }
+        )
+        if (result.isSuccess) ServerSyncManager.connect(context, endpoint, result.getOrNull())
+        onResult?.let { callback ->
+            kotlinx.coroutines.withContext(Dispatchers.Main) {
+                callback(result.isSuccess, endpoint, result.exceptionOrNull()?.describe())
+            }
+        }
+    }
+}
 
 internal fun pairWithServer(url: String, pin: String?): Result<String> {
     if (pin.isNullOrBlank()) return Result.failure(IllegalArgumentException("Pairing PIN is required"))
@@ -113,16 +132,7 @@ object ServerSyncManager {
             val port = runCatching { java.net.URI(url).port }.getOrDefault(-1)
             val target = if (port == -1) "$url:$DEFAULT_PORT" else url
             onStatus?.invoke("Connecting to $target...")
-            CoroutineScope(Dispatchers.IO).launch {
-                val result = pingUrl(target).fold(
-                    onSuccess = { pairWithServer(target, pin) },
-                    onFailure = { Result.failure(it) }
-                )
-                kotlinx.coroutines.withContext(Dispatchers.Main) {
-                    if (result.isSuccess) connect(context, target, result.getOrNull())
-                    onResult?.invoke(result.isSuccess, target, result.exceptionOrNull()?.describe())
-                }
-            }
+            connectToCustomEndpoint(context, target, pin, onResult)
             return
         }
 
@@ -132,13 +142,19 @@ object ServerSyncManager {
         CoroutineScope(Dispatchers.IO).launch {
             val search = scanForServer(ip, fallback)
             val pairing = search.url?.let { pairWithServer(it, pin) }
-            kotlinx.coroutines.withContext(Dispatchers.Main) {
-                if (search.url == null) {
-                    onResult?.invoke(false, fallback, search.failure ?: "No server responded")
-                } else {
-                    val result = pairing ?: Result.failure(IllegalStateException("Pairing did not run"))
-                    if (result.isSuccess) connect(context, search.url, result.getOrNull())
-                    onResult?.invoke(result.isSuccess, search.url, result.exceptionOrNull()?.describe())
+            if (search.url == null) {
+                onResult?.let { callback ->
+                    kotlinx.coroutines.withContext(Dispatchers.Main) {
+                        callback(false, fallback, search.failure ?: "No server responded")
+                    }
+                }
+            } else {
+                val result = pairing ?: Result.failure(IllegalStateException("Pairing did not run"))
+                if (result.isSuccess) connect(context, search.url, result.getOrNull())
+                onResult?.let { callback ->
+                    kotlinx.coroutines.withContext(Dispatchers.Main) {
+                        callback(result.isSuccess, search.url, result.exceptionOrNull()?.describe())
+                    }
                 }
             }
         }
