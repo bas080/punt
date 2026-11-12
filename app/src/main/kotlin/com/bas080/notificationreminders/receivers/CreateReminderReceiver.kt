@@ -677,6 +677,7 @@ class CreateReminderReceiver : BroadcastReceiver() {
                             } finally {
                                 pendingResult.finish()
                             }
+                        }
                     } else {
                         Toast.makeText(context, R.string.toast_reminder_create_failed_empty, Toast.LENGTH_SHORT).show()
                     }
