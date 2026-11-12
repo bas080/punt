@@ -292,7 +292,6 @@ class ReminderNotificationListenerService : NotificationListenerService() {
         }
     }
 
-    private fun checkAndTriggerReminderMatchLegacy(fullContent: String, sbnKey: String) {
     fun postMatchNotification(matchedReminder: String, @Suppress("UNUSED_PARAMETER") isHighPriority: Boolean = true) {
         try {
             com.bas080.notificationreminders.utils.AppLogger.log(this, "NotificationListener", "Updating persistent status notification for reminder")
