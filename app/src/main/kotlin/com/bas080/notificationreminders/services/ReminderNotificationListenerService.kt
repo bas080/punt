@@ -276,7 +276,7 @@ class ReminderNotificationListenerService : NotificationListenerService() {
                 lastTriggeredMap.remove("snooze_$lower")
             }
 
-            val isWordMatch = ReminderMatcher.matches(reminder, fullContent, commonWordsSet)
+            val isWordMatch = ReminderMatcher.matches(reminder.text, fullContent, commonWordsSet)
 
             if (isWordMatch) {
                 if (now - lastTime >= COOL_DOWN_MS) {
