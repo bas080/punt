@@ -100,7 +100,7 @@ internal fun pairWithServer(url: String, pin: String?): Result<String> {
 object ServerSyncManager {
 
     private const val DEFAULT_PUNT_MS = 3600000L
-    private const val PING_TIMEOUT_MS = 300
+    private const val PING_TIMEOUT_MS = 3000
     const val DEFAULT_PORT = 7868
 
     private var socket: Socket? = null
