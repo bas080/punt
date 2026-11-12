@@ -111,7 +111,7 @@ export class PuntServer {
 
   public start(): Promise<number> {
     return new Promise((resolve, reject) => {
-      const port = this.options.port || parseInt(process.env.PUNT_PORT || '7868', 10);
+      const port = this.options.port ?? parseInt(process.env.PUNT_PORT || '7868', 10);
       const host = this.options.host || '0.0.0.0';
       const webDist = this.options.webDistDir || path.resolve(__dirname, '../web');
 
