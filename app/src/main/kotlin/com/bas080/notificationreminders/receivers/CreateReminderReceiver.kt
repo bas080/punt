@@ -1,7 +1,9 @@
 @file:Suppress("ComplexCondition", "CyclomaticComplexMethod", "EmptyFunctionBlock", "LargeClass", "LongMethod", "LoopWithTooManyJumpStatements", "MagicNumber", "MaxLineLength", "NestedBlockDepth", "ReturnCount", "TooManyFunctions", "UnusedPrivateMember", "UseRequire")
 package com.bas080.notificationreminders.receivers
 
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import android.app.NotificationManager
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -648,26 +650,33 @@ class CreateReminderReceiver : BroadcastReceiver() {
                         val savedSet = prefs.getStringSet(KEY_REMINDERS, emptySet())?.toMutableSet() ?: mutableSetOf()
                         savedSet.add(reminderText)
                         prefs.edit().putStringSet(KEY_REMINDERS, savedSet).apply()
+                        Toast.makeText(context, R.string.toast_reminder_created, Toast.LENGTH_SHORT).show()
 
                         val cleanText = reminderText.replace(Regex("(?i)\\s*#done\\b"), "").trim()
                         val recurrence = parseRecurrenceDuration(cleanText)?.second
 
-                        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
-                            val db = com.bas080.notificationreminders.data.PuntDatabase.getInstance(context)
-                            db.reminderDao().insert(
-                                com.bas080.notificationreminders.data.ReminderEntity(
-                                    text = cleanText,
-                                    recurrenceInterval = recurrence
-                                )
-                            )
-                        }
-
-                        ReminderNotificationListenerService.instance?.postMatchNotification(reminderText)
-                        ReminderNotificationListenerService.instance?.showStatusNotification()
-                            ?: ReminderNotificationListenerService.startService(context)
-                        com.bas080.notificationreminders.providers.RemindersContentProvider.notifyChange(context)
-                        com.bas080.notificationreminders.utils.TaskBackupManager.backupTasks(context)
-                        Toast.makeText(context, R.string.toast_reminder_created, Toast.LENGTH_SHORT).show()
+                        val pendingResult = goAsync()
+                        kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+                            try {
+                                val db = com.bas080.notificationreminders.data.PuntDatabase.getInstance(context)
+                                if (db.reminderDao().getReminderByText(cleanText) == null) {
+                                    db.reminderDao().insert(
+                                        com.bas080.notificationreminders.data.ReminderEntity(
+                                            text = cleanText,
+                                            recurrenceInterval = recurrence
+                                        )
+                                    )
+                                }
+                                com.bas080.notificationreminders.utils.TaskBackupManager.backupTasks(context)
+                                withContext(Dispatchers.Main) {
+                                    ReminderNotificationListenerService.instance?.postMatchNotification(reminderText)
+                                    ReminderNotificationListenerService.instance?.showStatusNotification()
+                                        ?: ReminderNotificationListenerService.startService(context)
+                                    com.bas080.notificationreminders.providers.RemindersContentProvider.notifyChange(context)
+                                }
+                            } finally {
+                                pendingResult.finish()
+                            }
                     } else {
                         Toast.makeText(context, R.string.toast_reminder_create_failed_empty, Toast.LENGTH_SHORT).show()
                     }
