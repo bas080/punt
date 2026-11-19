@@ -261,7 +261,35 @@ object ServerSyncManager {
                 }
             }
             "done" -> if (entity != null) {
-                dao.update(entity.copy(isDone = true, updatedAt = System.currentTimeMillis()))
+                val recurrence = CreateReminderReceiver.parseRecurrenceDuration(entity.text)
+                if (recurrence != null) {
+                    val snoozeUntil = System.currentTimeMillis() + recurrence.first
+                    dao.update(entity.copy(snoozeUntil = snoozeUntil, updatedAt = System.currentTimeMillis()))
+                } else {
+                    dao.update(entity.copy(isDone = true, updatedAt = System.currentTimeMillis()))
+                }
+            }
+            "undone" -> if (entity != null) {
+                val cleanText = entity.text.replace(Regex("(?i)\\\\s*#done\\\\b"), "").trim()
+                dao.update(entity.copy(text = cleanText, isDone = false, updatedAt = System.currentTimeMillis()))
+            }
+            "edit" -> if (entity != null) {
+                val newText = payload?.optString("text")?.trim().orEmpty()
+                if (newText.isNotBlank()) {
+                    val recurrence = CreateReminderReceiver.parseRecurrenceDuration(newText)?.second
+                    val isDone = newText.contains("#done", ignoreCase = true) || entity.isDone
+                    dao.update(
+                        entity.copy(
+                            text = newText,
+                            isDone = isDone,
+                            recurrenceInterval = recurrence,
+                            updatedAt = System.currentTimeMillis()
+                        )
+                    )
+                }
+            }
+            "unpunt" -> if (entity != null) {
+                dao.update(entity.copy(snoozeUntil = null, updatedAt = System.currentTimeMillis()))
             }
             "punt" -> if (entity != null) {
                 val duration = payload?.optString("duration") ?: "1h"
