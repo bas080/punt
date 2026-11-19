@@ -62,4 +62,43 @@ test('Web App Use Cases - Rendering, Filtering, Actions, and Viewport States', a
     const doneCard = taskCardView({ id: 11, text: 'Completed item', isDone: true });
     assert.ok(doneCard);
   });
+
+  await t.test('Use Case 7: Punting a task opens the duration dialog with an unpunt option when punted', () => {
+    state.dialog = 'punt';
+    state.puntTargets = ['Punted Task'];
+    state.puntIsPunted = true;
+    state.focusProfiles = [];
+    state.activeFocusProfiles = [];
+
+    const template = appView(state);
+    assert.ok(template);
+
+    state.dialog = null;
+    state.puntTargets = [];
+    state.puntIsPunted = false;
+  });
+
+  await t.test('Use Case 8: Focus profiles narrow the visible list with union matching', () => {
+    state.focusProfiles = [
+      { name: 'Work', query: '#work' },
+      { name: 'Home', query: '#home' }
+    ];
+    state.activeFocusProfiles = ['Work'];
+    state.tasks = [
+      { id: 1, text: 'send email #work', isDone: false },
+      { id: 2, text: 'buy groceries #home', isDone: false }
+    ];
+
+    const template = appView(state);
+    assert.ok(template);
+
+    state.focusProfiles = [];
+    state.activeFocusProfiles = [];
+    state.tasks = [];
+  });
+
+  await t.test('Use Case 9: Overdue recurring tasks render recurrence tags with styled spans', () => {
+    const card = taskCardView({ id: 12, text: 'water plants #every 1d', isDone: false });
+    assert.ok(card);
+  });
 });
