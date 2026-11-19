@@ -24,6 +24,14 @@ import org.robolectric.shadows.ShadowToast
 @Config(sdk = [34])
 class SnoozeDialogActivityTest {
 
+    @org.junit.Before
+    fun setUp() {
+        val context = RuntimeEnvironment.getApplication()
+        kotlinx.coroutines.runBlocking {
+            com.bas080.notificationreminders.data.PuntDatabase.getInstance(context).reminderDao().deleteAll()
+        }
+    }
+
     @Test
     fun testLastConfiguredDurationPlacedAtTop() {
         val context = RuntimeEnvironment.getApplication()
@@ -74,9 +82,9 @@ class SnoozeDialogActivityTest {
         assertTrue("Activity should be finishing after snooze choice", activity.isFinishing)
         assertTrue("Toast should indicate reminder punted", ShadowToast.getTextOfLatestToast().startsWith("Reminder punted for"))
 
-        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
-        val snoozeTime = prefs.getLong("snooze_buy milk", 0L)
-        assertTrue("Snooze timestamp should be saved in preferences", snoozeTime > System.currentTimeMillis())
+        val dao = com.bas080.notificationreminders.data.PuntDatabase.getInstance(context).reminderDao()
+        val snoozeTime = kotlinx.coroutines.runBlocking { dao.getReminderByText("Buy milk")?.snoozeUntil ?: 0L }
+        assertTrue("Snooze timestamp should be saved in Room", snoozeTime > System.currentTimeMillis())
     }
 
     @Test
@@ -106,12 +114,11 @@ class SnoozeDialogActivityTest {
 
         assertTrue("Activity should finish after snoozing all reminders", activity.isFinishing)
 
-        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
+        val dao = com.bas080.notificationreminders.data.PuntDatabase.getInstance(context).reminderDao()
         val now = System.currentTimeMillis()
 
         for (target in targets) {
-            val key = "snooze_" + target.trim().lowercase()
-            val snoozeTime = prefs.getLong(key, 0L)
+            val snoozeTime = kotlinx.coroutines.runBlocking { dao.getReminderByText(target.trim())?.snoozeUntil ?: 0L }
             assertTrue("Snooze time for '$target' should be in future", snoozeTime > now)
         }
     }
@@ -156,9 +163,9 @@ class SnoozeDialogActivityTest {
         assertTrue("Activity should finish after custom snooze entry", activity.isFinishing)
         assertEquals("Reminder punted for 30 minutes", ShadowToast.getTextOfLatestToast())
 
-        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
-        val snoozeTime = prefs.getLong("snooze_buy bread", 0L)
-        assertTrue("Snooze timestamp should be saved in preferences", snoozeTime > System.currentTimeMillis())
+        val dao = com.bas080.notificationreminders.data.PuntDatabase.getInstance(context).reminderDao()
+        val snoozeTime = kotlinx.coroutines.runBlocking { dao.getReminderByText("Buy bread")?.snoozeUntil ?: 0L }
+        assertTrue("Snooze timestamp should be saved in Room", snoozeTime > System.currentTimeMillis())
     }
 
     @Test

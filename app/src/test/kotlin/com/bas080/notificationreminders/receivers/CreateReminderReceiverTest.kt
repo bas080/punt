@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.core.app.RemoteInput
 import com.bas080.notificationreminders.data.PuntDatabase
+import com.bas080.notificationreminders.data.ReminderEntity
 import com.bas080.notificationreminders.services.ReminderNotificationListenerService
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
@@ -12,6 +13,7 @@ import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -116,12 +118,11 @@ class CreateReminderReceiverTest {
     @Test
     fun testDoneReminderShowsSuccessToastAndPreservesSnooze() {
         val context = RuntimeEnvironment.getApplication()
-        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
+        val dao = PuntDatabase.getInstance(context).reminderDao()
         val futureSnooze = System.currentTimeMillis() + 60000L
-        prefs.edit()
-            .putStringSet("key_reminders_list", setOf("Buy milk"))
-            .putLong("snooze_buy milk", futureSnooze)
-            .commit()
+        runBlocking {
+            dao.insert(ReminderEntity(text = "Buy milk", snoozeUntil = futureSnooze))
+        }
 
         val receiver = CreateReminderReceiver()
 
@@ -132,11 +133,11 @@ class CreateReminderReceiverTest {
         receiver.onReceive(context, intent)
 
         assertEquals("Reminder marked done", ShadowToast.getTextOfLatestToast())
-        val snoozeTimestamp = prefs.getLong("snooze_buy milk", 0L)
-        assertEquals(futureSnooze, snoozeTimestamp)
 
-        val savedSet = prefs.getStringSet("key_reminders_list", emptySet()) ?: emptySet()
-        org.junit.Assert.assertTrue("Saved set should contain 'Buy milk #done'", savedSet.contains("Buy milk #done"))
+        val storedTask = runBlocking { dao.getReminderByText("Buy milk") }
+        assertNotNull("Task should still exist in Room", storedTask)
+        assertEquals(futureSnooze, storedTask!!.snoozeUntil)
+        assertTrue("Task should be marked done", storedTask.isDone)
     }
 
     @Test
@@ -151,7 +152,8 @@ class CreateReminderReceiverTest {
         receiver.onReceive(context, intent)
 
         assertEquals("Reminder punted for 1 hour", ShadowToast.getTextOfLatestToast())
-        val snoozeUntil = ReminderNotificationListenerService.lastTriggeredMap["snooze_buy milk"] ?: 0L
+        val dao = PuntDatabase.getInstance(context).reminderDao()
+        val snoozeUntil = runBlocking { dao.getReminderByText("Buy milk")?.snoozeUntil ?: 0L }
         org.junit.Assert.assertTrue("Snooze timestamp should be in the future", snoozeUntil > System.currentTimeMillis())
     }
 
@@ -260,8 +262,8 @@ class CreateReminderReceiverTest {
         receiver.onReceive(context, intent)
 
         assertEquals("Failed to punt: Invalid duration entered", ShadowToast.getTextOfLatestToast())
-        val snoozeUntil = ReminderNotificationListenerService.lastTriggeredMap["snooze_buy milk"] ?: 0L
-        assertEquals(0L, snoozeUntil)
+        val dao = PuntDatabase.getInstance(context).reminderDao()
+        assertNull("No reminder should be stored for invalid duration", runBlocking { dao.getReminderByText("Buy milk") })
     }
 
     @Test
@@ -533,8 +535,8 @@ class CreateReminderReceiverTest {
     @Test
     fun testActionDoneReminderRecurring() {
         val context = RuntimeEnvironment.getApplication()
-        val prefs = context.getSharedPreferences("reminders_prefs", android.content.Context.MODE_PRIVATE)
-        prefs.edit().putStringSet("key_reminders_list", setOf("Water plants #every 1d")).apply()
+        val dao = PuntDatabase.getInstance(context).reminderDao()
+        runBlocking { dao.insert(ReminderEntity(text = "Water plants #every 1d")) }
 
         val receiver = CreateReminderReceiver()
         val intent = Intent(ReminderNotificationListenerService.ACTION_DONE_REMINDER).apply {
@@ -543,11 +545,11 @@ class CreateReminderReceiverTest {
 
         receiver.onReceive(context, intent)
 
-        val savedSet = prefs.getStringSet("key_reminders_list", emptySet()) ?: emptySet()
-        assertTrue(savedSet.contains("Water plants #every 1d"))
-        assertFalse(savedSet.contains("Water plants #every 1d #done"))
+        val storedTask = runBlocking { dao.getReminderByText("Water plants #every 1d") }
+        assertTrue("Recurring task should exist in Room", storedTask != null)
+        assertFalse("Recurring task should not be done", storedTask!!.isDone)
 
-        val snoozeTime = prefs.getLong("snooze_water plants #every 1d", 0L)
+        val snoozeTime = storedTask.snoozeUntil ?: 0L
         assertTrue("Snooze timestamp should be set in future", snoozeTime > System.currentTimeMillis())
     }
 }

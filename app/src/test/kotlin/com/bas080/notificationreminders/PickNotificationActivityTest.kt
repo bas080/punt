@@ -23,6 +23,14 @@ import org.robolectric.shadows.ShadowAlertDialog
 @Config(sdk = [34])
 class PickNotificationActivityTest {
 
+    @org.junit.Before
+    fun setUp() {
+        val context = RuntimeEnvironment.getApplication()
+        kotlinx.coroutines.runBlocking {
+            com.bas080.notificationreminders.data.PuntDatabase.getInstance(context).reminderDao().deleteAll()
+        }
+    }
+
     @After
     fun tearDown() {
         PickNotificationActivity.mockActiveNotifications = null
@@ -50,7 +58,7 @@ class PickNotificationActivityTest {
     }
 
     @Test
-    fun testSelectionSavesReminderToPrefs() {
+    fun testSelectionSavesReminder() {
         val context = org.robolectric.RuntimeEnvironment.getApplication()
         Robolectric.buildService(ReminderNotificationListenerService::class.java).create().get()
 
@@ -93,9 +101,9 @@ class PickNotificationActivityTest {
         // Perform click on first item
         shadowOf(listView).performItemClick(0)
 
-        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
-        val savedReminders = prefs.getStringSet("key_reminders_list", emptySet()) ?: emptySet()
-        assertTrue("Saved reminders should contain selected notification text", savedReminders.contains("Email: Meeting at 3pm"))
+        val dao = com.bas080.notificationreminders.data.PuntDatabase.getInstance(context).reminderDao()
+        val stored = kotlinx.coroutines.runBlocking { dao.getReminderByText("Email: Meeting at 3pm") }
+        assertTrue("Reminder should be stored in Room", stored != null)
 
         assertEquals("Reminder created", org.robolectric.shadows.ShadowToast.getTextOfLatestToast())
         assertTrue(activity.isFinishing)

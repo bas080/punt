@@ -1,7 +1,6 @@
 package com.bas080.notificationreminders.utils
 
 import android.content.Context
-import android.content.SharedPreferences
 import android.os.Environment
 import com.bas080.notificationreminders.data.PuntDatabase
 import com.bas080.notificationreminders.data.ReminderEntity
@@ -10,8 +9,6 @@ import java.io.File
 
 object TaskBackupManager {
 
-    private const val PREFS_REMINDERS = "reminders_prefs"
-    private const val KEY_REMINDERS = "key_reminders"
     const val BACKUP_FILE_NAME = "punt_tasks_backup.md"
 
     fun getDownloadsBackupFile(): File? {
@@ -39,20 +36,12 @@ object TaskBackupManager {
         try {
             val db = PuntDatabase.getInstance(context)
             val roomReminders = runBlocking { db.reminderDao().getAllReminders() }
-            val prefs = context.getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
-            val reminderSet = prefs.getStringSet(KEY_REMINDERS, null) ?: emptySet()
-            val list = roomReminders.takeIf { it.isNotEmpty() }?.map {
+            val list = roomReminders.map {
                 if (it.isDone) "${it.text} #done" else it.text
-            } ?: reminderSet.toList()
-            val snoozeMap = if (roomReminders.isNotEmpty()) {
-                roomReminders.mapNotNull { reminder ->
-                    reminder.snoozeUntil?.let { reminder.text.trim().lowercase() to it }
-                }.toMap()
-            } else {
-                prefs.all.mapNotNull { (key, value) ->
-                    if (key.startsWith("snooze_") && value is Long) key.removePrefix("snooze_") to value else null
-                }.toMap()
             }
+            val snoozeMap = roomReminders.mapNotNull { reminder ->
+                reminder.snoozeUntil?.let { reminder.text.trim().lowercase() to it }
+            }.toMap()
 
             if (list.isNotEmpty()) {
                 val markdown = buildBackupMarkdown(snoozeMap, list)
@@ -91,24 +80,22 @@ object TaskBackupManager {
         return try {
             val db = PuntDatabase.getInstance(context)
             val roomCount = runBlocking { db.reminderDao().getAllReminders().size }
-            val prefs = context.getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
-            val existingSet = prefs.getStringSet(KEY_REMINDERS, null)
-            if (roomCount > 0 || !existingSet.isNullOrEmpty()) {
+            if (roomCount > 0) {
                 false
             } else {
-                importBackupIfAvailable(context, prefs)
+                importBackupIfAvailable(context)
             }
         } catch (_: Exception) {
             false
         }
     }
 
-    private fun importBackupIfAvailable(context: Context, prefs: SharedPreferences): Boolean {
+    private fun importBackupIfAvailable(context: Context): Boolean {
         val backupContent = readBackupFromCandidates(context) ?: return false
         val imported = MarkdownRemindersUtil.importFromMarkdown(backupContent)
         val hasItems = imported.isNotEmpty()
         if (hasItems) {
-            applyImportedReminders(context, prefs, imported)
+            applyImportedReminders(context, imported)
         }
         return hasItems
     }
@@ -135,21 +122,13 @@ object TaskBackupManager {
 
     private fun applyImportedReminders(
         context: Context,
-        prefs: SharedPreferences,
         imported: List<ImportedReminder>
     ) {
-        val editor = prefs.edit()
-        val newSet = mutableSetOf<String>()
         val entities = mutableListOf<ReminderEntity>()
         for (item in imported) {
-            newSet.add(item.text)
             val isDone = item.isDone || item.text.contains(Regex("(?i)(?<=^|\\s)#done(?=\\s|$)"))
             val cleanText = item.text.replace(Regex("(?i)\\s*#done\\b"), "").trim()
             val snoozeMillis = item.snoozeUntilMillis
-            if (snoozeMillis != null && snoozeMillis > 0L) {
-                val cleanKey = cleanText.lowercase()
-                editor.putLong("snooze_$cleanKey", snoozeMillis)
-            }
             entities.add(
                 ReminderEntity(
                     text = cleanText,
@@ -158,8 +137,6 @@ object TaskBackupManager {
                 )
             )
         }
-        editor.putStringSet(KEY_REMINDERS, newSet)
-        editor.apply()
 
         val db = PuntDatabase.getInstance(context)
         runBlocking {

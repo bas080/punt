@@ -256,20 +256,6 @@ object ServerSyncManager {
             try {
                 val dao = PuntDatabase.getInstance(context).reminderDao()
                 SyncActions.apply(dao, action, payload)
-                val reminders = dao.getAllReminders()
-                val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
-                val editor = prefs.edit()
-                val reminderSet = mutableSetOf<String>()
-                for (reminder in reminders) {
-                    reminderSet.add(if (reminder.isDone) "${reminder.text} #done" else reminder.text)
-                    val key = reminder.text.lowercase()
-                    if (reminder.snoozeUntil != null && reminder.snoozeUntil > 0L) {
-                        editor.putLong("snooze_$key", reminder.snoozeUntil)
-                    } else {
-                        editor.remove("snooze_$key")
-                    }
-                }
-                editor.putStringSet("key_reminders_list", reminderSet).apply()
                 com.bas080.notificationreminders.providers.RemindersContentProvider.notifyChange(context)
                 TaskBackupManager.backupTasks(context)
                 val response = JSONObject().apply {

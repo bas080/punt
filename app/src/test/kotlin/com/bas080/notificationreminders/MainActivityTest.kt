@@ -32,7 +32,37 @@ class MainActivityTest {
 
     @org.junit.Before
     fun setUp() {
+        val context = RuntimeEnvironment.getApplication()
+        val dao = com.bas080.notificationreminders.data.PuntDatabase.getInstance(context).reminderDao()
+        kotlinx.coroutines.runBlocking { dao.deleteAll() }
+        java.io.File(context.filesDir, com.bas080.notificationreminders.utils.TaskBackupManager.BACKUP_FILE_NAME).delete()
         com.bas080.notificationreminders.services.ReminderNotificationListenerService.lastTriggeredMap.clear()
+    }
+
+    private fun seedTasks(context: Context, vararg tasks: Pair<String, Long?>) {
+        val dao = com.bas080.notificationreminders.data.PuntDatabase.getInstance(context).reminderDao()
+        kotlinx.coroutines.runBlocking {
+            var order = 0L
+            for ((raw, snoozeUntil) in tasks) {
+                val isDone = raw.contains(Regex("(?i)(?<=^|\\s)#done(?=\\s|$)"))
+                val clean = raw.replace(Regex("(?i)\\s*#done\\b"), "").trim()
+                dao.insert(
+                    com.bas080.notificationreminders.data.ReminderEntity(
+                        text = clean,
+                        createdAt = System.currentTimeMillis() + order,
+                        updatedAt = System.currentTimeMillis() + order,
+                        snoozeUntil = snoozeUntil,
+                        isDone = isDone
+                    )
+                )
+                order += 1
+            }
+        }
+    }
+
+    private fun storedTask(context: Context, text: String): com.bas080.notificationreminders.data.ReminderEntity? {
+        val dao = com.bas080.notificationreminders.data.PuntDatabase.getInstance(context).reminderDao()
+        return kotlinx.coroutines.runBlocking { dao.getReminderByText(text) }
     }
 
     @Test
@@ -94,8 +124,7 @@ class MainActivityTest {
     @Test
     fun testPullDownToRefreshClearsRecentlyDoneAndReloadsList() {
         val context = RuntimeEnvironment.getApplication()
-        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
-        prefs.edit().clear().putStringSet("key_reminders_list", setOf("Buy milk", "Clean garage")).commit()
+        seedTasks(context, "Buy milk" to null, "Clean garage" to null)
 
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
@@ -295,8 +324,7 @@ class MainActivityTest {
     @Test
     fun testExportMarkdownOnlyExportsFilteredReminders() {
         val context = RuntimeEnvironment.getApplication()
-        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
-        prefs.edit().clear().putStringSet("key_reminders_list", setOf("Buy milk #punt", "Clean garage #home", "Fix bike #punt")).commit()
+        seedTasks(context, "Buy milk #punt" to null, "Clean garage #home" to null, "Fix bike #punt" to null)
 
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
@@ -338,8 +366,7 @@ class MainActivityTest {
     @Test
     fun testExportMarkdownWhenFilteredListIsEmptyShowsToast() {
         val context = RuntimeEnvironment.getApplication()
-        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
-        prefs.edit().clear().putStringSet("key_reminders_list", setOf("Buy milk #punt")).commit()
+        seedTasks(context, "Buy milk #punt" to null)
 
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
@@ -365,8 +392,7 @@ class MainActivityTest {
     @Test
     fun testBulkActionsMenuPuntAllAndShareAll() {
         val context = RuntimeEnvironment.getApplication()
-        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
-        prefs.edit().clear().putStringSet("key_reminders_list", setOf("Task 1", "Task 2")).commit()
+        seedTasks(context, "Task 1" to null, "Task 2" to null)
 
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
@@ -388,8 +414,8 @@ class MainActivityTest {
         firstOptionTv.performClick()
         shadowOf(android.os.Looper.getMainLooper()).idle()
 
-        val snoozeTime1 = prefs.getLong("snooze_task 1", 0L)
-        val snoozeTime2 = prefs.getLong("snooze_task 2", 0L)
+        val snoozeTime1 = storedTask(context, "Task 1")?.snoozeUntil ?: 0L
+        val snoozeTime2 = storedTask(context, "Task 2")?.snoozeUntil ?: 0L
         assertTrue("Task 1 should be snoozed", snoozeTime1 > System.currentTimeMillis())
         assertTrue("Task 2 should be snoozed", snoozeTime2 > System.currentTimeMillis())
     }
@@ -397,12 +423,8 @@ class MainActivityTest {
     @Test
     fun testExportOptionsDialogTextOnlyExcludesPuntInfo() {
         val context = RuntimeEnvironment.getApplication()
-        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
         val snoozeUntil = System.currentTimeMillis() + 86400000L
-        prefs.edit().clear()
-            .putStringSet("key_reminders_list", setOf("Punted task"))
-            .putLong("snooze_punted task", snoozeUntil)
-            .commit()
+        seedTasks(context, "Punted task" to snoozeUntil)
 
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
@@ -454,10 +476,8 @@ class MainActivityTest {
     }
 
     @Test
-    fun testImportMarkdownDialogParsesPuntStateAndSetsSnoozeInPrefs() {
+    fun testImportMarkdownDialogParsesPuntStateAndSetsSnooze() {
         val context = RuntimeEnvironment.getApplication()
-        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
-        prefs.edit().clear().commit()
 
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
@@ -476,8 +496,8 @@ class MainActivityTest {
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
         shadowOf(android.os.Looper.getMainLooper()).idle()
 
-        val savedSnooze = prefs.getLong("snooze_water plants", 0L)
-        assertTrue("Imported punt timestamp should be saved in prefs", savedSnooze > System.currentTimeMillis())
+        val savedSnooze = storedTask(context, "Water plants")?.snoozeUntil ?: 0L
+        assertTrue("Imported punt timestamp should be saved in Room", savedSnooze > System.currentTimeMillis())
     }
 
     @Test
@@ -505,12 +525,8 @@ class MainActivityTest {
     @Test
     fun testSnoozedReminderDisplaysStatusLabelAndShareButton() {
         val context = RuntimeEnvironment.getApplication()
-        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
         val snoozeTime = System.currentTimeMillis() + 3600000L
-        prefs.edit()
-            .putStringSet("key_reminders_list", setOf("Snoozed Task"))
-            .putLong("snooze_snoozed task", snoozeTime)
-            .commit()
+        seedTasks(context, "Snoozed Task" to snoozeTime)
 
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
@@ -529,12 +545,8 @@ class MainActivityTest {
     @Test
     fun testUnpuntReminderMethod() {
         val context = RuntimeEnvironment.getApplication()
-        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
         val snoozeTime = System.currentTimeMillis() + 3600000L
-        prefs.edit()
-            .putStringSet("key_reminders_list", setOf("Punted Task"))
-            .putLong("snooze_punted task", snoozeTime)
-            .commit()
+        seedTasks(context, "Punted Task" to snoozeTime)
 
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
@@ -545,15 +557,14 @@ class MainActivityTest {
         shadowOf(android.os.Looper.getMainLooper()).idle()
 
         assertEquals("Punt cancelled", ShadowToast.getTextOfLatestToast())
-        val updatedSnooze = prefs.getLong("snooze_punted task", 0L)
+        val updatedSnooze = storedTask(context, "Punted Task")?.snoozeUntil ?: 0L
         assertEquals(0L, updatedSnooze)
     }
 
     @Test
     fun testItemShareClickLaunchesShareIntent() {
         val context = RuntimeEnvironment.getApplication()
-        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
-        prefs.edit().putStringSet("key_reminders_list", setOf("Shared Task")).commit()
+        seedTasks(context, "Shared Task" to null)
 
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
@@ -572,8 +583,7 @@ class MainActivityTest {
     @Test
     fun testClearSearchButtonClearsQueryAndResetsList() {
         val context = RuntimeEnvironment.getApplication()
-        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
-        prefs.edit().clear().putStringSet("key_reminders_list", setOf("Buy milk", "Clean garage")).commit()
+        seedTasks(context, "Buy milk" to null, "Clean garage" to null)
 
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
@@ -598,8 +608,7 @@ class MainActivityTest {
     @Test
     fun testClearInputButtonClickClearsInputAndResetsFilter() {
         val context = RuntimeEnvironment.getApplication()
-        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
-        prefs.edit().clear().putStringSet("key_reminders_list", setOf("Buy milk", "Clean garage")).commit()
+        seedTasks(context, "Buy milk" to null, "Clean garage" to null)
 
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
@@ -630,7 +639,8 @@ class MainActivityTest {
     fun testSearchQueryIsPersistedAndRestoredAcrossActivityRecreation() {
         val context = RuntimeEnvironment.getApplication()
         val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
-        prefs.edit().clear().putStringSet("key_reminders_list", setOf("Buy milk", "Clean garage")).commit()
+        prefs.edit().clear().commit()
+        seedTasks(context, "Buy milk" to null, "Clean garage" to null)
 
         val controller1 = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity1 = controller1.get()
@@ -652,15 +662,10 @@ class MainActivityTest {
     @Test
     fun testActiveItemsSortedFirstAndSnoozedItemsSortedAscendingBySnoozeTime() {
         val context = RuntimeEnvironment.getApplication()
-        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
         val now = System.currentTimeMillis()
         val snoozeLater = now + 7200000L // 2h
         val snoozeSooner = now + 3600000L // 1h
-        prefs.edit()
-            .putStringSet("key_reminders_list", setOf("Task Later", "Task Sooner", "Task Active"))
-            .putLong("snooze_task later", snoozeLater)
-            .putLong("snooze_task sooner", snoozeSooner)
-            .commit()
+        seedTasks(context, "Task Later" to snoozeLater, "Task Sooner" to snoozeSooner, "Task Active" to null)
 
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
@@ -703,8 +708,7 @@ class MainActivityTest {
     @Test
     fun testSearchZeroResultsRetainsFocusOnInputAndShowsEmptyText() {
         val context = RuntimeEnvironment.getApplication()
-        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
-        prefs.edit().putStringSet("key_reminders_list", setOf("Buy milk", "Clean garage")).commit()
+        seedTasks(context, "Buy milk" to null, "Clean garage" to null)
 
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
@@ -730,8 +734,7 @@ class MainActivityTest {
     @Test
     fun testSearchInputDoesNotLoseFocusWhileTypingCharacterByCharacter() {
         val context = RuntimeEnvironment.getApplication()
-        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
-        prefs.edit().putStringSet("key_reminders_list", setOf("Buy milk", "Clean garage", "Walk dog")).commit()
+        seedTasks(context, "Buy milk" to null, "Clean garage" to null, "Walk dog" to null)
 
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
@@ -759,8 +762,7 @@ class MainActivityTest {
     @Test
     fun testApplySnoozeDurationClearsFocusAndPreservesScrollPosition() {
         val context = RuntimeEnvironment.getApplication()
-        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
-        prefs.edit().clear().putStringSet("key_reminders_list", setOf("Task 1", "Task 2", "Task 3")).commit()
+        seedTasks(context, "Task 1" to null, "Task 2" to null, "Task 3" to null)
 
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
@@ -776,12 +778,8 @@ class MainActivityTest {
     @Test
     fun testSnoozedReminderSwipeOpensDialogWithUnsnoozeOption() {
         val context = RuntimeEnvironment.getApplication()
-        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
         val snoozeTime = System.currentTimeMillis() + 3600000L
-        prefs.edit()
-            .putStringSet("key_reminders_list", setOf("Snoozed Item"))
-            .putLong("snooze_snoozed item", snoozeTime)
-            .commit()
+        seedTasks(context, "Snoozed Item" to snoozeTime)
 
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
@@ -806,15 +804,14 @@ class MainActivityTest {
         shadowOf(android.os.Looper.getMainLooper()).idle()
 
         assertEquals("Punt cancelled", ShadowToast.getTextOfLatestToast())
-        val updatedSnooze = prefs.getLong("snooze_snoozed item", 0L)
+        val updatedSnooze = storedTask(context, "Snoozed Item")?.snoozeUntil ?: 0L
         assertEquals(0L, updatedSnooze)
     }
 
     @Test
     fun testMarkDoneAppendsDoneTagAndFiltersFromOverview() {
         val context = RuntimeEnvironment.getApplication()
-        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
-        prefs.edit().clear().putStringSet("key_reminders_list", setOf("Task 1")).commit()
+        seedTasks(context, "Task 1" to null)
 
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
@@ -827,19 +824,16 @@ class MainActivityTest {
 
         assertEquals("Reminder marked done", ShadowToast.getTextOfLatestToast())
 
-        val savedSet = prefs.getStringSet("key_reminders_list", emptySet()) ?: emptySet()
-        assertTrue("Saved set should contain 'Task 1 #done'", savedSet.contains("Task 1 #done"))
+        val stored = storedTask(context, "Task 1")
+        assertNotNull("Task 1 should be marked done", stored)
+        assertTrue("Task 1 should be marked done", stored!!.isDone)
     }
 
     @Test
     fun testMarkingPuntedReminderDonePreservesPuntTimeAndSection() {
         val context = RuntimeEnvironment.getApplication()
-        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
         val futureSnooze = System.currentTimeMillis() + 3600000L
-        prefs.edit().clear()
-            .putStringSet("key_reminders_list", setOf("Punted Task"))
-            .putLong("snooze_punted task", futureSnooze)
-            .commit()
+        seedTasks(context, "Punted Task" to futureSnooze)
 
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
@@ -849,10 +843,11 @@ class MainActivityTest {
         markDoneMethod.invoke(activity, "Punted Task")
         shadowOf(android.os.Looper.getMainLooper()).idle()
 
-        val savedSet = prefs.getStringSet("key_reminders_list", emptySet()) ?: emptySet()
-        assertTrue("Saved set should contain 'Punted Task #done'", savedSet.contains("Punted Task #done"))
+        val stored = storedTask(context, "Punted Task")
+        assertNotNull("Punted task should exist", stored)
+        assertTrue("Punted task should be marked done", stored!!.isDone)
 
-        val preservedSnooze = prefs.getLong("snooze_punted task", 0L)
+        val preservedSnooze = stored.snoozeUntil ?: 0L
         assertEquals(futureSnooze, preservedSnooze)
 
         val displayedField = MainActivity::class.java.getDeclaredField("displayedReminders")
@@ -867,7 +862,7 @@ class MainActivityTest {
         undoMethod.invoke(activity, "Punted Task #done")
         shadowOf(android.os.Looper.getMainLooper()).idle()
 
-        val restoredSnooze = prefs.getLong("snooze_punted task", 0L)
+        val restoredSnooze = storedTask(context, "Punted Task")?.snoozeUntil ?: 0L
         assertEquals(futureSnooze, restoredSnooze)
         @Suppress("UNCHECKED_CAST")
         val restoredDisplayed = displayedField.get(activity) as List<String>
@@ -877,8 +872,7 @@ class MainActivityTest {
     @Test
     fun testSwipingDoneItemPermanentlyDeletesReminder() {
         val context = RuntimeEnvironment.getApplication()
-        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
-        prefs.edit().clear().putStringSet("key_reminders_list", setOf("Done Task #done")).commit()
+        seedTasks(context, "Done Task #done" to null)
 
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
@@ -889,16 +883,14 @@ class MainActivityTest {
         deleteMethod.invoke(activity, "Done Task #done")
         shadowOf(android.os.Looper.getMainLooper()).idle()
 
-        val savedSet = prefs.getStringSet("key_reminders_list", emptySet()) ?: emptySet()
-        org.junit.Assert.assertFalse("Saved set should NOT contain 'Done Task #done'", savedSet.contains("Done Task #done"))
+        assertNull("Reminder should be deleted from Room", storedTask(context, "Done Task"))
         assertEquals("Reminder deleted", ShadowToast.getTextOfLatestToast())
     }
 
     @Test
     fun testSwipeLeftOnMarkedDoneItemUndosMarkDone() {
         val context = RuntimeEnvironment.getApplication()
-        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
-        prefs.edit().clear().putStringSet("key_reminders_list", setOf("Done Task #done")).commit()
+        seedTasks(context, "Done Task #done" to null)
 
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
@@ -908,16 +900,16 @@ class MainActivityTest {
         undoMethod.invoke(activity, "Done Task #done")
         shadowOf(android.os.Looper.getMainLooper()).idle()
 
-        val savedSet = prefs.getStringSet("key_reminders_list", emptySet()) ?: emptySet()
-        assertTrue("Saved set should contain restored 'Done Task'", savedSet.contains("Done Task"))
+        val restored = storedTask(context, "Done Task")
+        assertNotNull("Restored task should exist in Room", restored)
+        assertFalse("Restored task should not be done", restored!!.isDone)
         assertEquals("Mark done undone", ShadowToast.getTextOfLatestToast())
     }
 
     @Test
     fun testSwipeRightReplacesTileWithGrayedOutTileAndUndoRestoresReminder() {
         val context = RuntimeEnvironment.getApplication()
-        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
-        prefs.edit().clear().putStringSet("key_reminders_list", setOf("Task 1")).commit()
+        seedTasks(context, "Task 1" to null)
 
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
@@ -928,8 +920,9 @@ class MainActivityTest {
         markMethod.invoke(activity, "Task 1")
         shadowOf(android.os.Looper.getMainLooper()).idle()
 
-        val savedSet = prefs.getStringSet("key_reminders_list", emptySet()) ?: emptySet()
-        assertTrue("Saved set should contain 'Task 1 #done'", savedSet.contains("Task 1 #done"))
+        val stored = storedTask(context, "Task 1")
+        assertNotNull("Task 1 should be marked done", stored)
+        assertTrue("Task 1 should be marked done", stored!!.isDone)
 
         // Undo mark done
         val undoMethod = MainActivity::class.java.getDeclaredMethod("undoMarkDone", String::class.java)
@@ -937,16 +930,16 @@ class MainActivityTest {
         undoMethod.invoke(activity, "Task 1 #done")
         shadowOf(android.os.Looper.getMainLooper()).idle()
 
-        val restoredSet = prefs.getStringSet("key_reminders_list", emptySet()) ?: emptySet()
-        assertTrue("Saved set should contain 'Task 1'", restoredSet.contains("Task 1"))
+        val restoredTask = storedTask(context, "Task 1")
+        assertNotNull("Restored task should exist in Room", restoredTask)
+        assertTrue("Restored task should not be done", !restoredTask!!.isDone)
         assertEquals("Mark done undone", ShadowToast.getTextOfLatestToast())
     }
 
     @Test
     fun testMarkedDoneItemRemainsVisibleUntilSearchOrFilterUpdated() {
         val context = RuntimeEnvironment.getApplication()
-        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
-        prefs.edit().clear().putStringSet("key_reminders_list", setOf("Task 1", "Task 2")).commit()
+        seedTasks(context, "Task 1" to null, "Task 2" to null)
 
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
@@ -972,8 +965,7 @@ class MainActivityTest {
     @Test
     fun testDoneItemsHiddenFromSearchUnlessSearchContainsHashDone() {
         val context = RuntimeEnvironment.getApplication()
-        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
-        prefs.edit().clear().putStringSet("key_reminders_list", setOf("Buy milk", "Buy bread #done")).commit()
+        seedTasks(context, "Buy milk" to null, "Buy bread #done" to null)
 
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
@@ -1000,12 +992,8 @@ class MainActivityTest {
     @Test
     fun testSnoozedDividerAppearsWhenSnoozedItemsExist() {
         val context = RuntimeEnvironment.getApplication()
-        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
         val snoozeTime = System.currentTimeMillis() + 3600000L
-        prefs.edit()
-            .putStringSet("key_reminders_list", setOf("Active Task", "Snoozed Task"))
-            .putLong("snooze_snoozed task", snoozeTime)
-            .commit()
+        seedTasks(context, "Active Task" to null, "Snoozed Task" to snoozeTime)
 
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
@@ -1021,8 +1009,7 @@ class MainActivityTest {
     @Test
     fun testPullToRefreshClearsRecentlyDoneRemindersAndRefreshesList() {
         val context = RuntimeEnvironment.getApplication()
-        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
-        prefs.edit().clear().putStringSet("key_reminders_list", setOf("Task 1", "Task 2")).commit()
+        seedTasks(context, "Task 1" to null, "Task 2" to null)
 
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
@@ -1057,10 +1044,7 @@ class MainActivityTest {
     @Test
     fun testSwipeHandlerCallbacksAndChildDraw() {
         val context = RuntimeEnvironment.getApplication()
-        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
-        prefs.edit().clear()
-            .putStringSet("key_reminders_list", setOf("Active Task", "Done Task #done"))
-            .commit()
+        seedTasks(context, "Active Task" to null, "Done Task #done" to null)
 
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
@@ -1152,8 +1136,7 @@ class MainActivityTest {
     @Test
     fun testRemindersAdapterEditingFocusAndAccessibility() {
         val context = RuntimeEnvironment.getApplication()
-        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
-        prefs.edit().clear().putStringSet("key_reminders_list", setOf("Editable task")).commit()
+        seedTasks(context, "Editable task" to null)
 
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
@@ -1176,8 +1159,7 @@ class MainActivityTest {
         holder.reminderInput.setText("Editable task updated")
         shadowOf(android.os.Looper.getMainLooper()).idleFor(350, java.util.concurrent.TimeUnit.MILLISECONDS)
 
-        val updatedSet = prefs.getStringSet("key_reminders_list", emptySet()) ?: emptySet()
-        assertTrue(updatedSet.contains("Editable task updated"))
+        assertNotNull("Updated text should be stored in Room", storedTask(context, "Editable task updated"))
 
         // 3. Accessibility delegates
         val info = androidx.core.view.accessibility.AccessibilityNodeInfoCompat.obtain()
@@ -1210,8 +1192,7 @@ class MainActivityTest {
     @Test
     fun testDebouncedReminderEditingFlushesOnFocusLossOrDebounce() {
         val context = RuntimeEnvironment.getApplication()
-        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
-        prefs.edit().clear().putStringSet("key_reminders_list", setOf("Original Task")).commit()
+        seedTasks(context, "Original Task" to null)
 
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
@@ -1228,8 +1209,7 @@ class MainActivityTest {
         holder.reminderInput.onFocusChangeListener?.onFocusChange(holder.reminderInput, false)
         shadowOf(android.os.Looper.getMainLooper()).idle()
 
-        val updatedSet = prefs.getStringSet("key_reminders_list", emptySet()) ?: emptySet()
-        assertTrue(updatedSet.contains("Original Task Updated"))
+        assertNotNull("Updated text should be stored in Room", storedTask(context, "Original Task Updated"))
     }
 
     @Test
@@ -1250,8 +1230,8 @@ class MainActivityTest {
 
     @Test
     fun testMarkRecurringReminderDonePuntsTask() {
-        val prefs = RuntimeEnvironment.getApplication().getSharedPreferences("reminders_prefs", android.content.Context.MODE_PRIVATE)
-        prefs.edit().putStringSet("key_reminders_list", setOf("Water plants #every 1d")).apply()
+        val context = RuntimeEnvironment.getApplication()
+        seedTasks(context, "Water plants #every 1d" to null)
 
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
@@ -1263,18 +1243,18 @@ class MainActivityTest {
         swipeHandler.onSwiped(holder, ItemTouchHelper.RIGHT)
         shadowOf(android.os.Looper.getMainLooper()).idle()
 
-        val savedSet = prefs.getStringSet("key_reminders_list", emptySet()) ?: emptySet()
-        assertTrue(savedSet.contains("Water plants #every 1d"))
-        assertFalse(savedSet.contains("Water plants #every 1d #done"))
+        val stored = storedTask(context, "Water plants #every 1d")
+        assertNotNull("Recurring task should exist in Room", stored)
+        assertFalse("Recurring task should not be done", stored!!.isDone)
 
-        val snoozeTime = prefs.getLong("snooze_water plants #every 1d", 0L)
+        val snoozeTime = stored.snoozeUntil ?: 0L
         assertTrue("Snooze timestamp should be set in future for recurring task", snoozeTime > System.currentTimeMillis())
     }
 
     @Test
     fun testSwipePeekingIconForRecurringTask() {
-        val prefs = RuntimeEnvironment.getApplication().getSharedPreferences("reminders_prefs", android.content.Context.MODE_PRIVATE)
-        prefs.edit().putStringSet("key_reminders_list", setOf("Water plants #every 1d", "Buy milk")).apply()
+        val context = RuntimeEnvironment.getApplication()
+        seedTasks(context, "Water plants #every 1d" to null, "Buy milk" to null)
 
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
@@ -1292,8 +1272,8 @@ class MainActivityTest {
 
     @Test
     fun testRecurrenceTagSpanAppliedToRecurringTask() {
-        val prefs = RuntimeEnvironment.getApplication().getSharedPreferences("reminders_prefs", android.content.Context.MODE_PRIVATE)
-        prefs.edit().putStringSet("key_reminders_list", setOf("Water plants #every 1d #notify 1h")).apply()
+        val context = RuntimeEnvironment.getApplication()
+        seedTasks(context, "Water plants #every 1d #notify 1h" to null)
 
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
@@ -1317,10 +1297,10 @@ class MainActivityTest {
         }.toString()
 
         prefs.edit()
-            .putStringSet("key_reminders_list", setOf("Buy groceries #work", "Gym session #fitness", "Doctor #health"))
             .putString("key_focus_profiles", profilesJson)
             .putString("key_active_focus_profile", "Work")
             .apply()
+        seedTasks(context, "Buy groceries #work" to null, "Gym session #fitness" to null, "Doctor #health" to null)
 
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
@@ -1344,10 +1324,10 @@ class MainActivityTest {
         }.toString()
 
         prefs.edit()
-            .putStringSet("key_reminders_list", setOf("Task A #work", "Task B #personal"))
             .putString("key_focus_profiles", profilesJson)
             .putString("key_active_focus_profile", "Work")
             .apply()
+        seedTasks(context, "Task A #work" to null, "Task B #personal" to null)
 
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
@@ -1375,10 +1355,10 @@ class MainActivityTest {
         }.toString()
 
         prefs.edit()
-            .putStringSet("key_reminders_list", setOf("Task A #work", "Task B #fitness", "Task C #other"))
             .putString("key_focus_profiles", profilesJson)
             .putStringSet("key_active_focus_profiles", setOf("Work", "Fitness"))
             .apply()
+        seedTasks(context, "Task A #work" to null, "Task B #fitness" to null, "Task C #other" to null)
 
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
@@ -1458,12 +1438,9 @@ class MainActivityTest {
 
     @Test
     fun testCollapsibleActiveAndPuntedSectionHeaders() {
-        val prefs = RuntimeEnvironment.getApplication().getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
+        val context = RuntimeEnvironment.getApplication()
         val snoozeTime = System.currentTimeMillis() + 3600000L
-        prefs.edit().clear()
-            .putStringSet("key_reminders_list", setOf("Task Active", "Task Punted"))
-            .putLong("snooze_task punted", snoozeTime)
-            .commit()
+        seedTasks(context, "Task Active" to null, "Task Punted" to snoozeTime)
 
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
@@ -1502,8 +1479,8 @@ class MainActivityTest {
 
     @Test
     fun testSectionHeaderCountsUpdateOnTaskStateChange() {
-        val prefs = RuntimeEnvironment.getApplication().getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
-        prefs.edit().clear().putStringSet("key_reminders_list", setOf("Task A", "Task B")).commit()
+        val context = RuntimeEnvironment.getApplication()
+        seedTasks(context, "Task A" to null, "Task B" to null)
 
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()

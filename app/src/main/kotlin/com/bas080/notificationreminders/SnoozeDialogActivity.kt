@@ -1,7 +1,6 @@
 @file:Suppress("ComplexCondition", "CyclomaticComplexMethod", "EmptyFunctionBlock", "LargeClass", "LongMethod", "LoopWithTooManyJumpStatements", "MagicNumber", "MaxLineLength", "NestedBlockDepth", "ReturnCount", "TooManyFunctions", "UnusedPrivateMember", "UseRequire")
 package com.bas080.notificationreminders
 
-import kotlinx.coroutines.launch
 import android.content.Context
 import android.os.Bundle
 import android.widget.EditText
@@ -16,7 +15,6 @@ class SnoozeDialogActivity : AppCompatActivity() {
     companion object {
         const val EXTRA_REMINDER_TEXT = "extra_reminder_text"
         const val EXTRA_REMINDER_LIST = "extra_reminder_list"
-        private const val PREFS_REMINDERS = "reminders_prefs"
         private const val PREFS_SNOOZE_FREQ = "snooze_freq_prefs"
     }
 
@@ -140,18 +138,12 @@ class SnoozeDialogActivity : AppCompatActivity() {
         val (snoozeMs, durationLabel) = parseResult
         val snoozeUntil = System.currentTimeMillis() + snoozeMs
 
-        val prefs = getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
-        val editor = prefs.edit()
+        kotlinx.coroutines.runBlocking {
+            for (target in targets) {
+                ReminderNotificationListenerService.activePostedReminders.remove(target)
+                ReminderNotificationListenerService.recordTaskSnoozeChoice(this@SnoozeDialogActivity, target, durationChoice)
 
-        for (target in targets) {
-            val trimmed = target.trim().lowercase()
-            ReminderNotificationListenerService.lastTriggeredMap["snooze_$trimmed"] = snoozeUntil
-            ReminderNotificationListenerService.activePostedReminders.remove(target)
-            editor.putLong("snooze_$trimmed", snoozeUntil)
-            ReminderNotificationListenerService.recordTaskSnoozeChoice(this, target, durationChoice)
-
-            val cleanText = target.replace(Regex("(?i)\\s*#done\\b"), "").trim()
-            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                val cleanText = target.replace(Regex("(?i)\\s*#done\\b"), "").trim()
                 val db = com.bas080.notificationreminders.data.PuntDatabase.getInstance(this@SnoozeDialogActivity)
                 val existing = db.reminderDao().getReminderByText(cleanText)
                 if (existing != null) {
@@ -171,7 +163,6 @@ class SnoozeDialogActivity : AppCompatActivity() {
                 }
             }
         }
-        editor.apply()
 
         ReminderNotificationListenerService.instance?.showStatusNotification()
 

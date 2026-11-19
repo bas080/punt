@@ -24,12 +24,16 @@ class UiPerformanceAndroidTest {
     @Before
     fun setUp() {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
+        val dao = com.bas080.notificationreminders.data.PuntDatabase.getInstance(context).reminderDao()
+        java.io.File(context.filesDir, com.bas080.notificationreminders.utils.TaskBackupManager.BACKUP_FILE_NAME).delete()
 
         val activeList = (1..200).map { "Active Task $it #tag${it % 5}" }
-        prefs.edit().clear()
-            .putStringSet("key_reminders_list", activeList.toSet())
-            .commit()
+        kotlinx.coroutines.runBlocking {
+            dao.deleteAll()
+            for (text in activeList) {
+                dao.insert(com.bas080.notificationreminders.data.ReminderEntity(text = text))
+            }
+        }
     }
 
     @Suppress("DEPRECATION")
