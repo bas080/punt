@@ -97,6 +97,7 @@ class ScreenshotGeneratorTest {
     private fun captureScreenshot2Punted() {
         val app = RuntimeEnvironment.getApplication()
         val dao = com.bas080.notificationreminders.data.PuntDatabase.getInstance(app).reminderDao()
+        val now = System.currentTimeMillis()
         kotlinx.coroutines.runBlocking { dao.deleteAll() }
         kotlinx.coroutines.runBlocking {
             dao.insert(com.bas080.notificationreminders.data.ReminderEntity(text = "Call dentist at 3 PM #health"))

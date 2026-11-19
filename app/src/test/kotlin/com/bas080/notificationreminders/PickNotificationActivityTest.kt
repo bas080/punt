@@ -25,7 +25,7 @@ class PickNotificationActivityTest {
 
     @org.junit.Before
     fun setUp() {
-        val context = RuntimeEnvironment.getApplication()
+        val context = org.robolectric.RuntimeEnvironment.getApplication()
         kotlinx.coroutines.runBlocking {
             com.bas080.notificationreminders.data.PuntDatabase.getInstance(context).reminderDao().deleteAll()
         }

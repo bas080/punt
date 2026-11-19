@@ -1290,7 +1290,8 @@ class MainActivityTest {
 
     @Test
     fun testFocusProfilesPersistenceAndFiltering() {
-        val prefs = RuntimeEnvironment.getApplication().getSharedPreferences("reminders_prefs", android.content.Context.MODE_PRIVATE)
+        val context = RuntimeEnvironment.getApplication()
+        val prefs = context.getSharedPreferences("reminders_prefs", android.content.Context.MODE_PRIVATE)
         val profilesJson = org.json.JSONArray().apply {
             put(org.json.JSONObject().put("name", "Work").put("query", "#work"))
             put(org.json.JSONObject().put("name", "Fitness").put("query", "#fitness"))
@@ -1318,7 +1319,8 @@ class MainActivityTest {
 
     @Test
     fun testClearFocusProfileAction() {
-        val prefs = RuntimeEnvironment.getApplication().getSharedPreferences("reminders_prefs", android.content.Context.MODE_PRIVATE)
+        val context = RuntimeEnvironment.getApplication()
+        val prefs = context.getSharedPreferences("reminders_prefs", android.content.Context.MODE_PRIVATE)
         val profilesJson = org.json.JSONArray().apply {
             put(org.json.JSONObject().put("name", "Work").put("query", "#work"))
         }.toString()
@@ -1348,7 +1350,8 @@ class MainActivityTest {
 
     @Test
     fun testFocusProfilesDialogInlineEditAndMultiToggle() {
-        val prefs = RuntimeEnvironment.getApplication().getSharedPreferences("reminders_prefs", android.content.Context.MODE_PRIVATE)
+        val context = RuntimeEnvironment.getApplication()
+        val prefs = context.getSharedPreferences("reminders_prefs", android.content.Context.MODE_PRIVATE)
         val profilesJson = org.json.JSONArray().apply {
             put(org.json.JSONObject().put("name", "Work").put("query", "#work"))
             put(org.json.JSONObject().put("name", "Fitness").put("query", "#fitness"))
