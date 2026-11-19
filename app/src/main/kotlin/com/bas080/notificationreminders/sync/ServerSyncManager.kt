@@ -99,7 +99,6 @@ internal fun pairWithServer(url: String, pin: String?): Result<String> {
 
 object ServerSyncManager {
 
-    private const val DEFAULT_PUNT_MS = 3600000L
     private const val PING_TIMEOUT_MS = 3000
     const val DEFAULT_PORT = 7868
 
@@ -247,79 +246,6 @@ object ServerSyncManager {
         }
     }
 
-    private suspend fun findTargetEntity(dao: ReminderDao, payload: JSONObject?): ReminderEntity? {
-        val target = payload?.optString("target") ?: ""
-        val id = target.toLongOrNull()
-        return if (id != null) dao.getAllReminders().find { it.id == id } else dao.getReminderByText(target)
-    }
-
-    private suspend fun applyAction(dao: ReminderDao, action: String, payload: JSONObject?) {
-        val entity = findTargetEntity(dao, payload)
-        when (action) {
-            "create" -> applyCreate(dao, payload)
-            "done" -> applyMarkDone(dao, entity)
-            "undone" -> applyUnmarkDone(dao, entity)
-            "edit" -> applyEdit(dao, entity, payload)
-            "unpunt" -> applyUnpunt(dao, entity)
-            "punt" -> applyPunt(dao, entity, payload)
-            "delete" -> if (entity != null) dao.deleteByText(entity.text)
-        }
-    }
-
-    private suspend fun applyCreate(dao: ReminderDao, payload: JSONObject?) {
-        val text = payload?.optString("text")?.trim().orEmpty()
-        if (text.isNotBlank()) {
-            val recurrence = CreateReminderReceiver.parseRecurrenceDuration(text)?.second
-            dao.insert(ReminderEntity(text = text, recurrenceInterval = recurrence))
-        }
-    }
-
-    private suspend fun applyMarkDone(dao: ReminderDao, entity: ReminderEntity?) {
-        if (entity == null) return
-        val recurrence = CreateReminderReceiver.parseRecurrenceDuration(entity.text)
-        if (recurrence != null) {
-            val snoozeUntil = System.currentTimeMillis() + recurrence.first
-            dao.update(entity.copy(snoozeUntil = snoozeUntil, updatedAt = System.currentTimeMillis()))
-        } else {
-            dao.update(entity.copy(isDone = true, updatedAt = System.currentTimeMillis()))
-        }
-    }
-
-    private suspend fun applyUnmarkDone(dao: ReminderDao, entity: ReminderEntity?) {
-        if (entity == null) return
-        val cleanText = entity.text.replace(Regex("(?i)\\\\s*#done\\\\b"), "").trim()
-        dao.update(entity.copy(text = cleanText, isDone = false, updatedAt = System.currentTimeMillis()))
-    }
-
-    private suspend fun applyEdit(dao: ReminderDao, entity: ReminderEntity?, payload: JSONObject?) {
-        if (entity == null) return
-        val newText = payload?.optString("text")?.trim().orEmpty()
-        if (newText.isBlank()) return
-        val recurrence = CreateReminderReceiver.parseRecurrenceDuration(newText)?.second
-        val isDone = newText.contains("#done", ignoreCase = true) || entity.isDone
-        dao.update(
-            entity.copy(
-                text = newText,
-                isDone = isDone,
-                recurrenceInterval = recurrence,
-                updatedAt = System.currentTimeMillis()
-            )
-        )
-    }
-
-    private suspend fun applyUnpunt(dao: ReminderDao, entity: ReminderEntity?) {
-        if (entity == null) return
-        dao.update(entity.copy(snoozeUntil = null, updatedAt = System.currentTimeMillis()))
-    }
-
-    private suspend fun applyPunt(dao: ReminderDao, entity: ReminderEntity?, payload: JSONObject?) {
-        if (entity == null) return
-        val duration = payload?.optString("duration") ?: "1h"
-        val snoozeMs = CreateReminderReceiver.parseSnoozeDuration(duration)?.first ?: DEFAULT_PUNT_MS
-        val snoozeUntil = System.currentTimeMillis() + snoozeMs
-        dao.update(entity.copy(snoozeUntil = snoozeUntil, updatedAt = System.currentTimeMillis()))
-    }
-
     private fun handleMutationRequest(context: Context, request: JSONObject) {
         val currentSocket = socket ?: return
         val mutationId = request.optString("mutationId")
@@ -329,7 +255,7 @@ object ServerSyncManager {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val dao = PuntDatabase.getInstance(context).reminderDao()
-                applyAction(dao, action, payload)
+                SyncActions.apply(dao, action, payload)
                 val reminders = dao.getAllReminders()
                 val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
                 val editor = prefs.edit()
@@ -361,5 +287,83 @@ object ServerSyncManager {
                 currentSocket.emit("mutation_response", errorResponse)
             }
         }
+    }
+}
+
+private const val DEFAULT_PUNT_MS = 3600000L
+
+private object SyncActions {
+
+    suspend fun apply(dao: ReminderDao, action: String, payload: JSONObject?) {
+        val entity = findTargetEntity(dao, payload)
+        when (action) {
+            "create" -> applyCreate(dao, payload)
+            "done" -> applyMarkDone(dao, entity)
+            "undone" -> applyUnmarkDone(dao, entity)
+            "edit" -> applyEdit(dao, entity, payload)
+            "unpunt" -> applyUnpunt(dao, entity)
+            "punt" -> applyPunt(dao, entity, payload)
+            "delete" -> if (entity != null) dao.deleteByText(entity.text)
+        }
+    }
+
+    private suspend fun findTargetEntity(dao: ReminderDao, payload: JSONObject?): ReminderEntity? {
+        val target = payload?.optString("target") ?: ""
+        val id = target.toLongOrNull()
+        return if (id != null) dao.getAllReminders().find { it.id == id } else dao.getReminderByText(target)
+    }
+
+    private suspend fun applyCreate(dao: ReminderDao, payload: JSONObject?) {
+        val text = payload?.optString("text")?.trim().orEmpty()
+        if (text.isNotBlank()) {
+            val recurrence = CreateReminderReceiver.parseRecurrenceDuration(text)?.second
+            dao.insert(ReminderEntity(text = text, recurrenceInterval = recurrence))
+        }
+    }
+
+    private suspend fun applyMarkDone(dao: ReminderDao, entity: ReminderEntity?) {
+        if (entity == null) return
+        val recurrence = CreateReminderReceiver.parseRecurrenceDuration(entity.text)
+        if (recurrence != null) {
+            val snoozeUntil = System.currentTimeMillis() + recurrence.first
+            dao.update(entity.copy(snoozeUntil = snoozeUntil, updatedAt = System.currentTimeMillis()))
+        } else {
+            dao.update(entity.copy(isDone = true, updatedAt = System.currentTimeMillis()))
+        }
+    }
+
+    private suspend fun applyUnmarkDone(dao: ReminderDao, entity: ReminderEntity?) {
+        if (entity == null) return
+        val cleanText = entity.text.replace(Regex("(?i)\\s*#done\\b"), "").trim()
+        dao.update(entity.copy(text = cleanText, isDone = false, updatedAt = System.currentTimeMillis()))
+    }
+
+    private suspend fun applyEdit(dao: ReminderDao, entity: ReminderEntity?, payload: JSONObject?) {
+        if (entity == null) return
+        val newText = payload?.optString("text")?.trim().orEmpty()
+        if (newText.isBlank()) return
+        val recurrence = CreateReminderReceiver.parseRecurrenceDuration(newText)?.second
+        val isDone = newText.contains("#done", ignoreCase = true) || entity.isDone
+        dao.update(
+            entity.copy(
+                text = newText,
+                isDone = isDone,
+                recurrenceInterval = recurrence,
+                updatedAt = System.currentTimeMillis()
+            )
+        )
+    }
+
+    private suspend fun applyUnpunt(dao: ReminderDao, entity: ReminderEntity?) {
+        if (entity == null) return
+        dao.update(entity.copy(snoozeUntil = null, updatedAt = System.currentTimeMillis()))
+    }
+
+    private suspend fun applyPunt(dao: ReminderDao, entity: ReminderEntity?, payload: JSONObject?) {
+        if (entity == null) return
+        val duration = payload?.optString("duration") ?: "1h"
+        val snoozeMs = CreateReminderReceiver.parseSnoozeDuration(duration)?.first ?: DEFAULT_PUNT_MS
+        val snoozeUntil = System.currentTimeMillis() + snoozeMs
+        dao.update(entity.copy(snoozeUntil = snoozeUntil, updatedAt = System.currentTimeMillis()))
     }
 }
