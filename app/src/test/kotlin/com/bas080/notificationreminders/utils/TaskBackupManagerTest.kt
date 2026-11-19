@@ -19,15 +19,12 @@ import org.robolectric.annotation.Config
 class TaskBackupManagerTest {
 
     private lateinit var context: Context
-    private val PREFS_REMINDERS = "reminders_prefs"
 
     @Before
     fun setUp() {
         context = RuntimeEnvironment.getApplication()
         val dao = PuntDatabase.getInstance(context).reminderDao()
         runBlocking { dao.deleteAll() }
-        val prefs = context.getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
-        prefs.edit().clear().commit()
 
         val backupFile = TaskBackupManager.getFilesBackupFile(context)
         if (backupFile.exists()) {
@@ -54,10 +51,8 @@ class TaskBackupManagerTest {
         assertTrue(content.contains("Call mom #done"))
         assertTrue(content.contains("Pay bills"))
 
-        // Clear legacy storage and database to simulate a fresh install.
+        // Clear database to simulate a fresh install.
         runBlocking { dao.deleteAll() }
-        val prefs = context.getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
-        prefs.edit().clear().commit()
 
         val restored = TaskBackupManager.restoreIfEmpty(context)
         assertTrue(restored)

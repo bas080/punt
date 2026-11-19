@@ -262,7 +262,7 @@ class ReminderNotificationListenerService : NotificationListenerService() {
             val lower = trimmed.lowercase()
             val trackingKey = "${sbnKey}_$lower"
             val lastTime = lastTriggeredMap[trackingKey] ?: 0L
-            val snoozeUntil = reminder.snoozeUntil ?: (lastTriggeredMap["snooze_$lower"] ?: 0L)
+            val snoozeUntil = reminder.snoozeUntil ?: 0L
 
             val isSnoozed = (snoozeUntil > 0L && now < snoozeUntil)
             if (isSnoozed) {
@@ -273,7 +273,6 @@ class ReminderNotificationListenerService : NotificationListenerService() {
             val isSnoozeExpired = (snoozeUntil > 0L && now >= snoozeUntil)
             if (isSnoozeExpired) {
                 runBlocking { dao.updateSnooze(trimmed, null) }
-                lastTriggeredMap.remove("snooze_$lower")
             }
 
             val isWordMatch = ReminderMatcher.matches(reminder.text, fullContent, commonWordsSet)
@@ -385,8 +384,7 @@ class ReminderNotificationListenerService : NotificationListenerService() {
                     if (!matchesAnyFocus) continue
                 }
                 val trimmed = reminder.text.trim()
-                val lower = trimmed.lowercase()
-                val snoozeUntil = reminder.snoozeUntil ?: (lastTriggeredMap["snooze_$lower"] ?: 0L)
+                val snoozeUntil = reminder.snoozeUntil ?: 0L
                 if (snoozeUntil > now) {
                     snoozedCount++
                 } else {

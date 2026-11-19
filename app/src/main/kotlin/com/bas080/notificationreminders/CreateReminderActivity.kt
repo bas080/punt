@@ -1,8 +1,6 @@
 @file:Suppress("ComplexCondition", "CyclomaticComplexMethod", "EmptyFunctionBlock", "LargeClass", "LongMethod", "LoopWithTooManyJumpStatements", "MagicNumber", "MaxLineLength", "NestedBlockDepth", "ReturnCount", "TooManyFunctions", "UnusedPrivateMember", "UseRequire")
 package com.bas080.notificationreminders
 
-import kotlinx.coroutines.launch
-import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.view.View
@@ -25,9 +23,6 @@ class CreateReminderActivity : AppCompatActivity() {
         const val EXTRA_TITLE = "android.intent.extra.TITLE"
         const val EXTRA_TEXT = "android.intent.extra.TEXT"
         const val EXTRA_TIME = "android.intent.extra.TIME"
-
-        private const val PREFS_REMINDERS = "reminders_prefs"
-        private const val KEY_REMINDERS = "key_reminders_list"
 
         fun formatReminderString(title: String, text: String): String {
             val trimmedTitle = title.trim()
@@ -125,29 +120,20 @@ class CreateReminderActivity : AppCompatActivity() {
     }
 
     private fun saveReminder(reminderString: String, targetTimeMillis: Long) {
-        val prefs = getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
-        val savedSet = prefs.getStringSet(KEY_REMINDERS, emptySet())?.toMutableSet() ?: mutableSetOf()
-        savedSet.add(reminderString)
         val now = System.currentTimeMillis()
-        val editor = prefs.edit().putStringSet(KEY_REMINDERS, savedSet)
-
         val snoozeUntilValue = if (targetTimeMillis > now) targetTimeMillis else null
         val cleanText = reminderString.replace(Regex("(?i)\\s*#done\\b"), "").trim()
 
         com.bas080.notificationreminders.utils.ExperimentTracker.trackCreation(this, "create_intent")
         if (targetTimeMillis > now) {
-            val trimmed = reminderString.trim().lowercase()
-            ReminderNotificationListenerService.lastTriggeredMap["snooze_$trimmed"] = targetTimeMillis
-            editor.putLong("snooze_$trimmed", targetTimeMillis)
             AppLogger.log(this, "CreateReminderActivity", "Created scheduled reminder via ACTION_CREATE_REMINDER")
         } else {
             ReminderNotificationListenerService.instance?.postMatchNotification(reminderString)
             AppLogger.log(this, "CreateReminderActivity", "Created immediate reminder via ACTION_CREATE_REMINDER")
         }
-        editor.apply()
 
         val recurrence = com.bas080.notificationreminders.receivers.CreateReminderReceiver.parseRecurrenceDuration(cleanText)?.second
-        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+        kotlinx.coroutines.runBlocking {
             val db = com.bas080.notificationreminders.data.PuntDatabase.getInstance(this@CreateReminderActivity)
             db.reminderDao().insert(
                 com.bas080.notificationreminders.data.ReminderEntity(

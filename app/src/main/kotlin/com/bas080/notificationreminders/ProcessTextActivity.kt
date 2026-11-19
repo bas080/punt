@@ -1,7 +1,5 @@
 package com.bas080.notificationreminders
 
-import kotlinx.coroutines.launch
-import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
@@ -10,11 +8,6 @@ import com.bas080.notificationreminders.services.ReminderNotificationListenerSer
 import com.bas080.notificationreminders.utils.AppLogger
 
 class ProcessTextActivity : AppCompatActivity() {
-
-    companion object {
-        private const val PREFS_REMINDERS = "reminders_prefs"
-        private const val KEY_REMINDERS = "key_reminders_list"
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -35,16 +28,12 @@ class ProcessTextActivity : AppCompatActivity() {
         if (!selectedText.isNullOrEmpty()) {
             AppLogger.log(this, "ProcessTextActivity", "Created reminder from system text selection/share")
             com.bas080.notificationreminders.utils.ExperimentTracker.trackCreation(this, "text_selection")
-            val prefs = getSharedPreferences(PREFS_REMINDERS, Context.MODE_PRIVATE)
-            val savedSet = prefs.getStringSet(KEY_REMINDERS, emptySet())?.toMutableSet() ?: mutableSetOf()
-            savedSet.add(selectedText)
-            prefs.edit().putStringSet(KEY_REMINDERS, savedSet).apply()
 
             val cleanText = selectedText.replace(Regex("(?i)\\s*#done\\b"), "").trim()
             val parsed = com.bas080.notificationreminders.receivers.CreateReminderReceiver
                 .parseRecurrenceDuration(cleanText)
 
-            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+            kotlinx.coroutines.runBlocking {
                 val db = com.bas080.notificationreminders.data.PuntDatabase.getInstance(this@ProcessTextActivity)
                 db.reminderDao().insert(
                     com.bas080.notificationreminders.data.ReminderEntity(

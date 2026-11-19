@@ -77,12 +77,14 @@ class ScreenshotGeneratorTest {
 
     private fun captureScreenshot1Overview() {
         val app = RuntimeEnvironment.getApplication()
-        val prefs = app.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
-        prefs.edit().clear().putStringSet(
-            "key_reminders_list",
-            setOf("Buy groceries #groceries", "Call dentist at 3 PM #health", "Prepare presentation #work", "Review quarterly goals #work")
-        ).commit()
-
+        val dao = com.bas080.notificationreminders.data.PuntDatabase.getInstance(app).reminderDao()
+        kotlinx.coroutines.runBlocking { dao.deleteAll() }
+        kotlinx.coroutines.runBlocking {
+            dao.insert(com.bas080.notificationreminders.data.ReminderEntity(text = "Buy groceries #groceries"))
+            dao.insert(com.bas080.notificationreminders.data.ReminderEntity(text = "Call dentist at 3 PM #health"))
+            dao.insert(com.bas080.notificationreminders.data.ReminderEntity(text = "Prepare presentation #work"))
+            dao.insert(com.bas080.notificationreminders.data.ReminderEntity(text = "Review quarterly goals #work"))
+        }
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
         shadowOf(Looper.getMainLooper()).idle()
@@ -94,14 +96,14 @@ class ScreenshotGeneratorTest {
 
     private fun captureScreenshot2Punted() {
         val app = RuntimeEnvironment.getApplication()
-        val prefs = app.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
-        val now = System.currentTimeMillis()
-        prefs.edit().clear()
-            .putStringSet("key_reminders_list", setOf("Call dentist at 3 PM #health", "Prepare presentation #work", "Pay electricity bill #home", "Review budget #finance"))
-            .putLong("snooze_pay electricity bill #home", now + 2 * 3600 * 1000L)
-            .putLong("snooze_review budget #finance", now + 24 * 3600 * 1000L)
-            .commit()
-
+        val dao = com.bas080.notificationreminders.data.PuntDatabase.getInstance(app).reminderDao()
+        kotlinx.coroutines.runBlocking { dao.deleteAll() }
+        kotlinx.coroutines.runBlocking {
+            dao.insert(com.bas080.notificationreminders.data.ReminderEntity(text = "Call dentist at 3 PM #health"))
+            dao.insert(com.bas080.notificationreminders.data.ReminderEntity(text = "Prepare presentation #work"))
+            dao.insert(com.bas080.notificationreminders.data.ReminderEntity(text = "Pay electricity bill #home", snoozeUntil = now + 2 * 3600 * 1000L))
+            dao.insert(com.bas080.notificationreminders.data.ReminderEntity(text = "Review budget #finance", snoozeUntil = now + 24 * 3600 * 1000L))
+        }
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
         shadowOf(Looper.getMainLooper()).idle()
@@ -113,12 +115,15 @@ class ScreenshotGeneratorTest {
 
     private fun captureScreenshot3FilterDialog() {
         val app = RuntimeEnvironment.getApplication()
-        val prefs = app.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
-        prefs.edit().clear().putStringSet(
-            "key_reminders_list",
-            setOf("Buy groceries #groceries", "Call dentist #health", "Pay electric bill #home", "Prepare slides #work", "Review budget #finance")
-        ).commit()
-
+        val dao = com.bas080.notificationreminders.data.PuntDatabase.getInstance(app).reminderDao()
+        kotlinx.coroutines.runBlocking { dao.deleteAll() }
+        kotlinx.coroutines.runBlocking {
+            dao.insert(com.bas080.notificationreminders.data.ReminderEntity(text = "Buy groceries #groceries"))
+            dao.insert(com.bas080.notificationreminders.data.ReminderEntity(text = "Call dentist #health"))
+            dao.insert(com.bas080.notificationreminders.data.ReminderEntity(text = "Pay electric bill #home"))
+            dao.insert(com.bas080.notificationreminders.data.ReminderEntity(text = "Prepare slides #work"))
+            dao.insert(com.bas080.notificationreminders.data.ReminderEntity(text = "Review budget #finance"))
+        }
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
 
@@ -177,12 +182,13 @@ class ScreenshotGeneratorTest {
 
     private fun captureScreenshot6KeyboardEditing() {
         val app = RuntimeEnvironment.getApplication()
-        val prefs = app.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
-        prefs.edit().clear().putStringSet(
-            "key_reminders_list",
-            setOf("Buy groceries #groceries", "Call dentist at 3 PM #health", "Prepare presentation #work")
-        ).commit()
-
+        val dao = com.bas080.notificationreminders.data.PuntDatabase.getInstance(app).reminderDao()
+        kotlinx.coroutines.runBlocking { dao.deleteAll() }
+        kotlinx.coroutines.runBlocking {
+            dao.insert(com.bas080.notificationreminders.data.ReminderEntity(text = "Buy groceries #groceries"))
+            dao.insert(com.bas080.notificationreminders.data.ReminderEntity(text = "Call dentist at 3 PM #health"))
+            dao.insert(com.bas080.notificationreminders.data.ReminderEntity(text = "Prepare presentation #work"))
+        }
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
 

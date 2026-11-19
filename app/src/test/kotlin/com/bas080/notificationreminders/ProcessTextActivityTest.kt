@@ -17,6 +17,14 @@ import org.robolectric.shadows.ShadowToast
 @Config(sdk = [34])
 class ProcessTextActivityTest {
 
+    @org.junit.Before
+    fun setUp() {
+        val context = RuntimeEnvironment.getApplication()
+        kotlinx.coroutines.runBlocking {
+            com.bas080.notificationreminders.data.PuntDatabase.getInstance(context).reminderDao().deleteAll()
+        }
+    }
+
     @Test
     fun testProcessTextActionCreatesReminder() {
         val context = RuntimeEnvironment.getApplication()
@@ -32,9 +40,9 @@ class ProcessTextActivityTest {
 
         assertEquals("Reminder created", ShadowToast.getTextOfLatestToast())
 
-        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
-        val savedSet = prefs.getStringSet("key_reminders_list", emptySet()) ?: emptySet()
-        assertTrue("Saved reminders should contain selected text", savedSet.contains("Buy milk today"))
+        val dao = com.bas080.notificationreminders.data.PuntDatabase.getInstance(context).reminderDao()
+        val stored = kotlinx.coroutines.runBlocking { dao.getReminderByText("Buy milk today") }
+        assertTrue("Reminder should be stored in Room", stored != null)
 
         assertTrue("Activity should be finishing", controller.get().isFinishing)
     }
@@ -54,9 +62,9 @@ class ProcessTextActivityTest {
 
         assertEquals("Reminder created", ShadowToast.getTextOfLatestToast())
 
-        val prefs = context.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
-        val savedSet = prefs.getStringSet("key_reminders_list", emptySet()) ?: emptySet()
-        assertTrue("Saved reminders should contain shared text", savedSet.contains("Call doctor tomorrow"))
+        val dao = com.bas080.notificationreminders.data.PuntDatabase.getInstance(context).reminderDao()
+        val stored = kotlinx.coroutines.runBlocking { dao.getReminderByText("Call doctor tomorrow") }
+        assertTrue("Reminder should be stored in Room", stored != null)
 
         assertTrue("Activity should be finishing", controller.get().isFinishing)
     }

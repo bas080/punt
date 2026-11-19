@@ -22,6 +22,14 @@ import org.robolectric.shadows.ShadowToast
 @Config(sdk = [34])
 class CreateReminderActivityTest {
 
+    @org.junit.Before
+    fun setUp() {
+        val context = RuntimeEnvironment.getApplication()
+        kotlinx.coroutines.runBlocking {
+            com.bas080.notificationreminders.data.PuntDatabase.getInstance(context).reminderDao().deleteAll()
+        }
+    }
+
     @Test
     fun testActionCreateReminderTitleOnly() {
         val intent = Intent("android.intent.action.CREATE_REMINDER").apply {
@@ -42,9 +50,9 @@ class CreateReminderActivityTest {
         assertEquals(Activity.RESULT_OK, shadowOf(activity).resultCode)
         assertEquals("Reminder created", ShadowToast.getTextOfLatestToast())
 
-        val prefs = activity.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
-        val savedReminders = prefs.getStringSet("key_reminders_list", emptySet()) ?: emptySet()
-        assertTrue(savedReminders.contains("Call Alice"))
+        val dao = com.bas080.notificationreminders.data.PuntDatabase.getInstance(activity).reminderDao()
+        val stored = kotlinx.coroutines.runBlocking { dao.getReminderByText("Call Alice") }
+        assertNotNull("Reminder should be stored in Room", stored)
     }
 
     @Test
@@ -66,9 +74,9 @@ class CreateReminderActivityTest {
 
         assertEquals(Activity.RESULT_OK, shadowOf(activity).resultCode)
 
-        val prefs = activity.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
-        val savedReminders = prefs.getStringSet("key_reminders_list", emptySet()) ?: emptySet()
-        assertTrue(savedReminders.contains("Call Alice: Discuss the project"))
+        val dao = com.bas080.notificationreminders.data.PuntDatabase.getInstance(activity).reminderDao()
+        val stored = kotlinx.coroutines.runBlocking { dao.getReminderByText("Call Alice: Discuss the project") }
+        assertNotNull("Reminder should be stored in Room", stored)
     }
 
     @Test
@@ -91,11 +99,11 @@ class CreateReminderActivityTest {
 
         assertEquals(Activity.RESULT_OK, shadowOf(activity).resultCode)
 
-        val prefs = activity.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
-        val savedReminders = prefs.getStringSet("key_reminders_list", emptySet()) ?: emptySet()
-        assertTrue(savedReminders.contains("Dentist Appointment"))
+        val dao = com.bas080.notificationreminders.data.PuntDatabase.getInstance(activity).reminderDao()
+        val stored = kotlinx.coroutines.runBlocking { dao.getReminderByText("Dentist Appointment") }
+        assertNotNull("Reminder should be stored in Room", stored)
 
-        val snoozeVal = prefs.getLong("snooze_dentist appointment", 0L)
+        val snoozeVal = stored!!.snoozeUntil ?: 0L
         assertEquals(futureTime, snoozeVal)
     }
 
@@ -120,11 +128,11 @@ class CreateReminderActivityTest {
 
         assertEquals(Activity.RESULT_OK, shadowOf(activity).resultCode)
 
-        val prefs = activity.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
-        val savedReminders = prefs.getStringSet("key_reminders_list", emptySet()) ?: emptySet()
-        assertTrue(savedReminders.contains("Team Sync: Room 404"))
+        val dao = com.bas080.notificationreminders.data.PuntDatabase.getInstance(activity).reminderDao()
+        val stored = kotlinx.coroutines.runBlocking { dao.getReminderByText("Team Sync: Room 404") }
+        assertNotNull("Reminder should be stored in Room", stored)
 
-        val snoozeVal = prefs.getLong("snooze_team sync: room 404", 0L)
+        val snoozeVal = stored!!.snoozeUntil ?: 0L
         assertEquals(futureTime, snoozeVal)
     }
 
@@ -164,8 +172,8 @@ class CreateReminderActivityTest {
 
         assertEquals(Activity.RESULT_CANCELED, shadowOf(activity).resultCode)
 
-        val prefs = activity.getSharedPreferences("reminders_prefs", Context.MODE_PRIVATE)
-        val savedReminders = prefs.getStringSet("key_reminders_list", emptySet()) ?: emptySet()
-        assertTrue(!savedReminders.contains("Cancelled Task"))
+        val dao = com.bas080.notificationreminders.data.PuntDatabase.getInstance(activity).reminderDao()
+        val stored = kotlinx.coroutines.runBlocking { dao.getReminderByText("Cancelled Task") }
+        assertTrue("Cancelled task should not be stored in Room", stored == null)
     }
 }
