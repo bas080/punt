@@ -16,6 +16,12 @@ interface ReminderDao {
     @Query("SELECT * FROM reminders WHERE text = :text LIMIT 1")
     suspend fun getReminderByText(text: String): ReminderEntity?
 
+    @Query("SELECT * FROM reminders WHERE id = :id LIMIT 1")
+    suspend fun getReminderById(id: Long): ReminderEntity?
+
+    @Query("UPDATE reminders SET snooze_until = :snoozeUntil, updated_at = :updatedAt WHERE id = :id")
+    suspend fun updateSnoozeById(id: Long, snoozeUntil: Long?, updatedAt: Long = System.currentTimeMillis())
+
     @Query("SELECT * FROM reminders WHERE is_done = 0 AND (snooze_until IS NULL OR snooze_until <= :now)")
     suspend fun getActiveReminders(now: Long): List<ReminderEntity>
 

@@ -80,12 +80,14 @@ class MainActivityTest {
     }
 
     @Test
-    fun testShiftEnterInsertsNewlineInSearchInput() {
+    fun testEnterAlwaysCreatesItemAndNewlinesNotSupported() {
+        val context = RuntimeEnvironment.getApplication()
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
 
         val input = activity.findViewById<EditText>(R.id.search_reminder_input)
         assertNotNull(input)
+        assertEquals("Input must be single-line", 1, input.maxLines)
 
         input.setText("Line 1")
         input.setSelection(6)
@@ -96,13 +98,26 @@ class MainActivityTest {
             android.view.KeyEvent.META_SHIFT_ON
         )
         input.dispatchKeyEvent(shiftEnterDown)
+        shadowOf(android.os.Looper.getMainLooper()).idle()
 
-        assertEquals("Line 1\n", input.text.toString())
-        assertNull("No creation toast expected on Shift+Enter", ShadowToast.getTextOfLatestToast())
+        assertEquals("Reminder created", ShadowToast.getTextOfLatestToast())
+        assertEquals("", input.text.toString())
+        assertNotNull("Shift+Enter should create the reminder", storedTask(context, "Line 1"))
+
+        input.setText("Line 2")
+        val plainEnterDown = android.view.KeyEvent(
+            0L, 0L, android.view.KeyEvent.ACTION_DOWN,
+            android.view.KeyEvent.KEYCODE_ENTER, 0, 0
+        )
+        input.dispatchKeyEvent(plainEnterDown)
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        assertNotNull("Plain Enter should create the reminder", storedTask(context, "Line 2"))
     }
 
     @Test
     fun testPlainEnterSubmitsTaskFromSearchInput() {
+        val context = RuntimeEnvironment.getApplication()
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
 
@@ -110,15 +125,18 @@ class MainActivityTest {
         assertNotNull(input)
 
         input.setText("Task line 1\nTask line 2")
+        assertEquals("Pasted newlines must be collapsed to spaces", "Task line 1 Task line 2", input.text.toString())
 
         val enterDown = android.view.KeyEvent(
             0L, 0L, android.view.KeyEvent.ACTION_DOWN,
             android.view.KeyEvent.KEYCODE_ENTER, 0, 0
         )
         input.dispatchKeyEvent(enterDown)
+        shadowOf(android.os.Looper.getMainLooper()).idle()
 
         assertEquals("Reminder created", ShadowToast.getTextOfLatestToast())
         assertEquals("", input.text.toString())
+        assertNotNull("Reminder should be created without newlines", storedTask(context, "Task line 1 Task line 2"))
     }
 
     @Test
@@ -1209,6 +1227,7 @@ class MainActivityTest {
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
         val recyclerView = activity.findViewById<RecyclerView>(R.id.reminders_list)
+        recyclerView.itemAnimator = null
 
         recyclerView.measure(View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY))
         recyclerView.layout(0, 0, 1000, 1000)
@@ -1258,6 +1277,9 @@ class MainActivityTest {
         listenerField.isAccessible = true
         val refreshListener = listenerField.get(swipeRefreshLayout) as? androidx.swiperefreshlayout.widget.SwipeRefreshLayout.OnRefreshListener
         refreshListener!!.onRefresh()
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+        recyclerView.measure(View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY))
+        recyclerView.layout(0, 0, 1000, 1000)
         shadowOf(android.os.Looper.getMainLooper()).idle()
 
         assertFalse("Undo history should be cleared at refresh", activity.isSwipeUndoable("Task 1"))
@@ -1311,6 +1333,7 @@ class MainActivityTest {
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
         val recyclerView = activity.findViewById<RecyclerView>(R.id.reminders_list)
+        recyclerView.itemAnimator = null
         val swipeHandler = activity.createSwipeHandler()
 
         val swipeAndIdle = { direction: Int ->
@@ -1367,6 +1390,107 @@ class MainActivityTest {
         assertFalse(activity.isSwipeUndoable("Water plants #every 1d"))
     }
 
+    @Test
+    fun testSwipeStateMachineTracksIdKeyedUndoChains() {
+        val machine = SwipeStateMachine()
+
+        assertEquals(SwipeStateMachine.CardState.ACTIVE, machine.stateOf(1L))
+        assertFalse(machine.canUndo(1L))
+
+        machine.record(1L, SwipeTransition(SwipeActionKind.PUNT, machine.stateOf(1L), null, false))
+        machine.record(1L, SwipeTransition(SwipeActionKind.DONE, machine.stateOf(1L), 3600000L, false))
+        machine.record(1L, SwipeTransition(SwipeActionKind.DELETE, machine.stateOf(1L), null, false))
+
+        assertEquals(SwipeStateMachine.CardState.DELETE_PENDING, machine.stateOf(1L))
+        assertTrue(machine.canUndo(1L))
+        assertEquals(setOf(1L), machine.undoableKeys())
+        assertEquals(setOf(1L), machine.pendingDeleteIds())
+
+        assertEquals(SwipeActionKind.DELETE, machine.pop(1L)?.kind)
+        assertEquals(SwipeStateMachine.CardState.DONE_PENDING, machine.stateOf(1L))
+        assertEquals(SwipeActionKind.DONE, machine.pop(1L)?.kind)
+        assertEquals(SwipeStateMachine.CardState.PUNT_PENDING, machine.stateOf(1L))
+        assertEquals(SwipeActionKind.PUNT, machine.pop(1L)?.kind)
+        assertEquals(SwipeStateMachine.CardState.ACTIVE, machine.stateOf(1L))
+        assertFalse(machine.canUndo(1L))
+
+        val other = SwipeStateMachine()
+        other.record(7L, SwipeTransition(SwipeActionKind.PUNT, other.stateOf(7L), 1000L, true))
+        other.record(7L, SwipeTransition(SwipeActionKind.DONE, other.stateOf(7L), 1000L, false))
+        assertTrue(other.canUndo(7L))
+        assertTrue(other.pendingFromPuntedSection(7L) == false)
+        other.pop(7L)
+        assertTrue(other.pendingFromPuntedSection(7L) == true)
+        assertEquals(SwipeStateMachine.CardState.PUNT_PENDING, other.stateOf(7L))
+        assertEquals(emptySet<Long>(), other.pendingDeleteIds())
+        other.clearAll()
+        assertFalse(other.canUndo(7L))
+
+        val third = SwipeStateMachine()
+        third.record(9L, SwipeTransition(SwipeActionKind.PUNT, third.stateOf(9L), null, false))
+        assertTrue(third.pendingDeleteIds().isEmpty())
+    }
+
+    @Test
+    fun testLeftSwipeWithSnoozeDurationShowsUndoableCard() {
+        val context = RuntimeEnvironment.getApplication()
+        seedTasks(context, "Task 1" to null)
+
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = controller.get()
+        val recyclerView = activity.findViewById<RecyclerView>(R.id.reminders_list)
+        recyclerView.itemAnimator = null
+        val swipeHandler = activity.createSwipeHandler()
+
+        recyclerView.measure(View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY))
+        recyclerView.layout(0, 0, 1000, 1000)
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        val holder = recyclerView.findViewHolderForAdapterPosition(1)
+        swipeHandler.onSwiped(holder!!, ItemTouchHelper.LEFT)
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        val dialog = ShadowAlertDialog.getLatestDialog() as? AlertDialog
+        assertNotNull("Left swipe should open the punt dialog", dialog)
+        val inputEditText = dialog!!.findViewById<EditText>(R.id.import_input)
+        assertNotNull("Dialog should contain the custom duration input", inputEditText)
+        val parentLayout = inputEditText!!.parent as android.view.ViewGroup
+        val optionsList = parentLayout.getChildAt(0) as android.view.ViewGroup
+        val firstChoice = optionsList.getChildAt(0) as TextView
+        firstChoice.performClick()
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        assertTrue("Chosen punt duration should be undoable", activity.isSwipeUndoable("Task 1"))
+        assertTrue("Punt should be stored in Room", (storedTask(context, "Task 1")?.snoozeUntil ?: 0L) > System.currentTimeMillis())
+
+        val displayed = activity.getDisplayedRemindersForTesting()
+        assertFalse("Undoable card must stay in place, not move to punted section", displayed.contains("HEADER_SNOOZED_SECTION_MARKER"))
+        assertEquals("Undoable card keeps its position", 1, displayed.indexOf("Task 1"))
+
+        recyclerView.measure(View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY))
+        recyclerView.layout(0, 0, 1000, 1000)
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+        val undoableHolder = recyclerView.findViewHolderForAdapterPosition(1) as RemindersAdapter.ItemViewHolder
+        assertEquals("Undoable card should be grayed out", 0.5f, undoableHolder.reminderInput.alpha, 0.01f)
+        assertEquals("Undoable card should hide share button", View.GONE, undoableHolder.btnShare.visibility)
+        assertEquals("Undoable card should show undo button", View.VISIBLE, undoableHolder.btnAction.visibility)
+        assertEquals("Undo", undoableHolder.btnAction.contentDescription)
+        assertEquals(View.VISIBLE, undoableHolder.txtStatus.visibility)
+
+        activity.undoSwipeAction("Task 1")
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        assertEquals("Punt cancelled", ShadowToast.getTextOfLatestToast())
+        assertEquals("Undo should clear the punt", 0L, storedTask(context, "Task 1")?.snoozeUntil ?: 0L)
+        assertFalse(activity.isSwipeUndoable("Task 1"))
+        assertEquals("Undoable card keeps its position after undo", 1, activity.getDisplayedRemindersForTesting().indexOf("Task 1"))
+        recyclerView.measure(View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY))
+        recyclerView.layout(0, 0, 1000, 1000)
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+        val undoneHolder = recyclerView.findViewHolderForAdapterPosition(1) as RemindersAdapter.ItemViewHolder
+        assertEquals("Fully undone card should be full opacity", 1.0f, undoneHolder.reminderInput.alpha, 0.01f)
+        assertEquals("Fully undone card should show share button again", View.VISIBLE, undoneHolder.btnShare.visibility)
+    }
     @Test
     fun testRemindersAdapterEditingFocusAndAccessibility() {
         val context = RuntimeEnvironment.getApplication()
@@ -1502,6 +1626,64 @@ class MainActivityTest {
 
         val recurringResult = CreateReminderReceiver.parseRecurrenceDuration("Water plants #every 1d")
         assertNotNull(recurringResult)
+        assertEquals(R.drawable.ic_action_repeat, activity.getRightSwipePeekIcon("Water plants #every 1d"))
+        assertEquals(R.drawable.ic_action_snooze, activity.getLeftSwipePeekIcon("Water plants #every 1d"))
+    }
+
+    @Test
+    fun testPeekIconsMatchSwipeActionsInAllStates() {
+        val context = RuntimeEnvironment.getApplication()
+        val punted = System.currentTimeMillis() + 3600000L
+        seedTasks(context, "Buy milk" to null, "Water plants #every 1d" to null, "Punted Task" to punted, "Done Task #done" to null)
+
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = controller.get()
+        val recyclerView = activity.findViewById<RecyclerView>(R.id.reminders_list)
+        val swipeHandler = activity.createSwipeHandler()
+
+        assertEquals("Active non-recurring left: opens punt dialog", R.drawable.ic_action_snooze, activity.getLeftSwipePeekIcon("Buy milk"))
+        assertEquals("Active non-recurring right: marks done", R.drawable.ic_action_done, activity.getRightSwipePeekIcon("Buy milk"))
+
+        assertEquals("Active recurring left: opens punt dialog", R.drawable.ic_action_snooze, activity.getLeftSwipePeekIcon("Water plants #every 1d"))
+        assertEquals("Active recurring right: punts by recurrence", R.drawable.ic_action_repeat, activity.getRightSwipePeekIcon("Water plants #every 1d"))
+
+        assertEquals("Punted non-recurring left: opens punt dialog", R.drawable.ic_action_snooze, activity.getLeftSwipePeekIcon("Punted Task"))
+        assertEquals("Punted non-recurring right: marks done", R.drawable.ic_action_done, activity.getRightSwipePeekIcon("Punted Task"))
+
+        assertEquals("Done left: undoes", R.drawable.ic_action_undo, activity.getLeftSwipePeekIcon("Done Task #done"))
+        assertEquals("Done right: requests delete", R.drawable.ic_action_delete, activity.getRightSwipePeekIcon("Done Task #done"))
+
+        val swipeRight = { text: String ->
+            recyclerView.measure(View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY))
+            recyclerView.layout(0, 0, 1000, 1000)
+            shadowOf(android.os.Looper.getMainLooper()).idle()
+            val items = activity.getDisplayedRemindersForTesting()
+            val pos = items.indexOfFirst { it == text }
+            swipeHandler.onSwiped(recyclerView.findViewHolderForAdapterPosition(pos)!!, ItemTouchHelper.RIGHT)
+            shadowOf(android.os.Looper.getMainLooper()).idle()
+        }
+
+        swipeRight("Water plants #every 1d")
+        assertTrue("Punted recurring card should be undoable", activity.isSwipeUndoable("Water plants #every 1d"))
+        assertEquals("Undoable punted recurring left: undoes the punt", R.drawable.ic_action_undo, activity.getLeftSwipePeekIcon("Water plants #every 1d"))
+        assertEquals("Undoable punted recurring right: marks done", R.drawable.ic_action_done, activity.getRightSwipePeekIcon("Water plants #every 1d"))
+
+        swipeRight("Water plants #every 1d")
+        val stored = storedTask(context, "Water plants #every 1d")
+        assertNotNull(stored)
+        assertTrue("Second right swipe on undoable punted recurring should mark done", stored!!.isDone)
+        assertEquals("Done card left: undoes", R.drawable.ic_action_undo, activity.getLeftSwipePeekIcon("Water plants #every 1d #done"))
+        assertEquals("Done card right: requests delete", R.drawable.ic_action_delete, activity.getRightSwipePeekIcon("Water plants #every 1d #done"))
+
+        swipeRight("Water plants #every 1d #done")
+        assertTrue(activity.isPendingDelete("Water plants #every 1d #done"))
+        recyclerView.measure(View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY))
+        recyclerView.layout(0, 0, 1000, 1000)
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+        val pendingPos = activity.getDisplayedRemindersForTesting().indexOfFirst { it == "Water plants #every 1d #done" }
+        val pendingHolder = recyclerView.findViewHolderForAdapterPosition(pendingPos)
+        assertEquals("Pending delete only allows left swipe", ItemTouchHelper.LEFT, swipeHandler.getSwipeDirs(recyclerView, pendingHolder!!))
+        assertEquals("Pending delete left: undoes the delete", R.drawable.ic_action_undo, activity.getLeftSwipePeekIcon("Water plants #every 1d #done"))
     }
 
     @Test
