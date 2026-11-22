@@ -1297,7 +1297,7 @@ class MainActivityTest {
     @Test
     fun testPendingDeleteCardShowsRedBorderUndoableUntilRefresh() {
         val context = RuntimeEnvironment.getApplication()
-        seedTasks(context, "Task 1" to null)
+        seedTasks(context, "Task 1" to null, "Other Task" to null)
 
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
@@ -1305,57 +1305,59 @@ class MainActivityTest {
         val swipeHandler = activity.createSwipeHandler()
         recyclerView.itemAnimator = null
 
-        recyclerView.measure(View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY))
-        recyclerView.layout(0, 0, 1000, 1000)
-        shadowOf(android.os.Looper.getMainLooper()).idle()
+        val reLayout = {
+            recyclerView.measure(View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY))
+            recyclerView.layout(0, 0, 1000, 1000)
+            shadowOf(android.os.Looper.getMainLooper()).idle()
+        }
+        val holderFor = { text: String ->
+            val pos = activity.getDisplayedRemindersForTesting().indexOfFirst { it == text }
+            recyclerView.findViewHolderForAdapterPosition(pos) as RemindersAdapter.ItemViewHolder
+        }
 
-        val holder = recyclerView.findViewHolderForAdapterPosition(1) as RemindersAdapter.ItemViewHolder
+        reLayout()
+        val holder = holderFor("Task 1")
         assertEquals("Active card should use the default border", R.drawable.bg_card, (holder.cardContainer.tag as? Int))
 
         swipeHandler.onSwiped(holder, ItemTouchHelper.RIGHT)
         shadowOf(android.os.Looper.getMainLooper()).idle()
 
-        recyclerView.measure(View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY))
-        recyclerView.layout(0, 0, 1000, 1000)
-        shadowOf(android.os.Looper.getMainLooper()).idle()
-        val doneHolder = recyclerView.findViewHolderForAdapterPosition(1) as RemindersAdapter.ItemViewHolder
+        reLayout()
+        val doneHolder = holderFor("Task 1 #done")
         assertTrue("Done card should be undoable", activity.isSwipeUndoable("Task 1 #done"))
         assertEquals("Undoable done card keeps the default border", R.drawable.bg_card, (doneHolder.cardContainer.tag as? Int))
+        assertTrue("Done task should be marked done in Room", storedTask(context, "Task 1")!!.isDone)
 
         swipeHandler.onSwiped(doneHolder, ItemTouchHelper.RIGHT)
         shadowOf(android.os.Looper.getMainLooper()).idle()
         assertEquals(activity.getString(R.string.toast_reminder_pending_delete), ShadowToast.getTextOfLatestToast())
 
-        recyclerView.measure(View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY))
-        recyclerView.layout(0, 0, 1000, 1000)
-        shadowOf(android.os.Looper.getMainLooper()).idle()
-        val deleteHolder = recyclerView.findViewHolderForAdapterPosition(1) as RemindersAdapter.ItemViewHolder
+        reLayout()
+        val deleteHolder = holderFor("Task 1 #done")
         assertTrue("Pending delete card should be undoable", activity.isSwipeUndoable("Task 1 #done"))
         assertEquals("Pending delete card should show a red border", R.drawable.bg_card_delete, (deleteHolder.cardContainer.tag as? Int))
         assertEquals(View.GONE, deleteHolder.btnShare.visibility)
         assertEquals(View.VISIBLE, deleteHolder.btnAction.visibility)
         assertEquals("Undo mark done", deleteHolder.btnAction.contentDescription)
         assertNotNull("Reminder should not be deleted until refresh", storedTask(context, "Task 1"))
+        assertEquals("Pending delete card only accepts left swipes", ItemTouchHelper.LEFT, swipeHandler.getSwipeDirs(recyclerView, deleteHolder))
 
         swipeHandler.onSwiped(deleteHolder, ItemTouchHelper.LEFT)
         shadowOf(android.os.Looper.getMainLooper()).idle()
+        assertEquals("Delete undone", ShadowToast.getTextOfLatestToast())
 
-        recyclerView.measure(View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY))
-        recyclerView.layout(0, 0, 1000, 1000)
-        shadowOf(android.os.Looper.getMainLooper()).idle()
-        val restoredDoneHolder = recyclerView.findViewHolderForAdapterPosition(1) as RemindersAdapter.ItemViewHolder
+        reLayout()
+        val restoredDoneHolder = holderFor("Task 1 #done")
         assertTrue("Undoing delete should keep the done card undoable", activity.isSwipeUndoable("Task 1 #done"))
         assertEquals("Undoing delete restores the default border", R.drawable.bg_card, (restoredDoneHolder.cardContainer.tag as? Int))
         assertTrue("Done task should remain stored", storedTask(context, "Task 1")!!.isDone)
 
         swipeHandler.onSwiped(restoredDoneHolder, ItemTouchHelper.RIGHT)
         shadowOf(android.os.Looper.getMainLooper()).idle()
+        assertEquals(activity.getString(R.string.toast_reminder_pending_delete), ShadowToast.getTextOfLatestToast())
 
-        recyclerView.measure(View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY))
-        recyclerView.layout(0, 0, 1000, 1000)
-        shadowOf(android.os.Looper.getMainLooper()).idle()
-        val pendingDeleteHolder = recyclerView.findViewHolderForAdapterPosition(1) as RemindersAdapter.ItemViewHolder
-        assertEquals("Pending delete card only accepts left swipes", ItemTouchHelper.LEFT, swipeHandler.getSwipeDirs(recyclerView, pendingDeleteHolder))
+        reLayout()
+        assertEquals("Re-pending delete card shows the red border again", R.drawable.bg_card_delete, (holderFor("Task 1 #done").cardContainer.tag as? Int))
 
         val swipeRefreshLayout = activity.findViewById<androidx.swiperefreshlayout.widget.SwipeRefreshLayout>(R.id.swipe_refresh_layout)
         swipeRefreshLayout.isRefreshing = true
@@ -1369,6 +1371,7 @@ class MainActivityTest {
         assertNull("Pending delete should be finalized at refresh", storedTask(context, "Task 1"))
         assertFalse("Swipe history should be cleared at refresh", activity.isSwipeUndoable("Task 1 #done"))
         assertFalse("Deleted card should be removed after refresh", activity.getDisplayedRemindersForTesting().contains("Task 1 #done"))
+        assertTrue("Other task should survive the refresh", storedTask(context, "Other Task") != null)
     }
 
     @Test
