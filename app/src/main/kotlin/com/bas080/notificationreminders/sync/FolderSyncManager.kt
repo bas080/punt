@@ -1,5 +1,6 @@
 package com.bas080.notificationreminders.sync
 
+import android.content.ContentResolver
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -74,18 +75,18 @@ object FolderSyncManager {
 
     internal fun syncNow(context: Context): Boolean {
         pendingSync = null
-        val treeUri = getTreeUri(context) ?: return false
-        if (!isEnabled(context)) return false
+        val treeUri = getTreeUri(context)
+        if (treeUri == null || !isEnabled(context)) return false
         return try {
             val markdown = buildSyncContent(context)
-            if (markdown == lastSyncedContent) return true
-            if (writeToTree(context, treeUri, markdown)) {
+            val synced = markdown == lastSyncedContent || writeToTree(context, treeUri, markdown)
+            if (synced) {
                 lastSyncedContent = markdown
                 AppLogger.log(context, "FolderSync", "Synced $SYNC_FILE_NAME")
-                true
             } else {
-                false
+                AppLogger.log(context, "FolderSync", "Folder sync failed")
             }
+            synced
         } catch (e: SecurityException) {
             AppLogger.log(context, "FolderSync", "Folder permission revoked: ${e.message}")
             setEnabled(context, false)
@@ -110,70 +111,45 @@ object FolderSyncManager {
     private fun writeToTree(context: Context, treeUri: Uri, markdown: String): Boolean {
         val resolver = context.contentResolver
         val rootDocId = DocumentsContract.getTreeDocumentId(treeUri)
-        val rootUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, rootDocId)
-        val documentId = findDocumentId(context, resolver, treeUri, rootDocId)
-            ?: createDocument(context, resolver, rootUri)
-            ?: return false
-        return try {
-            resolver.openOutputStream(
-                DocumentsContract.buildDocumentUriUsingTree(treeUri, documentId),
-                "w"
-            )?.use { stream ->
-                stream.write(markdown.toByteArray(Charsets.UTF_8))
-                true
-            } ?: false.also { AppLogger.log(context, "FolderSync", "Could not open $SYNC_FILE_NAME") }
-        } catch (e: SecurityException) {
-            throw e
-        }
-    }
-
-    private fun findDocument(
-        context: Context,
-        resolver: android.content.ContentResolver,
-        treeUri: Uri,
-        rootDocId: String
-    ): String? {
         val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, rootDocId)
-        return try {
-            resolver.query(
-                childrenUri,
-                arrayOf(
-                    DocumentsContract.Document.COLUMN_DOCUMENT_ID,
-                    DocumentsContract.Document.COLUMN_DISPLAY_NAME
-                ),
-                null,
-                null,
-                null
-            )?.use { cursor ->
-                while (cursor.moveToNext()) {
-                    if (cursor.getString(1) == SYNC_FILE_NAME) {
-                        return cursor.getString(0)
-                    }
-                }
+        val rootUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, rootDocId)
+        val documentId = resolveSyncDocument(resolver, childrenUri, rootUri)
+            ?: run {
+                AppLogger.log(context, "FolderSync", "Could not resolve $SYNC_FILE_NAME in the sync folder")
                 null
             }
-        } catch (e: SecurityException) {
-            throw e
-        } catch (_: Exception) {
-            AppLogger.log(context, "FolderSync", "Could not list sync folder")
-            null
+        val documentUri = documentId?.let { DocumentsContract.buildDocumentUriUsingTree(treeUri, it) }
+        val stream = documentUri?.let { resolver.openOutputStream(it, "w") }
+        if (stream == null) {
+            AppLogger.log(context, "FolderSync", "Could not open $SYNC_FILE_NAME for writing")
         }
+        stream?.use { it.write(markdown.toByteArray(Charsets.UTF_8)) }
+        return stream != null
     }
 
-    private fun createDocument(
-        context: Context,
-        resolver: android.content.ContentResolver,
-        rootUri: Uri
-    ): String? {
-        return try {
-            DocumentsContract.createDocument(resolver, rootUri, SYNC_MIME_TYPE, SYNC_FILE_NAME)
-                ?.let { DocumentsContract.getDocumentId(it) }
-        } catch (e: SecurityException) {
-            throw e
-        } catch (_: Exception) {
-            AppLogger.log(context, "FolderSync", "Could not create $SYNC_FILE_NAME")
+    private fun resolveSyncDocument(resolver: ContentResolver, childrenUri: Uri, rootUri: Uri): String? {
+        val foundId = resolver.query(
+            childrenUri,
+            arrayOf(
+                DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                DocumentsContract.Document.COLUMN_DISPLAY_NAME
+            ),
+            null,
+            null,
             null
+        )?.use { cursor ->
+            var matchId: String? = null
+            while (cursor.moveToNext()) {
+                if (cursor.getString(1) == SYNC_FILE_NAME) {
+                    matchId = cursor.getString(0)
+                    break
+                }
+            }
+            matchId
         }
+        if (foundId != null) return foundId
+        return DocumentsContract.createDocument(resolver, rootUri, SYNC_MIME_TYPE, SYNC_FILE_NAME)
+            ?.let { DocumentsContract.getDocumentId(it) }
     }
 
     internal fun resetForTest() {
