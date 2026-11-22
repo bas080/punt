@@ -290,14 +290,14 @@ class MainActivity : AppCompatActivity() {
             }
             val rowTitleTv = TextView(this).apply {
                 text = titleText
-                setTextColor(textPrimaryColor)
                 setTextAppearance(android.R.style.TextAppearance_Small)
+                setTextColor(textPrimaryColor)
                 setTypeface(null, android.graphics.Typeface.BOLD)
             }
             val descriptionTv = TextView(this).apply {
                 text = descriptionText
-                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_secondary))
                 setTextAppearance(android.R.style.TextAppearance_Small)
+                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_secondary_bright))
             }
             row.addView(rowTitleTv)
             row.addView(descriptionTv)
@@ -320,14 +320,14 @@ class MainActivity : AppCompatActivity() {
         }
         val folderSyncTitleTv = TextView(this).apply {
             text = getString(R.string.folder_sync)
-            setTextColor(textPrimaryColor)
             setTextAppearance(android.R.style.TextAppearance_Small)
+            setTextColor(textPrimaryColor)
             setTypeface(null, android.graphics.Typeface.BOLD)
         }
         val folderSyncDescTv = TextView(this).apply {
             text = getString(R.string.folder_sync_desc)
-            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_secondary))
             setTextAppearance(android.R.style.TextAppearance_Small)
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_secondary_bright))
         }
         folderSyncLabel.addView(folderSyncTitleTv)
         folderSyncLabel.addView(folderSyncDescTv)
