@@ -2235,7 +2235,7 @@ class MainActivityTest {
         }
 
         val folderSyncRow = (findAboutDialogTitle(dialog!!, "Folder sync")!!.parent as View).parent as View
-        val folderSyncSwitch = (findAboutDialogTitle(dialog, "Folder sync")!!.parent as android.view.ViewGroup).getChildAt(1) as android.widget.Switch
+        val folderSyncSwitch = ((findAboutDialogTitle(dialog, "Folder sync")!!.parent as View).parent as android.view.ViewGroup).getChildAt(1) as android.widget.Switch
         assertFalse("Folder sync switch should start unchecked", folderSyncSwitch.isChecked)
 
         folderSyncRow.performClick()
@@ -2262,7 +2262,7 @@ class MainActivityTest {
         shadowOf(android.os.Looper.getMainLooper()).idle()
         val dialog2 = ShadowAlertDialog.getLatestDialog() as? AlertDialog
         assertNotNull(dialog2)
-        val folderSyncSwitch2 = (findAboutDialogTitle(dialog2!!, "Folder sync")!!.parent as android.view.ViewGroup).getChildAt(1) as android.widget.Switch
+        val folderSyncSwitch2 = ((findAboutDialogTitle(dialog2!!, "Folder sync")!!.parent as View).parent as android.view.ViewGroup).getChildAt(1) as android.widget.Switch
         assertTrue("Folder sync switch should reflect the on state", folderSyncSwitch2.isChecked)
         ((findAboutDialogTitle(dialog2, "Folder sync")!!.parent as View).parent as View).performClick()
         shadowOf(android.os.Looper.getMainLooper()).idle()
