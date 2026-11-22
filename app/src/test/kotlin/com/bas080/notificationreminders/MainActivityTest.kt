@@ -806,6 +806,14 @@ class MainActivityTest {
         assertEquals("Punt cancelled", ShadowToast.getTextOfLatestToast())
         val updatedSnooze = storedTask(context, "Snoozed Item")?.snoozeUntil ?: 0L
         assertEquals(0L, updatedSnooze)
+
+        assertTrue("Unpunt chosen from swipe dialog should be undoable", activity.isSwipeUndoable("Snoozed Item"))
+
+        activity.undoSwipeAction("Snoozed Item")
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        assertEquals("Undo should restore original punt", snoozeTime, storedTask(context, "Snoozed Item")?.snoozeUntil ?: 0L)
+        assertFalse(activity.isSwipeUndoable("Snoozed Item"))
     }
 
     @Test
@@ -1175,6 +1183,11 @@ class MainActivityTest {
         assertTrue("Done card should be undoable", activity.isSwipeUndoable("Task 1 #done"))
         assertTrue("Task should be marked done in Room", storedTask(context, "Task 1")!!.isDone)
 
+        val doneHolder = recyclerView.findViewHolderForAdapterPosition(1) as RemindersAdapter.ItemViewHolder
+        assertEquals("Done swipe result should be grayed out", 0.5f, doneHolder.reminderInput.alpha, 0.01f)
+        assertEquals(View.GONE, doneHolder.btnShare.visibility)
+        assertEquals(View.VISIBLE, doneHolder.btnAction.visibility)
+
         val swipeRefreshLayout = activity.findViewById<androidx.swiperefreshlayout.widget.SwipeRefreshLayout>(R.id.swipe_refresh_layout)
         swipeRefreshLayout.isRefreshing = true
         val listenerField = androidx.swiperefreshlayout.widget.SwipeRefreshLayout::class.java.getDeclaredField("mListener")
@@ -1189,7 +1202,7 @@ class MainActivityTest {
     }
 
     @Test
-    fun testUndoablePuntedCardShowsUndoButtonAndLeftSwipeUndoesPunt() {
+    fun testSwipeResultCardIsGrayedUndoableInPlaceUntilRefresh() {
         val context = RuntimeEnvironment.getApplication()
         seedTasks(context, "Task 1" to null)
 
@@ -1204,12 +1217,22 @@ class MainActivityTest {
         activity.applySnoozeDurationFromSwipe("Task 1", "1h")
         shadowOf(android.os.Looper.getMainLooper()).idle()
 
-        assertTrue("Punted card should be undoable", activity.isSwipeUndoable("Task 1"))
-        val puntedPos = activity.getDisplayedRemindersForTesting().indexOfFirst { it == "Task 1" }
-        val puntedHolder = recyclerView.findViewHolderForAdapterPosition(puntedPos) as RemindersAdapter.ItemViewHolder
-        assertEquals(View.GONE, puntedHolder.btnShare.visibility)
-        assertEquals(View.VISIBLE, puntedHolder.btnAction.visibility)
-        assertEquals("Undo", puntedHolder.btnAction.contentDescription)
+        assertTrue("Swiped card should be undoable", activity.isSwipeUndoable("Task 1"))
+        val displayed = activity.getDisplayedRemindersForTesting()
+        assertFalse("Swiped card should stay in place, not move to punted section", displayed.contains("HEADER_SNOOZED_SECTION_MARKER"))
+        assertEquals("Swiped card should keep its position", 1, displayed.indexOf("Task 1"))
+
+        val swipedHolder = recyclerView.findViewHolderForAdapterPosition(1) as RemindersAdapter.ItemViewHolder
+        assertEquals("Swiped card should be grayed out", 0.5f, swipedHolder.reminderInput.alpha, 0.01f)
+        assertEquals(
+            "Swiped card should use muted color",
+            swipedHolder.reminderInput.context.getColor(R.color.text_muted),
+            swipedHolder.reminderInput.textColors.defaultColor
+        )
+        assertEquals("Undoable card should hide share button", View.GONE, swipedHolder.btnShare.visibility)
+        assertEquals("Undoable card should show undo button", View.VISIBLE, swipedHolder.btnAction.visibility)
+        assertEquals("Undo", swipedHolder.btnAction.contentDescription)
+        assertEquals("Undoable punted card should show punt status", View.VISIBLE, swipedHolder.txtStatus.visibility)
 
         activity.undoSwipeAction("Task 1")
         shadowOf(android.os.Looper.getMainLooper()).idle()
@@ -1222,8 +1245,62 @@ class MainActivityTest {
         recyclerView.layout(0, 0, 1000, 1000)
         shadowOf(android.os.Looper.getMainLooper()).idle()
         val activeHolder = recyclerView.findViewHolderForAdapterPosition(1) as RemindersAdapter.ItemViewHolder
+        assertEquals("Fully undone card should be full opacity", 1.0f, activeHolder.reminderInput.alpha, 0.01f)
         assertEquals(View.VISIBLE, activeHolder.btnShare.visibility)
         assertEquals(View.GONE, activeHolder.btnAction.visibility)
+
+        activity.applySnoozeDurationFromSwipe("Task 1", "1h")
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        val swipeRefreshLayout = activity.findViewById<androidx.swiperefreshlayout.widget.SwipeRefreshLayout>(R.id.swipe_refresh_layout)
+        swipeRefreshLayout.isRefreshing = true
+        val listenerField = androidx.swiperefreshlayout.widget.SwipeRefreshLayout::class.java.getDeclaredField("mListener")
+        listenerField.isAccessible = true
+        val refreshListener = listenerField.get(swipeRefreshLayout) as? androidx.swiperefreshlayout.widget.SwipeRefreshLayout.OnRefreshListener
+        refreshListener!!.onRefresh()
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        assertFalse("Undo history should be cleared at refresh", activity.isSwipeUndoable("Task 1"))
+        val refreshedDisplayed = activity.getDisplayedRemindersForTesting()
+        assertTrue("Refreshed punted card moves to punted section", refreshedDisplayed.contains("HEADER_SNOOZED_SECTION_MARKER"))
+        val puntedPos = refreshedDisplayed.indexOf("Task 1")
+        assertTrue(puntedPos > 0)
+        val puntedHolder = recyclerView.findViewHolderForAdapterPosition(puntedPos) as RemindersAdapter.ItemViewHolder
+        assertEquals("Refreshed punted card is full opacity", 1.0f, puntedHolder.reminderInput.alpha, 0.01f)
+        assertEquals("Refreshed punted card shows share button again", View.VISIBLE, puntedHolder.btnShare.visibility)
+        assertEquals(View.GONE, puntedHolder.btnAction.visibility)
+        assertEquals("Refreshed punted card keeps punt status", View.VISIBLE, puntedHolder.txtStatus.visibility)
+    }
+
+    @Test
+    fun testEditUndoableCardKeepsSwipeHistory() {
+        val context = RuntimeEnvironment.getApplication()
+        seedTasks(context, "Task 1" to null)
+
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = controller.get()
+        val recyclerView = activity.findViewById<RecyclerView>(R.id.reminders_list)
+
+        recyclerView.measure(View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY))
+        recyclerView.layout(0, 0, 1000, 1000)
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        activity.applySnoozeDurationFromSwipe("Task 1", "1h")
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        val holder = recyclerView.findViewHolderForAdapterPosition(1) as RemindersAdapter.ItemViewHolder
+        holder.reminderInput.setText("Task 1 renamed")
+        holder.reminderInput.onFocusChangeListener?.onFocusChange(holder.reminderInput, false)
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        assertTrue("Edit should carry the swipe history to the new name", activity.isSwipeUndoable("Task 1 renamed"))
+        assertFalse("Old key should no longer hold history", activity.isSwipeUndoable("Task 1"))
+
+        activity.undoSwipeAction("Task 1 renamed")
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        assertEquals("Undo should clear punt after edit", 0L, storedTask(context, "Task 1 renamed")?.snoozeUntil ?: 0L)
+        assertFalse(activity.isSwipeUndoable("Task 1 renamed"))
     }
 
     @Test
@@ -1254,6 +1331,18 @@ class MainActivityTest {
         assertNotNull(stored)
         assertFalse("Recurring task should be punted, not done", stored!!.isDone)
         assertTrue("Punt should be set for recurring task", (stored.snoozeUntil ?: 0L) > System.currentTimeMillis())
+
+        val displayedAfterPunt = activity.getDisplayedRemindersForTesting()
+        assertFalse("Punted recurring card should stay in active section until refresh", displayedAfterPunt.contains("HEADER_SNOOZED_SECTION_MARKER"))
+        val frozenPos = displayedAfterPunt.indexOfFirst { it == "Water plants #every 1d" }
+        assertEquals("Punted recurring card should stay in place", 1, frozenPos)
+        recyclerView.measure(View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY))
+        recyclerView.layout(0, 0, 1000, 1000)
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+        val frozenHolder = recyclerView.findViewHolderForAdapterPosition(frozenPos) as RemindersAdapter.ItemViewHolder
+        assertEquals("Punted recurring card should be grayed out", 0.5f, frozenHolder.reminderInput.alpha, 0.01f)
+        assertEquals(View.GONE, frozenHolder.btnShare.visibility)
+        assertEquals(View.VISIBLE, frozenHolder.btnAction.visibility)
 
         swipeAndIdle(ItemTouchHelper.RIGHT)
         stored = storedTask(context, "Water plants #every 1d")
@@ -1374,7 +1463,7 @@ class MainActivityTest {
     }
 
     @Test
-    fun testMarkRecurringReminderDonePuntsTask() {
+    fun testSwipeRightOnActiveRecurringPuntsByRecurrence() {
         val context = RuntimeEnvironment.getApplication()
         seedTasks(context, "Water plants #every 1d" to null)
 

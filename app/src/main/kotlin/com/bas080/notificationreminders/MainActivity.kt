@@ -122,7 +122,8 @@ class MainActivity : AppCompatActivity() {
     private data class SwipeHistoryEntry(
         val kind: SwipeActionKind,
         val priorText: String,
-        val priorSnoozeUntil: Long?
+        val priorSnoozeUntil: Long?,
+        val fromPuntedSection: Boolean
     )
 
     private val swipeHistory = mutableMapOf<String, MutableList<SwipeHistoryEntry>>()
@@ -899,6 +900,15 @@ class MainActivity : AppCompatActivity() {
                             activeReminders[masterIdx] = updatedText
                             displayedReminders[index] = updatedText
 
+                            val oldKey = getCleanTrimmed(oldText)
+                            val newKey = getCleanTrimmed(updatedText)
+                            if (oldKey != newKey) {
+                                val movedHistory = swipeHistory.remove(oldKey)
+                                if (movedHistory != null && !swipeHistory.containsKey(newKey)) {
+                                    swipeHistory[newKey] = movedHistory
+                                }
+                            }
+
                             pendingEditRunnable?.let { editReminderHandler.removeCallbacks(it) }
                             val initialOldText = pendingOldText ?: oldText
                             pendingOldText = initialOldText
@@ -1107,7 +1117,7 @@ class MainActivity : AppCompatActivity() {
 
                         icon = ContextCompat.getDrawable(
                             this@MainActivity,
-                            if (isRecurring) R.drawable.ic_action_repeat else R.drawable.ic_action_done
+                            if (isRecurring && !isUndoable) R.drawable.ic_action_repeat else R.drawable.ic_action_done
                         )
                         icon?.let {
                             val vMargin = (itemView.height - it.intrinsicHeight) / 2
@@ -1176,6 +1186,7 @@ class MainActivity : AppCompatActivity() {
                 setPadding(0, (4 * density).toInt(), 0, (12 * density).toInt())
                 setOnClickListener {
                     dialogRef?.dismiss()
+                    pushSwipeHistory(reminderText, SwipeActionKind.PUNT)
                     kotlinx.coroutines.runBlocking {
                         com.bas080.notificationreminders.data.PuntDatabase.getInstance(this@MainActivity)
                             .reminderDao()
@@ -1382,7 +1393,20 @@ class MainActivity : AppCompatActivity() {
     private fun pushSwipeHistory(reminderText: String, kind: SwipeActionKind) {
         val cleanTrimmed = getCleanTrimmed(reminderText)
         swipeHistory.getOrPut(cleanTrimmed) { mutableListOf() }
-            .add(SwipeHistoryEntry(kind, reminderText, taskSnoozeByName[cleanTrimmed]))
+            .add(
+                SwipeHistoryEntry(
+                    kind,
+                    reminderText,
+                    taskSnoozeByName[cleanTrimmed],
+                    reminderIsInPuntedSection(cleanTrimmed)
+                )
+            )
+    }
+
+    private fun reminderIsInPuntedSection(cleanTrimmed: String): Boolean {
+        swipeHistory[cleanTrimmed]?.lastOrNull()?.let { return it.fromPuntedSection }
+        val snoozeUntil = taskSnoozeByName[cleanTrimmed] ?: 0L
+        return snoozeUntil > System.currentTimeMillis()
     }
 
     internal fun isSwipeUndoable(reminderText: String): Boolean {
@@ -1642,8 +1666,6 @@ class MainActivity : AppCompatActivity() {
             currentFocus?.clearFocus()
         }
 
-        val now = System.currentTimeMillis()
-
         val savedProfiles = getSavedFocusProfiles()
         val activeProfiles = savedProfiles.filter { p -> activeFocusProfileNames.any { it.equals(p.name, ignoreCase = true) } }
 
@@ -1687,7 +1709,7 @@ class MainActivity : AppCompatActivity() {
         for (reminder in filtered) {
             val cleanTrimmed = getCleanTrimmed(reminder)
             val snoozeUntil = taskSnoozeByName[cleanTrimmed] ?: 0L
-            if (snoozeUntil > now) {
+            if (reminderIsInPuntedSection(cleanTrimmed)) {
                 snoozedItems.add(reminder to snoozeUntil)
             } else {
                 activeItems.add(reminder)
@@ -2322,11 +2344,8 @@ class RemindersAdapter(
         }
 
         if (isDone || isUndoable) {
-            holder.reminderInput.setTextColor(
-                if (isDone) ContextCompat.getColor(context, R.color.text_muted)
-                else ContextCompat.getColor(context, R.color.text_primary)
-            )
-            holder.reminderInput.alpha = if (isDone) 0.5f else 1.0f
+            holder.reminderInput.setTextColor(ContextCompat.getColor(context, R.color.text_muted))
+            holder.reminderInput.alpha = 0.5f
             holder.reminderInput.paintFlags = holder.reminderInput.paintFlags and android.graphics.Paint.STRIKE_THRU_TEXT_FLAG.inv()
             holder.btnShare.visibility = View.GONE
             holder.btnAction.visibility = View.VISIBLE
