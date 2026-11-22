@@ -1359,7 +1359,7 @@ class MainActivityTest {
 
         swipeHandler.onSwiped(restoredDoneHolder, ItemTouchHelper.RIGHT)
         shadowOf(android.os.Looper.getMainLooper()).idle()
-        assertEquals(activity.getString(R.string.toast_reminder_pending_delete), ShadowToast.getTextOfLatestToast())
+        assertEquals(activity.getString(R.string.toast_reminder_deleted), ShadowToast.getTextOfLatestToast())
 
         reLayout()
         assertEquals("Re-pending delete card shows the red border again", R.drawable.bg_card_delete, (holderFor("Task 1 #done").cardContainer.tag as? Int))
