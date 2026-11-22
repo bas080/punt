@@ -11,6 +11,8 @@
     <string name="toast_reminder_create_failed_empty">Failed to create reminder: Text cannot be empty</string>
     <string name="toast_reminder_done">Reminder marked done</string>
     <string name="toast_reminder_deleted">Reminder deleted</string>
+    <string name="toast_reminder_pending_delete">Reminder marked for delete \u2022 refresh to remove</string>
+    <string name="toast_reminder_undo_delete">Delete undone</string>
     <string name="toast_reminder_snoozed">Reminder punted for 1 hour</string>
     <string name="toast_reminder_snoozed_duration">Reminder punted for %s</string>
     <string name="toast_invalid_snooze_input">Failed to punt: Invalid duration entered</string>

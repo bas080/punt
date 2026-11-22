@@ -117,6 +117,16 @@ class MainActivity : AppCompatActivity() {
         private set
     private val recentlyDoneReminders = mutableSetOf<String>()
 
+    private enum class SwipeActionKind { PUNT, DONE, DELETE }
+
+    private data class SwipeHistoryEntry(
+        val kind: SwipeActionKind,
+        val priorText: String,
+        val priorSnoozeUntil: Long?
+    )
+
+    private val swipeHistory = mutableMapOf<String, MutableList<SwipeHistoryEntry>>()
+
     private val searchHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private var searchRunnable: Runnable? = null
 
@@ -132,6 +142,8 @@ class MainActivity : AppCompatActivity() {
             pendingEditRunnable = null
         }
     }
+
+    internal fun getDisplayedRemindersForTesting(): List<String> = displayedReminders.toList()
 
     private val requestNotificationPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { _ ->
@@ -161,6 +173,7 @@ class MainActivity : AppCompatActivity() {
     private fun setupSwipeRefresh() {
         binding.swipeRefreshLayout.setColorSchemeResources(R.color.accent)
         binding.swipeRefreshLayout.setOnRefreshListener {
+            finalizePendingSwipes()
             recentlyDoneReminders.clear()
             loadReminders()
             binding.swipeRefreshLayout.isRefreshing = false
@@ -951,7 +964,7 @@ class MainActivity : AppCompatActivity() {
             },
             onUndoReminderRequested = { index ->
                 if (index in displayedReminders.indices) {
-                    undoMarkDone(displayedReminders[index])
+                    undoSwipeAction(displayedReminders[index])
                 }
             },
             onUnpuntReminderRequested = { index ->
@@ -974,6 +987,12 @@ class MainActivity : AppCompatActivity() {
                 if (viewHolder.itemViewType != RemindersAdapter.TYPE_ACTIVE_REMINDER) {
                     return 0
                 }
+                val position = viewHolder.bindingAdapterPosition
+                if (position != RecyclerView.NO_POSITION && position in displayedReminders.indices &&
+                    isPendingDelete(displayedReminders[position])
+                ) {
+                    return ItemTouchHelper.LEFT
+                }
                 return super.getSwipeDirs(recyclerView, viewHolder)
             }
 
@@ -988,20 +1007,37 @@ class MainActivity : AppCompatActivity() {
                 if (position in displayedReminders.indices) {
                     val reminderText = displayedReminders[position]
                     val isDone = reminderText.contains("#done", ignoreCase = true)
+                    val hasUndoableHistory = isSwipeUndoable(reminderText)
 
-                    if (isDone) {
+                    if (isPendingDelete(reminderText)) {
                         if (direction == ItemTouchHelper.LEFT) {
                             adapter.notifyItemChanged(position)
-                            undoMarkDone(reminderText)
+                            undoSwipeAction(reminderText)
+                        }
+                    } else if (isDone) {
+                        if (direction == ItemTouchHelper.LEFT) {
+                            adapter.notifyItemChanged(position)
+                            undoSwipeAction(reminderText)
                         } else if (direction == ItemTouchHelper.RIGHT) {
-                            deleteReminder(reminderText)
+                            adapter.notifyItemChanged(position)
+                            requestDeleteReminder(reminderText)
                         }
                     } else if (direction == ItemTouchHelper.LEFT) {
                         adapter.notifyItemChanged(position)
-                        showSnoozeOptionsDialog(reminderText)
+                        if (hasUndoableHistory) {
+                            undoSwipeAction(reminderText)
+                        } else {
+                            showSnoozeOptionsDialog(reminderText)
+                        }
                     } else if (direction == ItemTouchHelper.RIGHT) {
                         adapter.notifyItemChanged(position)
-                        markReminderDone(reminderText)
+                        if (hasUndoableHistory ||
+                            CreateReminderReceiver.parseRecurrenceDuration(reminderText) == null
+                        ) {
+                            markReminderDone(reminderText)
+                        } else {
+                            puntReminderByRecurrence(reminderText)
+                        }
                     }
                 }
             }
@@ -1019,6 +1055,9 @@ class MainActivity : AppCompatActivity() {
                 val position = viewHolder.bindingAdapterPosition
                 val isDone = if (position in displayedReminders.indices) {
                     displayedReminders[position].contains("#done", ignoreCase = true)
+                } else false
+                val isUndoable = if (position in displayedReminders.indices) {
+                    isSwipeUndoable(displayedReminders[position])
                 } else false
 
                 if (actionState == ItemTouchHelper.ACTION_STATE_SWIPE && dX != 0f) {
@@ -1084,7 +1123,10 @@ class MainActivity : AppCompatActivity() {
                         background.setBounds(itemView.right + dX.toInt(), itemView.top, itemView.right, itemView.bottom)
                         background.draw(c)
 
-                        icon = ContextCompat.getDrawable(this@MainActivity, R.drawable.ic_action_snooze)
+                        icon = ContextCompat.getDrawable(
+                            this@MainActivity,
+                            if (isUndoable) R.drawable.ic_action_undo else R.drawable.ic_action_snooze
+                        )
                         icon?.let {
                             val vMargin = (itemView.height - it.intrinsicHeight) / 2
                             val top = itemView.top + vMargin
@@ -1160,7 +1202,7 @@ class MainActivity : AppCompatActivity() {
                 setPadding(0, (10 * density).toInt(), 0, (10 * density).toInt())
                 setOnClickListener {
                     dialogRef?.dismiss()
-                    applySnoozeDuration(reminderText, choice)
+                    applySnoozeDurationFromSwipe(reminderText, choice)
                 }
             }
             optionsList.addView(itemTv)
@@ -1180,7 +1222,7 @@ class MainActivity : AppCompatActivity() {
             .setView(layout)
             .setPositiveButton(R.string.snooze) { _, _ ->
                 val customInput = input.text.toString().trim()
-                applySnoozeDuration(reminderText, customInput)
+                applySnoozeDurationFromSwipe(reminderText, customInput)
             }
             .setNegativeButton(R.string.cancel, null)
             .create()
@@ -1277,6 +1319,14 @@ class MainActivity : AppCompatActivity() {
         applySnoozeDurationToTargets(listOf(reminderText), durationChoice)
     }
 
+    internal fun applySnoozeDurationFromSwipe(reminderText: String, durationChoice: String) {
+        val parseResult = CreateReminderReceiver.parseSnoozeDuration(durationChoice)
+        if (parseResult != null) {
+            pushSwipeHistory(reminderText, SwipeActionKind.PUNT)
+        }
+        applySnoozeDuration(reminderText, durationChoice)
+    }
+
     private fun applySnoozeDurationToTargets(targets: List<String>, durationChoice: String) {
         val parseResult = CreateReminderReceiver.parseSnoozeDuration(durationChoice)
         val topChoices = ReminderNotificationListenerService.getTopSnoozeChoices(this).map { it.toString() }
@@ -1329,56 +1379,144 @@ class MainActivity : AppCompatActivity() {
         Toast.makeText(this, toastText, Toast.LENGTH_SHORT).show()
     }
 
+    private fun pushSwipeHistory(reminderText: String, kind: SwipeActionKind) {
+        val cleanTrimmed = getCleanTrimmed(reminderText)
+        swipeHistory.getOrPut(cleanTrimmed) { mutableListOf() }
+            .add(SwipeHistoryEntry(kind, reminderText, taskSnoozeByName[cleanTrimmed]))
+    }
+
+    internal fun isSwipeUndoable(reminderText: String): Boolean {
+        return !swipeHistory[getCleanTrimmed(reminderText)].isNullOrEmpty()
+    }
+
+    internal fun isPendingDelete(reminderText: String): Boolean {
+        return swipeHistory[getCleanTrimmed(reminderText)]?.lastOrNull()?.kind == SwipeActionKind.DELETE
+    }
+
+    private fun restoreEntrySnooze(entry: SwipeHistoryEntry) {
+        val cleanTrimmed = getCleanTrimmed(entry.priorText)
+        if (entry.priorSnoozeUntil != null) {
+            taskSnoozeByName[cleanTrimmed] = entry.priorSnoozeUntil
+        } else {
+            taskSnoozeByName.remove(cleanTrimmed)
+        }
+        kotlinx.coroutines.runBlocking {
+            val dao = com.bas080.notificationreminders.data.PuntDatabase.getInstance(this@MainActivity).reminderDao()
+            dao.updateSnooze(removeDoneTag(entry.priorText), entry.priorSnoozeUntil)
+        }
+    }
+
+    internal fun undoSwipeAction(reminderText: String) {
+        val cleanTrimmed = getCleanTrimmed(reminderText)
+        val history = swipeHistory[cleanTrimmed]
+        val entry = history?.lastOrNull()
+        if (history == null || entry == null) {
+            if (reminderText.contains("#done", ignoreCase = true)) {
+                undoMarkDone(reminderText)
+            }
+            return
+        }
+        history.removeAt(history.size - 1)
+        if (history.isEmpty()) {
+            swipeHistory.remove(cleanTrimmed)
+        }
+        when (entry.kind) {
+            SwipeActionKind.DONE -> {
+                restoreEntrySnooze(entry)
+                undoMarkDone(reminderText)
+            }
+            SwipeActionKind.PUNT -> {
+                restoreEntrySnooze(entry)
+                Toast.makeText(this, R.string.toast_snooze_cancelled, Toast.LENGTH_SHORT).show()
+            }
+            SwipeActionKind.DELETE -> {
+                Toast.makeText(this, R.string.toast_reminder_undo_delete, Toast.LENGTH_SHORT).show()
+            }
+        }
+        AppLogger.log(this, "MainActivity", "Undid swipe ${entry.kind.name.lowercase(Locale.US)}")
+        updateSummaryAndAdapter()
+    }
+
+    private fun requestDeleteReminder(reminderText: String) {
+        val idx = activeReminders.indexOf(reminderText)
+        if (idx != -1) {
+            pushSwipeHistory(reminderText, SwipeActionKind.DELETE)
+            updateSummaryAndAdapter()
+            AppLogger.log(this, "MainActivity", "Marked reminder for deletion")
+            Toast.makeText(this, R.string.toast_reminder_pending_delete, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun puntReminderByRecurrence(reminderText: String) {
+        val recurrenceResult = CreateReminderReceiver.parseRecurrenceDuration(reminderText)
+        if (recurrenceResult == null) {
+            markReminderDone(reminderText)
+            return
+        }
+        val (snoozeMs, durationLabel) = recurrenceResult
+        val snoozeUntil = System.currentTimeMillis() + snoozeMs
+        val cleanText = removeDoneTag(reminderText)
+        val cleanTrimmed = getCleanTrimmed(reminderText)
+
+        pushSwipeHistory(reminderText, SwipeActionKind.PUNT)
+        taskSnoozeByName[cleanTrimmed] = snoozeUntil
+        kotlinx.coroutines.runBlocking {
+            val dao = com.bas080.notificationreminders.data.PuntDatabase.getInstance(this@MainActivity).reminderDao()
+            dao.updateSnooze(cleanText, snoozeUntil)
+        }
+
+        val notificationId = ReminderNotificationListenerService.getNotificationIdForReminder(reminderText)
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager
+        notificationManager?.cancel(notificationId)
+
+        ReminderNotificationListenerService.instance?.showStatusNotification()
+        updateSummaryAndAdapter()
+        AppLogger.log(this, "MainActivity", "Punted recurring reminder for $durationLabel")
+        val toastText = getString(R.string.toast_reminder_snoozed_duration, durationLabel)
+        Toast.makeText(this, toastText, Toast.LENGTH_SHORT).show()
+    }
+
+    private fun finalizePendingSwipes() {
+        if (swipeHistory.isEmpty()) return
+        val keys = swipeHistory.keys.toList()
+        for (key in keys) {
+            if (swipeHistory[key]?.lastOrNull()?.kind != SwipeActionKind.DELETE) continue
+            val idx = activeReminders.indexOfFirst { getCleanTrimmed(it) == key }
+            if (idx != -1) {
+                deleteReminder(activeReminders[idx])
+            }
+        }
+        swipeHistory.clear()
+    }
+
     private fun markReminderDone(reminderText: String) {
         val idx = activeReminders.indexOf(reminderText)
         if (idx != -1) {
             com.bas080.notificationreminders.utils.ExperimentTracker.trackTaskLifecycle(this, "marked_done")
-            val recurringResult = CreateReminderReceiver.parseRecurrenceDuration(reminderText)
-            if (recurringResult != null) {
-                val (snoozeMs, durationLabel) = recurringResult
-                val snoozeUntil = System.currentTimeMillis() + snoozeMs
-                val cleanText = removeDoneTag(reminderText)
-                val cleanTrimmed = getCleanTrimmed(reminderText)
+            val cleanText = removeDoneTag(reminderText)
 
-                activeReminders[idx] = cleanText
-                taskSnoozeByName[cleanTrimmed] = snoozeUntil
-                kotlinx.coroutines.runBlocking {
-                    val dao = com.bas080.notificationreminders.data.PuntDatabase.getInstance(this@MainActivity).reminderDao()
-                    dao.updateSnooze(cleanText, snoozeUntil)
-                }
+            pushSwipeHistory(reminderText, SwipeActionKind.DONE)
 
-                val notificationId = ReminderNotificationListenerService.getNotificationIdForReminder(reminderText)
-                val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager
-                notificationManager?.cancel(notificationId)
-
-                ReminderNotificationListenerService.instance?.showStatusNotification()
-                updateSummaryAndAdapter()
-                AppLogger.log(this, "MainActivity", "Marked recurring reminder done and punted for $durationLabel")
-                val toastText = getString(R.string.toast_reminder_snoozed_duration, durationLabel)
-                Toast.makeText(this, toastText, Toast.LENGTH_SHORT).show()
+            val doneText = if (reminderText.contains("#done", ignoreCase = true)) {
+                reminderText
             } else {
-                val doneText = if (reminderText.contains("#done", ignoreCase = true)) {
-                    reminderText
-                } else {
-                    "$reminderText #done"
-                }
-                activeReminders[idx] = doneText
-                recentlyDoneReminders.add(doneText)
-                val cleanText = removeDoneTag(reminderText)
-                kotlinx.coroutines.runBlocking {
-                    val dao = com.bas080.notificationreminders.data.PuntDatabase.getInstance(this@MainActivity).reminderDao()
-                    dao.markDone(cleanText, true)
-                }
-
-                val notificationId = ReminderNotificationListenerService.getNotificationIdForReminder(reminderText)
-                val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager
-                notificationManager?.cancel(notificationId)
-
-                ReminderNotificationListenerService.instance?.showStatusNotification()
-                updateSummaryAndAdapter()
-                AppLogger.log(this, "MainActivity", "Marked reminder done")
-                Toast.makeText(this, R.string.toast_reminder_done, Toast.LENGTH_SHORT).show()
+                "$reminderText #done"
             }
+            activeReminders[idx] = doneText
+            recentlyDoneReminders.add(doneText)
+            kotlinx.coroutines.runBlocking {
+                val dao = com.bas080.notificationreminders.data.PuntDatabase.getInstance(this@MainActivity).reminderDao()
+                dao.markDone(cleanText, true)
+            }
+
+            val notificationId = ReminderNotificationListenerService.getNotificationIdForReminder(reminderText)
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager
+            notificationManager?.cancel(notificationId)
+
+            ReminderNotificationListenerService.instance?.showStatusNotification()
+            updateSummaryAndAdapter()
+            AppLogger.log(this, "MainActivity", "Marked reminder done")
+            Toast.makeText(this, R.string.toast_reminder_done, Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -1592,7 +1730,8 @@ class MainActivity : AppCompatActivity() {
                 puntedCount = snoozedItems.size,
                 isActiveCollapsed = isActiveCollapsed,
                 isPuntedCollapsed = isPuntedCollapsed
-            )
+            ),
+            swipeHistory.keys
         )
         updateSummary()
 
@@ -1951,6 +2090,7 @@ class RemindersAdapter(
 
     private val currentSnoozeMap = mutableMapOf<String, Long>()
     private var sectionState = SectionState()
+    private var undoableKeys: Set<String> = emptySet()
 
     private class RemindersDiffCallback(
         private val oldList: List<String>,
@@ -1958,8 +2098,11 @@ class RemindersAdapter(
         private val oldSnoozeMap: Map<String, Long>,
         private val newSnoozeMap: Map<String, Long>,
         private val oldSectionState: SectionState = SectionState(),
-        private val newSectionState: SectionState = SectionState()
+        private val newSectionState: SectionState = SectionState(),
+        private val oldUndoableKeys: Set<String> = emptySet(),
+        private val newUndoableKeys: Set<String> = emptySet()
     ) : androidx.recyclerview.widget.DiffUtil.Callback() {
+
         override fun getOldListSize(): Int = if (oldList.isEmpty()) 0 else oldList.size + 1
         override fun getNewListSize(): Int = if (newList.isEmpty()) 0 else newList.size + 1
 
@@ -2008,6 +2151,8 @@ class RemindersAdapter(
                     val oldTrimmed = MainActivity.getCleanTrimmed(oldItem)
                     val newTrimmed = MainActivity.getCleanTrimmed(newItem)
 
+                    if (oldUndoableKeys.contains(oldTrimmed) != newUndoableKeys.contains(newTrimmed)) return false
+
                     val oldSnooze = oldSnoozeMap[oldTrimmed] ?: 0L
                     val newSnooze = newSnoozeMap[newTrimmed] ?: 0L
 
@@ -2020,7 +2165,8 @@ class RemindersAdapter(
     fun updateList(
         newList: List<String>,
         newSnoozeMap: Map<String, Long> = emptyMap(),
-        newSectionState: SectionState = SectionState()
+        newSectionState: SectionState = SectionState(),
+        newUndoableKeys: Set<String> = emptySet()
     ) {
         val diffCallback = RemindersDiffCallback(
             displayedReminders,
@@ -2028,7 +2174,9 @@ class RemindersAdapter(
             currentSnoozeMap,
             newSnoozeMap,
             this.sectionState,
-            newSectionState
+            newSectionState,
+            undoableKeys,
+            newUndoableKeys
         )
         val diffResult = androidx.recyclerview.widget.DiffUtil.calculateDiff(diffCallback)
         displayedReminders.clear()
@@ -2036,6 +2184,7 @@ class RemindersAdapter(
         currentSnoozeMap.clear()
         currentSnoozeMap.putAll(newSnoozeMap)
         this.sectionState = newSectionState
+        this.undoableKeys = newUndoableKeys
         diffResult.dispatchUpdatesTo(this)
     }
 
@@ -2132,6 +2281,7 @@ class RemindersAdapter(
         val now = System.currentTimeMillis()
         val snoozeUntil = currentSnoozeMap[cleanTrimmed] ?: 0L
         val isSnoozed = snoozeUntil > now
+        val isUndoable = undoableKeys.contains(cleanTrimmed)
 
         holder.reminderInput.hint = "Reminder"
         val hasRecurrence = CreateReminderReceiver.parseRecurrenceDuration(reminderText) != null
@@ -2173,15 +2323,18 @@ class RemindersAdapter(
             holder.reminderInput.setText(reminderText)
         }
 
-        if (isDone) {
-            holder.reminderInput.setTextColor(ContextCompat.getColor(context, R.color.text_muted))
-            holder.reminderInput.alpha = 0.5f
+        if (isDone || isUndoable) {
+            holder.reminderInput.setTextColor(
+                if (isDone) ContextCompat.getColor(context, R.color.text_muted)
+                else ContextCompat.getColor(context, R.color.text_primary)
+            )
+            holder.reminderInput.alpha = if (isDone) 0.5f else 1.0f
             holder.reminderInput.paintFlags = holder.reminderInput.paintFlags and android.graphics.Paint.STRIKE_THRU_TEXT_FLAG.inv()
             holder.btnShare.visibility = View.GONE
             holder.btnAction.visibility = View.VISIBLE
             holder.btnAction.setImageResource(R.drawable.ic_action_undo)
             holder.btnAction.setColorFilter(ContextCompat.getColor(context, R.color.accent))
-            holder.btnAction.contentDescription = "Undo mark done"
+            holder.btnAction.contentDescription = if (isDone) "Undo mark done" else "Undo"
             holder.btnAction.setOnClickListener {
                 val currentPos = holder.bindingAdapterPosition
                 if (currentPos != RecyclerView.NO_POSITION && currentPos in displayedReminders.indices) {
@@ -2202,7 +2355,7 @@ class RemindersAdapter(
             }
         }
 
-        if (isSnoozed) {
+        if (isSnoozed && !isDone) {
             val formattedTime = MainActivity.formatSnoozeUntil(snoozeUntil, now)
             holder.txtStatus.visibility = View.VISIBLE
             holder.txtStatus.text = context.getString(R.string.snooze_status_format, formattedTime)
