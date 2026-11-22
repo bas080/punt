@@ -2092,16 +2092,20 @@ class RemindersAdapter(
     private var sectionState = SectionState()
     private var undoableKeys: Set<String> = emptySet()
 
+    private data class AdapterSnapshot(
+        val list: List<String> = emptyList(),
+        val snoozeMap: Map<String, Long> = emptyMap(),
+        val sectionState: SectionState = SectionState(),
+        val undoableKeys: Set<String> = emptySet()
+    )
+
     private class RemindersDiffCallback(
-        private val oldList: List<String>,
-        private val newList: List<String>,
-        private val oldSnoozeMap: Map<String, Long>,
-        private val newSnoozeMap: Map<String, Long>,
-        private val oldSectionState: SectionState = SectionState(),
-        private val newSectionState: SectionState = SectionState(),
-        private val oldUndoableKeys: Set<String> = emptySet(),
-        private val newUndoableKeys: Set<String> = emptySet()
+        private val old: AdapterSnapshot,
+        private val new: AdapterSnapshot
     ) : androidx.recyclerview.widget.DiffUtil.Callback() {
+
+        private val oldList get() = old.list
+        private val newList get() = new.list
 
         override fun getOldListSize(): Int = if (oldList.isEmpty()) 0 else oldList.size + 1
         override fun getNewListSize(): Int = if (newList.isEmpty()) 0 else newList.size + 1
@@ -2141,7 +2145,7 @@ class RemindersAdapter(
                 TYPE_FOOTER_INSTRUCTIONS -> true
                 TYPE_SECTION_HEADER -> {
                     oldList.getOrNull(oldItemPosition) == newList.getOrNull(newItemPosition) &&
-                            oldSectionState == newSectionState
+                            old.sectionState == new.sectionState
                 }
                 else -> {
                     val oldItem = oldList.getOrNull(oldItemPosition) ?: return true
@@ -2151,10 +2155,10 @@ class RemindersAdapter(
                     val oldTrimmed = MainActivity.getCleanTrimmed(oldItem)
                     val newTrimmed = MainActivity.getCleanTrimmed(newItem)
 
-                    if (oldUndoableKeys.contains(oldTrimmed) != newUndoableKeys.contains(newTrimmed)) return false
+                    if (old.undoableKeys.contains(oldTrimmed) != new.undoableKeys.contains(newTrimmed)) return false
 
-                    val oldSnooze = oldSnoozeMap[oldTrimmed] ?: 0L
-                    val newSnooze = newSnoozeMap[newTrimmed] ?: 0L
+                    val oldSnooze = old.snoozeMap[oldTrimmed] ?: 0L
+                    val newSnooze = new.snoozeMap[newTrimmed] ?: 0L
 
                     oldSnooze == newSnooze
                 }
@@ -2169,14 +2173,8 @@ class RemindersAdapter(
         newUndoableKeys: Set<String> = emptySet()
     ) {
         val diffCallback = RemindersDiffCallback(
-            displayedReminders,
-            newList,
-            currentSnoozeMap,
-            newSnoozeMap,
-            this.sectionState,
-            newSectionState,
-            undoableKeys,
-            newUndoableKeys
+            AdapterSnapshot(displayedReminders, currentSnoozeMap, this.sectionState, undoableKeys),
+            AdapterSnapshot(newList, newSnoozeMap, newSectionState, newUndoableKeys)
         )
         val diffResult = androidx.recyclerview.widget.DiffUtil.calculateDiff(diffCallback)
         displayedReminders.clear()
