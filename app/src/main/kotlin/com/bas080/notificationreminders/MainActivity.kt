@@ -1027,11 +1027,10 @@ class MainActivity : AppCompatActivity() {
                 val reminderText = if (position in displayedReminders.indices) displayedReminders[position] else null
                 val background = ColorDrawable()
                 val hMargin = (16 * resources.displayMetrics.density).toInt()
-                var icon: Drawable? = null
 
                 if (actionState == ItemTouchHelper.ACTION_STATE_SWIPE && dX != 0f && reminderText != null) {
                     background.color = ContextCompat.getColor(this@MainActivity, R.color.bg_dark)
-                    icon = ContextCompat.getDrawable(
+                    val icon = ContextCompat.getDrawable(
                         this@MainActivity,
                         if (dX > 0) getRightSwipePeekIcon(reminderText) else getLeftSwipePeekIcon(reminderText)
                     )
@@ -1353,17 +1352,19 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun restoreEntrySnooze(reminderText: String, entry: SwipeTransition) {
-        val cleanTrimmed = getCleanTrimmed(reminderText)
-        val cleanText = removeDoneTag(reminderText)
-        if (entry.priorSnoozeUntil != null) {
-            taskSnoozeByName[cleanTrimmed] = entry.priorSnoozeUntil
-        } else {
-            taskSnoozeByName.remove(cleanTrimmed)
-        }
+    private fun restoreEntrySnooze(taskId: Long, entry: SwipeTransition) {
         kotlinx.coroutines.runBlocking {
             val dao = com.bas080.notificationreminders.data.PuntDatabase.getInstance(this@MainActivity).reminderDao()
-            dao.updateSnooze(cleanText, entry.priorSnoozeUntil)
+            dao.updateSnoozeById(taskId, entry.priorSnoozeUntil)
+            val currentTask = dao.getReminderById(taskId)
+            if (currentTask != null) {
+                val currentClean = getCleanTrimmed(currentTask.text)
+                if (entry.priorSnoozeUntil != null) {
+                    taskSnoozeByName[currentClean] = entry.priorSnoozeUntil
+                } else {
+                    taskSnoozeByName.remove(currentClean)
+                }
+            }
         }
     }
 
@@ -1379,11 +1380,11 @@ class MainActivity : AppCompatActivity() {
         }
         when (entry.kind) {
             SwipeActionKind.DONE -> {
-                restoreEntrySnooze(reminderText, entry)
+                restoreEntrySnooze(taskId, entry)
                 undoMarkDone(reminderText)
             }
             SwipeActionKind.PUNT -> {
-                restoreEntrySnooze(reminderText, entry)
+                restoreEntrySnooze(taskId, entry)
                 Toast.makeText(this, R.string.toast_snooze_cancelled, Toast.LENGTH_SHORT).show()
             }
             SwipeActionKind.DELETE -> {
