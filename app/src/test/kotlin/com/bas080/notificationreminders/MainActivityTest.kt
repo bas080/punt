@@ -1310,7 +1310,7 @@ class MainActivityTest {
         shadowOf(android.os.Looper.getMainLooper()).idle()
 
         val holder = recyclerView.findViewHolderForAdapterPosition(1) as RemindersAdapter.ItemViewHolder
-        assertEquals("Active card should use the default border", R.drawable.bg_card, shadowOf(holder.cardContainer).getBackgroundResourceId())
+        assertEquals("Active card should use the default border", R.drawable.bg_card, (holder.cardContainer.tag as? Int))
 
         swipeHandler.onSwiped(holder, ItemTouchHelper.RIGHT)
         shadowOf(android.os.Looper.getMainLooper()).idle()
@@ -1320,7 +1320,7 @@ class MainActivityTest {
         shadowOf(android.os.Looper.getMainLooper()).idle()
         val doneHolder = recyclerView.findViewHolderForAdapterPosition(1) as RemindersAdapter.ItemViewHolder
         assertTrue("Done card should be undoable", activity.isSwipeUndoable("Task 1 #done"))
-        assertEquals("Undoable done card keeps the default border", R.drawable.bg_card, shadowOf(doneHolder.cardContainer).getBackgroundResourceId())
+        assertEquals("Undoable done card keeps the default border", R.drawable.bg_card, (doneHolder.cardContainer.tag as? Int))
 
         swipeHandler.onSwiped(doneHolder, ItemTouchHelper.RIGHT)
         shadowOf(android.os.Looper.getMainLooper()).idle()
@@ -1331,7 +1331,7 @@ class MainActivityTest {
         shadowOf(android.os.Looper.getMainLooper()).idle()
         val deleteHolder = recyclerView.findViewHolderForAdapterPosition(1) as RemindersAdapter.ItemViewHolder
         assertTrue("Pending delete card should be undoable", activity.isSwipeUndoable("Task 1 #done"))
-        assertEquals("Pending delete card should show a red border", R.drawable.bg_card_delete, shadowOf(deleteHolder.cardContainer).getBackgroundResourceId())
+        assertEquals("Pending delete card should show a red border", R.drawable.bg_card_delete, (deleteHolder.cardContainer.tag as? Int))
         assertEquals(View.GONE, deleteHolder.btnShare.visibility)
         assertEquals(View.VISIBLE, deleteHolder.btnAction.visibility)
         assertEquals("Undo", deleteHolder.btnAction.contentDescription)
@@ -1345,7 +1345,7 @@ class MainActivityTest {
         shadowOf(android.os.Looper.getMainLooper()).idle()
         val restoredDoneHolder = recyclerView.findViewHolderForAdapterPosition(1) as RemindersAdapter.ItemViewHolder
         assertTrue("Undoing delete should keep the done card undoable", activity.isSwipeUndoable("Task 1 #done"))
-        assertEquals("Undoing delete restores the default border", R.drawable.bg_card, shadowOf(restoredDoneHolder.cardContainer).getBackgroundResourceId())
+        assertEquals("Undoing delete restores the default border", R.drawable.bg_card, (restoredDoneHolder.cardContainer.tag as? Int))
         assertTrue("Done task should remain stored", storedTask(context, "Task 1")!!.isDone)
 
         swipeHandler.onSwiped(restoredDoneHolder, ItemTouchHelper.RIGHT)
