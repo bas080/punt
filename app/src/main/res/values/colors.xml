@@ -5,6 +5,7 @@
     <color name="text_primary">#FFFFFF</color>
     <color name="pill_chill_white">#E5E5EA</color>
     <color name="text_secondary">#8E8E93</color>
+    <color name="text_secondary_bright">#A8A8B0</color>
     <color name="text_muted">#636366</color>
     <color name="accent">#00E5FF</color>
     <color name="accent_subtle">#80DEEA</color>

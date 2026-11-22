@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import com.bas080.notificationreminders.sync.FolderSyncManager
 
 @Database(entities = [ReminderEntity::class], version = 1, exportSchema = false)
 abstract class PuntDatabase : RoomDatabase() {
@@ -20,6 +21,13 @@ abstract class PuntDatabase : RoomDatabase() {
                     PuntDatabase::class.java,
                     "punt_database"
                 ).build()
+                instance.invalidationTracker.addObserver(
+                    object : androidx.room.InvalidationTracker.Observer("reminders") {
+                        override fun onInvalidated(tables: Set<String>) {
+                            FolderSyncManager.requestSync(context.applicationContext)
+                        }
+                    }
+                )
                 INSTANCE = instance
                 instance
             }
