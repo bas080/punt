@@ -2173,7 +2173,13 @@ class MainActivityTest {
         val markDone = MainActivity::class.java.getDeclaredMethod("markReminderDone", String::class.java)
         markDone.isAccessible = true
         markDone.invoke(activity, "Buy milk")
-        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        val deadline = System.currentTimeMillis() + 5000
+        val mainLooper = shadowOf(android.os.Looper.getMainLooper())
+        while (!syncedFile.readText().contains("- [x] Buy milk") && System.currentTimeMillis() < deadline) {
+            Thread.sleep(50)
+            mainLooper.idle()
+        }
 
         val updatedContent = syncedFile.readText()
         assertTrue("Marking done should flip the checklist entry", updatedContent.contains("- [x] Buy milk"))
