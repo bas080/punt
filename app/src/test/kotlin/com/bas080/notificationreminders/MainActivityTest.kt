@@ -904,7 +904,7 @@ class MainActivityTest {
         val activity = controller.get()
 
         // Call delete directly or verify deletion
-        val deleteMethod = MainActivity::class.java.getDeclaredMethod("deleteReminder", String::class.java)
+        val deleteMethod = MainActivity::class.java.getDeclaredMethod("requestDeleteReminder", String::class.java)
         deleteMethod.isAccessible = true
         deleteMethod.invoke(activity, "Done Task #done")
         shadowOf(android.os.Looper.getMainLooper()).idle()
@@ -1153,11 +1153,13 @@ class MainActivityTest {
         shadowOf(android.os.Looper.getMainLooper()).idle()
         val doneHolder2 = recyclerView.findViewHolderForAdapterPosition(1) as RemindersAdapter.ItemViewHolder
 
-        // Swiping done task RIGHT -> marks for delete, card stays visible until refresh
+        // Swiping done task RIGHT -> deletes immediately, card stays visible as undoable
         swipeHandler.onSwiped(doneHolder2, androidx.recyclerview.widget.ItemTouchHelper.RIGHT)
         shadowOf(android.os.Looper.getMainLooper()).idle()
-        assertEquals(activity.getString(R.string.toast_reminder_pending_delete), ShadowToast.getTextOfLatestToast())
-        assertNotNull("Reminder should not be deleted until refresh", storedTask(context, "Active Task"))
+        assertEquals(activity.getString(R.string.toast_reminder_deleted), ShadowToast.getTextOfLatestToast())
+        assertNull("Delete should persist immediately at swipe", storedTask(context, "Active Task"))
+        assertTrue("Deleted card should stay visible as undoable", activity.getDisplayedRemindersForTesting().contains("Active Task #done"))
+        assertTrue("Deleted card should be undoable", activity.isSwipeUndoable("Active Task #done"))
 
         // Re-layout and check pending-delete card only accepts left swipes
         recyclerView.measure(View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY))
@@ -1327,10 +1329,11 @@ class MainActivityTest {
         assertTrue("Done card should be undoable", activity.isSwipeUndoable("Task 1 #done"))
         assertEquals("Undoable done card keeps the default border", R.drawable.bg_card, (doneHolder.cardContainer.tag as? Int))
         assertTrue("Done task should be marked done in Room", storedTask(context, "Task 1")!!.isDone)
+        val taskIdBeforeDelete = storedTask(context, "Task 1")!!.id
 
         swipeHandler.onSwiped(doneHolder, ItemTouchHelper.RIGHT)
         shadowOf(android.os.Looper.getMainLooper()).idle()
-        assertEquals(activity.getString(R.string.toast_reminder_pending_delete), ShadowToast.getTextOfLatestToast())
+        assertEquals(activity.getString(R.string.toast_reminder_deleted), ShadowToast.getTextOfLatestToast())
 
         reLayout()
         val deleteHolder = holderFor("Task 1 #done")
@@ -1339,7 +1342,8 @@ class MainActivityTest {
         assertEquals(View.GONE, deleteHolder.btnShare.visibility)
         assertEquals(View.VISIBLE, deleteHolder.btnAction.visibility)
         assertEquals("Undo mark done", deleteHolder.btnAction.contentDescription)
-        assertNotNull("Reminder should not be deleted until refresh", storedTask(context, "Task 1"))
+        assertNull("Delete should persist immediately at swipe", storedTask(context, "Task 1"))
+        assertTrue("Deleted card should stay visible as undoable", activity.getDisplayedRemindersForTesting().contains("Task 1 #done"))
         assertEquals("Pending delete card only accepts left swipes", ItemTouchHelper.LEFT, swipeHandler.getSwipeDirs(recyclerView, deleteHolder))
 
         swipeHandler.onSwiped(deleteHolder, ItemTouchHelper.LEFT)
@@ -1351,6 +1355,7 @@ class MainActivityTest {
         assertTrue("Undoing delete should keep the done card undoable", activity.isSwipeUndoable("Task 1 #done"))
         assertEquals("Undoing delete restores the default border", R.drawable.bg_card, (restoredDoneHolder.cardContainer.tag as? Int))
         assertTrue("Done task should remain stored", storedTask(context, "Task 1")!!.isDone)
+        assertEquals("Undo delete should restore the row with the same id", taskIdBeforeDelete, storedTask(context, "Task 1")!!.id)
 
         swipeHandler.onSwiped(restoredDoneHolder, ItemTouchHelper.RIGHT)
         shadowOf(android.os.Looper.getMainLooper()).idle()
@@ -1452,8 +1457,9 @@ class MainActivityTest {
         assertTrue("Two swipes should mark recurring task done", stored!!.isDone)
 
         swipeAndIdle(ItemTouchHelper.RIGHT)
-        assertEquals(activity.getString(R.string.toast_reminder_pending_delete), ShadowToast.getTextOfLatestToast())
-        assertNotNull("Deletion should stay visible until refresh", storedTask(context, "Water plants #every 1d"))
+        assertEquals(activity.getString(R.string.toast_reminder_deleted), ShadowToast.getTextOfLatestToast())
+        assertNull("Delete should persist immediately at swipe", storedTask(context, "Water plants #every 1d"))
+        assertTrue("Deleted card should stay visible as undoable", activity.getDisplayedRemindersForTesting().contains("Water plants #every 1d #done"))
 
         swipeAndIdle(ItemTouchHelper.LEFT)
         assertEquals("Delete undone", ShadowToast.getTextOfLatestToast())
@@ -1474,41 +1480,103 @@ class MainActivityTest {
     fun testSwipeStateMachineTracksIdKeyedUndoChains() {
         val machine = SwipeStateMachine()
 
-        assertEquals(SwipeStateMachine.CardState.ACTIVE, machine.stateOf(1L))
         assertFalse(machine.canUndo(1L))
+        assertNull(machine.pendingStateOf(1L))
+        assertEquals(
+            listOf(
+                SwipeStateMachine.CardState.PUNTED,
+                SwipeStateMachine.CardState.ACTIVE,
+                SwipeStateMachine.CardState.DONE,
+                SwipeStateMachine.CardState.DELETED
+            ),
+            machine.stateLine(false)
+        )
+        assertEquals(
+            listOf(
+                SwipeStateMachine.CardState.PUNTED,
+                SwipeStateMachine.CardState.ACTIVE,
+                SwipeStateMachine.CardState.AUTO_PUNTED,
+                SwipeStateMachine.CardState.DONE,
+                SwipeStateMachine.CardState.DELETED
+            ),
+            machine.stateLine(true)
+        )
 
-        machine.record(1L, SwipeTransition(SwipeActionKind.PUNT, machine.stateOf(1L), null, false))
-        machine.record(1L, SwipeTransition(SwipeActionKind.DONE, machine.stateOf(1L), 3600000L, false))
-        machine.record(1L, SwipeTransition(SwipeActionKind.DELETE, machine.stateOf(1L), null, false))
+        machine.record(1L, SwipeTransition(SwipeActionKind.PUNT, SwipeStateMachine.CardState.PUNTED, null, null, false))
+        machine.record(1L, SwipeTransition(SwipeActionKind.DONE, SwipeStateMachine.CardState.DONE, 3600000L, null, false))
+        machine.record(1L, SwipeTransition(SwipeActionKind.DELETE, SwipeStateMachine.CardState.DELETED, null, null, false))
 
-        assertEquals(SwipeStateMachine.CardState.DELETE_PENDING, machine.stateOf(1L))
+        assertEquals(SwipeStateMachine.CardState.DELETED, machine.pendingStateOf(1L))
         assertTrue(machine.canUndo(1L))
         assertEquals(setOf(1L), machine.undoableKeys())
-        assertEquals(setOf(1L), machine.pendingDeleteIds())
 
         assertEquals(SwipeActionKind.DELETE, machine.pop(1L)?.kind)
-        assertEquals(SwipeStateMachine.CardState.DONE_PENDING, machine.stateOf(1L))
+        assertEquals(SwipeStateMachine.CardState.DONE, machine.pendingStateOf(1L))
         assertEquals(SwipeActionKind.DONE, machine.pop(1L)?.kind)
-        assertEquals(SwipeStateMachine.CardState.PUNT_PENDING, machine.stateOf(1L))
+        assertEquals(SwipeStateMachine.CardState.PUNTED, machine.pendingStateOf(1L))
         assertEquals(SwipeActionKind.PUNT, machine.pop(1L)?.kind)
-        assertEquals(SwipeStateMachine.CardState.ACTIVE, machine.stateOf(1L))
+        assertNull(machine.pendingStateOf(1L))
         assertFalse(machine.canUndo(1L))
 
         val other = SwipeStateMachine()
-        other.record(7L, SwipeTransition(SwipeActionKind.PUNT, other.stateOf(7L), 1000L, true))
-        other.record(7L, SwipeTransition(SwipeActionKind.DONE, other.stateOf(7L), 1000L, false))
+        other.record(7L, SwipeTransition(SwipeActionKind.PUNT, SwipeStateMachine.CardState.PUNTED, 1000L, null, true))
+        other.record(7L, SwipeTransition(SwipeActionKind.DONE, SwipeStateMachine.CardState.DONE, 1000L, null, false))
         assertTrue(other.canUndo(7L))
         assertTrue(other.pendingFromPuntedSection(7L) == false)
         other.pop(7L)
         assertTrue(other.pendingFromPuntedSection(7L) == true)
-        assertEquals(SwipeStateMachine.CardState.PUNT_PENDING, other.stateOf(7L))
-        assertEquals(emptySet<Long>(), other.pendingDeleteIds())
+        assertEquals(SwipeStateMachine.CardState.PUNTED, other.pendingStateOf(7L))
+
+        val snapshot = com.bas080.notificationreminders.data.ReminderEntity(id = 5L, text = "Saved task")
+        other.record(7L, SwipeTransition(SwipeActionKind.DELETE, SwipeStateMachine.CardState.DELETED, null, snapshot, false))
+        assertEquals(SwipeStateMachine.CardState.DELETED, other.pendingStateOf(7L))
+        assertEquals(snapshot, other.pop(7L)?.priorEntity)
+
         other.clearAll()
         assertFalse(other.canUndo(7L))
+        assertTrue(other.undoableKeys().isEmpty())
+    }
 
-        val third = SwipeStateMachine()
-        third.record(9L, SwipeTransition(SwipeActionKind.PUNT, third.stateOf(9L), null, false))
-        assertTrue(third.pendingDeleteIds().isEmpty())
+    @Test
+    fun testPuntedNormalCardRightSwipesUndoPuntThenMarkDone() {
+        seedTasks(
+            RuntimeEnvironment.getApplication(),
+            "Task 1" to (System.currentTimeMillis() + 3600000L)
+        )
+        val context = RuntimeEnvironment.getApplication()
+
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = controller.get()
+        val recyclerView = activity.findViewById<RecyclerView>(R.id.reminders_list)
+        recyclerView.itemAnimator = null
+        val swipeHandler = activity.createSwipeHandler()
+
+        val reLayout = {
+            recyclerView.measure(View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY))
+            recyclerView.layout(0, 0, 1000, 1000)
+            shadowOf(android.os.Looper.getMainLooper()).idle()
+        }
+        val holderFor = { text: String ->
+            val pos = activity.getDisplayedRemindersForTesting().indexOfFirst { it == text }
+            recyclerView.findViewHolderForAdapterPosition(pos) as RemindersAdapter.ItemViewHolder
+        }
+
+        reLayout()
+        assertEquals(SwipeStateMachine.CardState.PUNTED, activity.resolveCardState("Task 1"))
+
+        swipeHandler.onSwiped(holderFor("Task 1"), ItemTouchHelper.RIGHT)
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        assertEquals("Punt cancelled", ShadowToast.getTextOfLatestToast())
+        assertEquals("First right swipe should undo the punt", 0L, storedTask(context, "Task 1")?.snoozeUntil ?: 0L)
+        assertEquals(SwipeStateMachine.CardState.ACTIVE, activity.resolveCardState("Task 1"))
+
+        reLayout()
+        swipeHandler.onSwiped(holderFor("Task 1"), ItemTouchHelper.RIGHT)
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        assertTrue("Second right swipe should mark the task done", storedTask(context, "Task 1")!!.isDone)
+        assertTrue("Done card should be undoable", activity.isSwipeUndoable("Task 1 #done"))
     }
 
     @Test
@@ -1727,8 +1795,8 @@ class MainActivityTest {
         assertEquals("Active recurring left: opens punt dialog", R.drawable.ic_action_snooze, activity.getLeftSwipePeekIcon("Water plants #every 1d"))
         assertEquals("Active recurring right: punts by recurrence", R.drawable.ic_action_repeat, activity.getRightSwipePeekIcon("Water plants #every 1d"))
 
-        assertEquals("Punted non-recurring left: opens punt dialog", R.drawable.ic_action_snooze, activity.getLeftSwipePeekIcon("Punted Task"))
-        assertEquals("Punted non-recurring right: marks done", R.drawable.ic_action_done, activity.getRightSwipePeekIcon("Punted Task"))
+        assertEquals("Punted non-recurring left: reconfigures the punt", R.drawable.ic_action_snooze, activity.getLeftSwipePeekIcon("Punted Task"))
+        assertEquals("Punted non-recurring right: undoes the punt", R.drawable.ic_action_undo, activity.getRightSwipePeekIcon("Punted Task"))
 
         assertEquals("Done left: undoes", R.drawable.ic_action_undo, activity.getLeftSwipePeekIcon("Done Task #done"))
         assertEquals("Done right: requests delete", R.drawable.ic_action_delete, activity.getRightSwipePeekIcon("Done Task #done"))
@@ -1764,6 +1832,7 @@ class MainActivityTest {
         val pendingHolder = recyclerView.findViewHolderForAdapterPosition(pendingPos)
         assertEquals("Pending delete only allows left swipe", ItemTouchHelper.LEFT, swipeHandler.getSwipeDirs(recyclerView, pendingHolder!!))
         assertEquals("Pending delete left: undoes the delete", R.drawable.ic_action_undo, activity.getLeftSwipePeekIcon("Water plants #every 1d #done"))
+        assertEquals("Deleted card right swipe is disabled", 0, activity.getRightSwipePeekIcon("Water plants #every 1d #done"))
     }
 
     @Test
