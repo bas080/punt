@@ -288,7 +288,7 @@ class MainActivity : AppCompatActivity() {
                 isClickable = true
                 isFocusable = true
             }
-            val titleTv = TextView(this).apply {
+            val rowTitleTv = TextView(this).apply {
                 text = titleText
                 setTextColor(accentColor)
                 setTextAppearance(android.R.style.TextAppearance_Small)
@@ -299,7 +299,7 @@ class MainActivity : AppCompatActivity() {
                 setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_secondary))
                 setTextAppearance(android.R.style.TextAppearance_Small)
             }
-            row.addView(titleTv)
+            row.addView(rowTitleTv)
             row.addView(descriptionTv)
             return row
         }
