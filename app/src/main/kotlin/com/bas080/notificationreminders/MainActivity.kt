@@ -1693,6 +1693,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         val undoableSet = sorted.filter { isSwipeUndoable(it) }.map { getCleanTrimmed(it) }.toSet()
+        val pendingDeleteSet = sorted.filter { isPendingDelete(it) }.map { getCleanTrimmed(it) }.toSet()
         adapter.updateList(
             sorted,
             snoozeMap,
@@ -1702,7 +1703,8 @@ class MainActivity : AppCompatActivity() {
                 isActiveCollapsed = isActiveCollapsed,
                 isPuntedCollapsed = isPuntedCollapsed
             ),
-            undoableSet
+            undoableSet,
+            pendingDeleteSet
         )
         updateSummary()
 
@@ -2062,12 +2064,14 @@ class RemindersAdapter(
     private val currentSnoozeMap = mutableMapOf<String, Long>()
     private var sectionState = SectionState()
     private var undoableKeys: Set<String> = emptySet()
+    private var pendingDeleteKeys: Set<String> = emptySet()
 
     private data class AdapterSnapshot(
         val list: List<String> = emptyList(),
         val snoozeMap: Map<String, Long> = emptyMap(),
         val sectionState: SectionState = SectionState(),
-        val undoableKeys: Set<String> = emptySet()
+        val undoableKeys: Set<String> = emptySet(),
+        val pendingDeleteKeys: Set<String> = emptySet()
     )
 
     private class RemindersDiffCallback(
@@ -2127,6 +2131,7 @@ class RemindersAdapter(
                     val newTrimmed = MainActivity.getCleanTrimmed(newItem)
 
                     if (old.undoableKeys.contains(oldTrimmed) != new.undoableKeys.contains(newTrimmed)) return false
+                    if (old.pendingDeleteKeys.contains(oldTrimmed) != new.pendingDeleteKeys.contains(newTrimmed)) return false
 
                     val oldSnooze = old.snoozeMap[oldTrimmed] ?: 0L
                     val newSnooze = new.snoozeMap[newTrimmed] ?: 0L
@@ -2141,11 +2146,12 @@ class RemindersAdapter(
         newList: List<String>,
         newSnoozeMap: Map<String, Long> = emptyMap(),
         newSectionState: SectionState = SectionState(),
-        newUndoableKeys: Set<String> = emptySet()
+        newUndoableKeys: Set<String> = emptySet(),
+        newPendingDeleteKeys: Set<String> = emptySet()
     ) {
         val diffCallback = RemindersDiffCallback(
-            AdapterSnapshot(displayedReminders, currentSnoozeMap, this.sectionState, undoableKeys),
-            AdapterSnapshot(newList, newSnoozeMap, newSectionState, newUndoableKeys)
+            AdapterSnapshot(displayedReminders, currentSnoozeMap, this.sectionState, undoableKeys, pendingDeleteKeys),
+            AdapterSnapshot(newList, newSnoozeMap, newSectionState, newUndoableKeys, newPendingDeleteKeys)
         )
         val diffResult = androidx.recyclerview.widget.DiffUtil.calculateDiff(diffCallback)
         displayedReminders.clear()
@@ -2154,10 +2160,12 @@ class RemindersAdapter(
         currentSnoozeMap.putAll(newSnoozeMap)
         this.sectionState = newSectionState
         this.undoableKeys = newUndoableKeys
+        this.pendingDeleteKeys = newPendingDeleteKeys
         diffResult.dispatchUpdatesTo(this)
     }
 
     class ItemViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+        val cardContainer: View = view.findViewById(R.id.card_container)
         val reminderInput: EditText = view.findViewById(R.id.reminder_input)
         val txtStatus: TextView = view.findViewById(R.id.txt_status)
         val btnShare: ImageView = view.findViewById(R.id.btn_share)
@@ -2251,6 +2259,11 @@ class RemindersAdapter(
         val snoozeUntil = currentSnoozeMap[cleanTrimmed] ?: 0L
         val isSnoozed = snoozeUntil > now
         val isUndoable = undoableKeys.contains(cleanTrimmed)
+        val isPendingDelete = pendingDeleteKeys.contains(cleanTrimmed)
+
+        holder.cardContainer.setBackgroundResource(
+            if (isPendingDelete) R.drawable.bg_card_delete else R.drawable.bg_card
+        )
 
         holder.reminderInput.hint = "Reminder"
         val hasRecurrence = CreateReminderReceiver.parseRecurrenceDuration(reminderText) != null
