@@ -2264,7 +2264,7 @@ class MainActivityTest {
         assertNotNull(dialog2)
         val folderSyncSwitch2 = (findAboutDialogTitle(dialog2!!, "Folder sync")!!.parent as android.view.ViewGroup).getChildAt(1) as android.widget.Switch
         assertTrue("Folder sync switch should reflect the on state", folderSyncSwitch2.isChecked)
-        (findAboutDialogTitle(dialog2, "Folder sync")!!.parent as View).parent.performClick()
+        ((findAboutDialogTitle(dialog2, "Folder sync")!!.parent as View).parent as View).performClick()
         shadowOf(android.os.Looper.getMainLooper()).idle()
 
         assertFalse("Tapping Folder sync while on should turn sync off", FolderSyncManager.isEnabled(activity))
@@ -2279,7 +2279,7 @@ class MainActivityTest {
         shadowOf(android.os.Looper.getMainLooper()).idle()
         val dialog3 = ShadowAlertDialog.getLatestDialog() as? AlertDialog
         assertNotNull(dialog3)
-        (findAboutDialogTitle(dialog3, "Sync folder")!!.parent as View).performClick()
+        (findAboutDialogTitle(dialog3!!, "Sync folder")!!.parent as View).performClick()
         shadowOf(android.os.Looper.getMainLooper()).idle()
         val relaunched = shadowOf(activity).nextStartedActivityForResult
         assertNotNull("Tapping Sync folder should open the tree picker", relaunched)
