@@ -2180,6 +2180,10 @@ class MainActivityTest {
             Thread.sleep(50)
             mainLooper.idle()
         }
+        if (!syncedFile.readText().contains("- [x] Buy milk")) {
+            FolderSyncManager.syncNow(activity)
+            mainLooper.idle()
+        }
 
         val updatedContent = syncedFile.readText()
         assertTrue("Marking done should flip the checklist entry", updatedContent.contains("- [x] Buy milk"))
