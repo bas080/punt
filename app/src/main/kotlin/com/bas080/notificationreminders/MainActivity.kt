@@ -1356,9 +1356,9 @@ class MainActivity : AppCompatActivity() {
     private fun restoreEntrySnooze(taskId: Long, entry: SwipeTransition) {
         kotlinx.coroutines.runBlocking {
             val dao = com.bas080.notificationreminders.data.PuntDatabase.getInstance(this@MainActivity).reminderDao()
-            dao.updateSnoozeById(taskId, entry.priorSnoozeUntil)
             val currentTask = dao.getReminderById(taskId)
             if (currentTask != null) {
+                dao.update(currentTask.copy(snoozeUntil = entry.priorSnoozeUntil, updatedAt = System.currentTimeMillis()))
                 val currentClean = getCleanTrimmed(currentTask.text)
                 if (entry.priorSnoozeUntil != null) {
                     taskSnoozeByName[currentClean] = entry.priorSnoozeUntil
