@@ -1334,7 +1334,7 @@ class MainActivityTest {
         assertEquals("Pending delete card should show a red border", R.drawable.bg_card_delete, (deleteHolder.cardContainer.tag as? Int))
         assertEquals(View.GONE, deleteHolder.btnShare.visibility)
         assertEquals(View.VISIBLE, deleteHolder.btnAction.visibility)
-        assertEquals("Undo", deleteHolder.btnAction.contentDescription)
+        assertEquals("Undo mark done", deleteHolder.btnAction.contentDescription)
         assertNotNull("Reminder should not be deleted until refresh", storedTask(context, "Task 1"))
 
         swipeHandler.onSwiped(deleteHolder, ItemTouchHelper.LEFT)
