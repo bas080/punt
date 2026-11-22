@@ -2082,11 +2082,10 @@ class MainActivityTest {
     private fun prefsForFolderSync(context: Context) =
         context.getSharedPreferences("folder_sync_prefs", Context.MODE_PRIVATE)
 
-    private fun registerSyncProvider(authority: String, context: Context, docsDir: java.io.File): SyncDocsTestProvider {
+    private fun registerSyncProvider(authority: String, docsDir: java.io.File): SyncDocsTestProvider {
         val provider = SyncDocsTestProvider(docsDir)
         val providerInfo = android.content.pm.ProviderInfo().apply { this.authority = authority }
-        provider.attachInfo(context, providerInfo)
-        shadowOf(context.contentResolver).registerProvider(authority, provider)
+        org.robolectric.android.controller.ContentProviderController.of(provider).create(providerInfo)
         return provider
     }
 
@@ -2147,7 +2146,7 @@ class MainActivityTest {
         FolderSyncManager.resetForTest()
         val docsDir = java.io.File(context.cacheDir, "synctest-tracks-${System.nanoTime()}")
         docsDir.mkdirs()
-        registerSyncProvider("com.punt.writetest", context, docsDir)
+        registerSyncProvider("com.punt.writetest", docsDir)
         seedTasks(context, "Buy milk" to null, "Water plants" to null)
 
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
@@ -2181,7 +2180,7 @@ class MainActivityTest {
         FolderSyncManager.resetForTest()
         val docsDir = java.io.File(context.cacheDir, "synctest-empty-${System.nanoTime()}")
         docsDir.mkdirs()
-        registerSyncProvider("com.punt.emptytest", context, docsDir)
+        registerSyncProvider("com.punt.emptytest", docsDir)
 
         FolderSyncManager.setSyncFolder(context, android.net.Uri.parse("content://com.punt.emptytest/tree/root"))
         shadowOf(android.os.Looper.getMainLooper()).idle()
