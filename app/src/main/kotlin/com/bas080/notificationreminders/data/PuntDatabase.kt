@@ -23,7 +23,7 @@ abstract class PuntDatabase : RoomDatabase() {
                 ).build()
                 instance.invalidationTracker.addObserver(
                     object : androidx.room.InvalidationTracker.Observer("reminders") {
-                        override fun onInvalidated(tables: MutableSet<out String>) {
+                        override fun onInvalidated(tables: Set<String>) {
                             FolderSyncManager.requestSync(context.applicationContext)
                         }
                     }
