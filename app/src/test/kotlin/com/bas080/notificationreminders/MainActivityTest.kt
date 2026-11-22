@@ -2256,7 +2256,7 @@ class MainActivityTest {
             "content://com.punt.abouttest/tree/root",
             FolderSyncManager.getTreeUri(activity).toString()
         )
-        assertFalse("Dialog should have closed to make room for the picker", dialog!!.isShowing)
+        assertFalse("Dialog should have closed to make room for the picker", dialog.isShowing)
 
         activity.showAboutDialog()
         shadowOf(android.os.Looper.getMainLooper()).idle()
