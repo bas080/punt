@@ -2261,9 +2261,9 @@ class RemindersAdapter(
         val isUndoable = undoableKeys.contains(cleanTrimmed)
         val isPendingDelete = pendingDeleteKeys.contains(cleanTrimmed)
 
-        holder.cardContainer.setBackgroundResource(
-            if (isPendingDelete) R.drawable.bg_card_delete else R.drawable.bg_card
-        )
+        val cardBackgroundRes = if (isPendingDelete) R.drawable.bg_card_delete else R.drawable.bg_card
+        holder.cardContainer.setBackgroundResource(cardBackgroundRes)
+        holder.cardContainer.tag = cardBackgroundRes
 
         holder.reminderInput.hint = "Reminder"
         val hasRecurrence = CreateReminderReceiver.parseRecurrenceDuration(reminderText) != null
