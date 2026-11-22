@@ -2224,7 +2224,7 @@ class MainActivityTest {
         val dialog = ShadowAlertDialog.getLatestDialog() as? AlertDialog
         assertNotNull(dialog)
 
-        for (title in listOf("Import", "Export", "Server Sync", "Folder sync", "Donate", "Feedback")) {
+        for (title in listOf("Import", "Export", "Server Sync", "Folder sync", "Sync folder", "Donate", "Feedback")) {
             val titleTv = findAboutDialogTitle(dialog!!, title)
             assertNotNull("About dialog should contain a $title row", titleTv)
             val row = titleTv!!.parent as? android.view.ViewGroup
@@ -2234,12 +2234,9 @@ class MainActivityTest {
             assertTrue(descTv!!.text.isNotBlank())
         }
 
-        val folderSyncRow = findAboutDialogTitle(dialog!!, "Folder sync")!!.parent as android.view.ViewGroup
-        assertEquals(
-            "Folder sync row should show off state before a folder is picked",
-            activity.getString(R.string.folder_sync_desc_off),
-            (folderSyncRow.getChildAt(1) as TextView).text.toString()
-        )
+        val folderSyncRow = (findAboutDialogTitle(dialog!!, "Folder sync")!!.parent as View).parent as View
+        val folderSyncSwitch = (findAboutDialogTitle(dialog, "Folder sync")!!.parent as android.view.ViewGroup).getChildAt(1) as android.widget.Switch
+        assertFalse("Folder sync switch should start unchecked", folderSyncSwitch.isChecked)
 
         folderSyncRow.performClick()
         shadowOf(android.os.Looper.getMainLooper()).idle()
@@ -2259,17 +2256,15 @@ class MainActivityTest {
             "content://com.punt.abouttest/tree/root",
             FolderSyncManager.getTreeUri(activity).toString()
         )
+        assertFalse("Dialog should have closed to make room for the picker", dialog!!.isShowing)
 
         activity.showAboutDialog()
         shadowOf(android.os.Looper.getMainLooper()).idle()
         val dialog2 = ShadowAlertDialog.getLatestDialog() as? AlertDialog
         assertNotNull(dialog2)
-        assertEquals(
-            "Folder sync row should reflect the on state",
-            activity.getString(R.string.folder_sync_desc_on),
-            ((findAboutDialogTitle(dialog2!!, "Folder sync")!!.parent as android.view.ViewGroup).getChildAt(1) as TextView).text.toString()
-        )
-        (findAboutDialogTitle(dialog2, "Folder sync")!!.parent as View).performClick()
+        val folderSyncSwitch2 = (findAboutDialogTitle(dialog2!!, "Folder sync")!!.parent as android.view.ViewGroup).getChildAt(1) as android.widget.Switch
+        assertTrue("Folder sync switch should reflect the on state", folderSyncSwitch2.isChecked)
+        (findAboutDialogTitle(dialog2, "Folder sync")!!.parent as View).parent.performClick()
         shadowOf(android.os.Looper.getMainLooper()).idle()
 
         assertFalse("Tapping Folder sync while on should turn sync off", FolderSyncManager.isEnabled(activity))
@@ -2279,6 +2274,17 @@ class MainActivityTest {
             "content://com.punt.abouttest/tree/root",
             FolderSyncManager.getTreeUri(activity).toString()
         )
+
+        activity.showAboutDialog()
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+        val dialog3 = ShadowAlertDialog.getLatestDialog() as? AlertDialog
+        assertNotNull(dialog3)
+        (findAboutDialogTitle(dialog3, "Sync folder")!!.parent as View).performClick()
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+        val relaunched = shadowOf(activity).nextStartedActivityForResult
+        assertNotNull("Tapping Sync folder should open the tree picker", relaunched)
+        assertEquals(android.content.Intent.ACTION_OPEN_DOCUMENT_TREE, relaunched.intent.action)
+
         FolderSyncManager.resetForTest()
     }
 }

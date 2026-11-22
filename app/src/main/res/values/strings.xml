@@ -38,8 +38,9 @@
     <string name="feedback">Feedback</string>
     <string name="donate">Donate</string>
     <string name="folder_sync">Folder sync</string>
-    <string name="folder_sync_desc_off">Off. Tap to pick a folder whose punt.md will mirror your tasks.</string>
-    <string name="folder_sync_desc_on">On. punt.md in your chosen folder updates on every task change.</string>
+    <string name="folder_sync_desc">Mirror your tasks to punt.md in a chosen folder</string>
+    <string name="sync_dir">Sync folder</string>
+    <string name="sync_dir_desc">Pick which folder stores punt.md</string>
     <string name="about_desc_import">Add tasks from a markdown checklist</string>
     <string name="about_desc_export">Share or copy your tasks as markdown</string>
     <string name="about_desc_server_sync">Pair with a Punt server to keep devices in sync</string>

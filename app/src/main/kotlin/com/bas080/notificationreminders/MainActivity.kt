@@ -279,7 +279,7 @@ class MainActivity : AppCompatActivity() {
         }
         container.addView(versionTv)
 
-        val accentColor = ContextCompat.getColor(this, R.color.accent)
+        val textPrimaryColor = ContextCompat.getColor(this, R.color.text_primary)
 
         fun buildActionRow(titleText: String, descriptionText: String): android.widget.LinearLayout {
             val row = android.widget.LinearLayout(this).apply {
@@ -290,7 +290,7 @@ class MainActivity : AppCompatActivity() {
             }
             val rowTitleTv = TextView(this).apply {
                 text = titleText
-                setTextColor(accentColor)
+                setTextColor(textPrimaryColor)
                 setTextAppearance(android.R.style.TextAppearance_Small)
                 setTypeface(null, android.graphics.Typeface.BOLD)
             }
@@ -310,34 +310,47 @@ class MainActivity : AppCompatActivity() {
         val btnDonate = buildActionRow(getString(R.string.donate), getString(R.string.about_desc_donate))
         val btnFeedback = buildActionRow(getString(R.string.feedback), getString(R.string.about_desc_feedback))
 
-        val folderSyncRow = android.widget.LinearLayout(this).apply {
+        val folderSyncLabel = android.widget.LinearLayout(this).apply {
             orientation = android.widget.LinearLayout.VERTICAL
-            setPadding(0, (6 * density).toInt(), 0, (6 * density).toInt())
-            isClickable = true
-            isFocusable = true
+            layoutParams = android.widget.LinearLayout.LayoutParams(
+                0,
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+                1f
+            )
         }
         val folderSyncTitleTv = TextView(this).apply {
             text = getString(R.string.folder_sync)
-            setTextColor(accentColor)
+            setTextColor(textPrimaryColor)
             setTextAppearance(android.R.style.TextAppearance_Small)
             setTypeface(null, android.graphics.Typeface.BOLD)
         }
         val folderSyncDescTv = TextView(this).apply {
-            text = if (com.bas080.notificationreminders.sync.FolderSyncManager.isEnabled(this@MainActivity)) {
-                getString(R.string.folder_sync_desc_on)
-            } else {
-                getString(R.string.folder_sync_desc_off)
-            }
+            text = getString(R.string.folder_sync_desc)
             setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_secondary))
             setTextAppearance(android.R.style.TextAppearance_Small)
         }
-        folderSyncRow.addView(folderSyncTitleTv)
-        folderSyncRow.addView(folderSyncDescTv)
+        folderSyncLabel.addView(folderSyncTitleTv)
+        folderSyncLabel.addView(folderSyncDescTv)
+        val folderSyncSwitch = android.widget.Switch(this).apply {
+            isChecked = com.bas080.notificationreminders.sync.FolderSyncManager.isEnabled(this@MainActivity)
+        }
+        val folderSyncRow = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            setPadding(0, (6 * density).toInt(), 0, (6 * density).toInt())
+            isClickable = true
+            isFocusable = true
+        }
+        folderSyncRow.addView(folderSyncLabel)
+        folderSyncRow.addView(folderSyncSwitch)
+
+        val btnSyncDir = buildActionRow(getString(R.string.sync_dir), getString(R.string.sync_dir_desc))
 
         container.addView(btnImport)
         container.addView(btnExport)
         container.addView(btnServerSync)
         container.addView(folderSyncRow)
+        container.addView(btnSyncDir)
         container.addView(btnDonate)
         container.addView(btnFeedback)
 
@@ -394,7 +407,6 @@ class MainActivity : AppCompatActivity() {
         container.addView(scrollView)
 
         val dialog = AlertDialog.Builder(this, R.style.Theme_Punt_Dialog)
-            .setTitle("About Punt")
             .setView(container)
             .setPositiveButton("Close", null)
             .create()
@@ -431,18 +443,27 @@ class MainActivity : AppCompatActivity() {
             showServerSyncDialog()
         }
 
-        folderSyncRow.setOnClickListener {
-            if (com.bas080.notificationreminders.sync.FolderSyncManager.isEnabled(this)) {
-                com.bas080.notificationreminders.sync.FolderSyncManager.setEnabled(this, false)
-                folderSyncDescTv.text = getString(R.string.folder_sync_desc_off)
+        fun toggleFolderSync() {
+            val manager = com.bas080.notificationreminders.sync.FolderSyncManager
+            if (manager.isEnabled(this)) {
+                manager.setEnabled(this, false)
+                folderSyncSwitch.isChecked = false
                 Toast.makeText(this, R.string.toast_folder_sync_disabled, Toast.LENGTH_SHORT).show()
-            } else if (com.bas080.notificationreminders.sync.FolderSyncManager.getTreeUri(this) != null) {
-                com.bas080.notificationreminders.sync.FolderSyncManager.setEnabled(this, true)
-                folderSyncDescTv.text = getString(R.string.folder_sync_desc_on)
+            } else if (manager.getTreeUri(this) != null) {
+                manager.setEnabled(this, true)
+                folderSyncSwitch.isChecked = true
             } else {
                 dialog.dismiss()
                 folderSyncLauncher.launch(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE))
             }
+        }
+
+        folderSyncRow.setOnClickListener { toggleFolderSync() }
+        folderSyncSwitch.setOnClickListener { toggleFolderSync() }
+
+        btnSyncDir.setOnClickListener {
+            dialog.dismiss()
+            folderSyncLauncher.launch(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE))
         }
 
         btnClearLogs.setOnClickListener {
