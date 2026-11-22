@@ -219,7 +219,7 @@ class MainActivityTest {
 
         val btnDonate = findTextViewByText(dialog!!.findViewById(android.R.id.content) ?: dialog.window?.decorView, "Donate")
         assertNotNull(btnDonate)
-        btnDonate!!.performClick()
+        (btnDonate!!.parent as View).performClick()
 
         val nextStartedActivity = shadowOf(activity).nextStartedActivity
         assertNotNull("Donate button should start an intent", nextStartedActivity)
@@ -277,7 +277,7 @@ class MainActivityTest {
 
         val btnFeedback = findTextViewByText(dialog!!.findViewById(android.R.id.content) ?: dialog.window?.decorView, "Feedback")
         assertNotNull(btnFeedback)
-        btnFeedback!!.performClick()
+        (btnFeedback!!.parent as View).performClick()
 
         val nextStartedActivity = shadowOf(activity).nextStartedActivity
         assertNotNull(nextStartedActivity)
@@ -2082,10 +2082,18 @@ class MainActivityTest {
     private fun prefsForFolderSync(context: Context) =
         context.getSharedPreferences("folder_sync_prefs", Context.MODE_PRIVATE)
 
-    private fun registerSyncProvider(authority: String, docsDir: java.io.File): SyncDocsTestProvider {
+    private fun registerSyncProvider(authority: String, context: Context, docsDir: java.io.File): SyncDocsTestProvider {
         val provider = SyncDocsTestProvider(docsDir)
         val providerInfo = android.content.pm.ProviderInfo().apply { this.authority = authority }
         org.robolectric.android.controller.ContentProviderController.of(provider).create(providerInfo)
+        java.io.File(docsDir, FolderSyncManager.SYNC_FILE_NAME).createNewFile()
+        val docUri = android.provider.DocumentsContract.buildDocumentUriUsingTree(
+            android.net.Uri.parse("content://$authority/tree/root"),
+            "root/${FolderSyncManager.SYNC_FILE_NAME}"
+        )
+        shadowOf(context.contentResolver).registerOutputStreamSupplier(docUri) {
+            java.io.FileOutputStream(java.io.File(docsDir, FolderSyncManager.SYNC_FILE_NAME), false)
+        }
         return provider
     }
 
@@ -2146,7 +2154,7 @@ class MainActivityTest {
         FolderSyncManager.resetForTest()
         val docsDir = java.io.File(context.cacheDir, "synctest-tracks-${System.nanoTime()}")
         docsDir.mkdirs()
-        registerSyncProvider("com.punt.writetest", docsDir)
+        registerSyncProvider("com.punt.writetest", context, docsDir)
         seedTasks(context, "Buy milk" to null, "Water plants" to null)
 
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
@@ -2180,7 +2188,7 @@ class MainActivityTest {
         FolderSyncManager.resetForTest()
         val docsDir = java.io.File(context.cacheDir, "synctest-empty-${System.nanoTime()}")
         docsDir.mkdirs()
-        registerSyncProvider("com.punt.emptytest", docsDir)
+        registerSyncProvider("com.punt.emptytest", context, docsDir)
 
         FolderSyncManager.setSyncFolder(context, android.net.Uri.parse("content://com.punt.emptytest/tree/root"))
         shadowOf(android.os.Looper.getMainLooper()).idle()
@@ -2251,7 +2259,7 @@ class MainActivityTest {
             activity.getString(R.string.folder_sync_desc_on),
             ((findAboutDialogTitle(dialog2!!, "Folder sync")!!.parent as android.view.ViewGroup).getChildAt(1) as TextView).text.toString()
         )
-        findAboutDialogTitle(dialog2, "Folder sync")!!.performClick()
+        (findAboutDialogTitle(dialog2, "Folder sync")!!.parent as View).performClick()
         shadowOf(android.os.Looper.getMainLooper()).idle()
 
         assertFalse("Tapping Folder sync while on should turn sync off", FolderSyncManager.isEnabled(activity))
