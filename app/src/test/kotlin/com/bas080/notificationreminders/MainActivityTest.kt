@@ -10,6 +10,7 @@ import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.recyclerview.widget.ItemTouchHelper
 import com.bas080.notificationreminders.receivers.CreateReminderReceiver
+import com.bas080.notificationreminders.sync.FolderSyncManager
 import androidx.recyclerview.widget.RecyclerView
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -2077,4 +2078,242 @@ class MainActivityTest {
         adapter.onBindViewHolder(holderPunted, 2) // ACTIVE header + Task B + PUNTED header
         assertEquals("▼ PUNTED (1)", holderPunted.txtHeaderTitle.text.toString())
     }
+
+    private fun prefsForFolderSync(context: Context) =
+        context.getSharedPreferences("folder_sync_prefs", Context.MODE_PRIVATE)
+
+    private fun registerSyncProvider(authority: String, context: Context, docsDir: java.io.File): SyncDocsTestProvider {
+        val provider = SyncDocsTestProvider(docsDir)
+        val providerInfo = android.content.pm.ProviderInfo().apply { this.authority = authority }
+        provider.attachInfo(context, providerInfo)
+        shadowOf(context.contentResolver).registerProvider(authority, provider)
+        return provider
+    }
+
+    private fun findAboutDialogTitle(dialog: AlertDialog, title: String): TextView? {
+        fun find(view: android.view.View?, text: String): TextView? {
+            if (view == null) return null
+            if (view is TextView && view.text.toString() == text) return view
+            if (view is android.view.ViewGroup) {
+                for (i in 0 until view.childCount) {
+                    val res = find(view.getChildAt(i), text)
+                    if (res != null) return res
+                }
+            }
+            return null
+        }
+        val root = dialog.findViewById<View>(android.R.id.content) ?: dialog.window?.decorView
+        return find(root, title)
+    }
+
+    @Test
+    fun testFolderSyncTogglePersistsRememberedFolder() {
+        val context = RuntimeEnvironment.getApplication()
+        FolderSyncManager.resetForTest()
+        prefsForFolderSync(context).edit().clear().commit()
+
+        assertFalse("Folder sync should be off by default", FolderSyncManager.isEnabled(context))
+        assertNull("No sync folder should be picked by default", FolderSyncManager.getTreeUri(context))
+
+        FolderSyncManager.setEnabled(context, true)
+        assertFalse("Enabling without a folder must not turn sync on", FolderSyncManager.isEnabled(context))
+
+        val treeUri = android.net.Uri.parse("content://com.punt.synctest/tree/root")
+        FolderSyncManager.setSyncFolder(context, treeUri)
+        assertTrue("Picking a folder should enable sync", FolderSyncManager.isEnabled(context))
+        assertEquals(treeUri.toString(), FolderSyncManager.getTreeUri(context).toString())
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        FolderSyncManager.setEnabled(context, false)
+        assertFalse(FolderSyncManager.isEnabled(context))
+        assertEquals(
+            "Remembered folder should survive toggling off",
+            treeUri.toString(),
+            FolderSyncManager.getTreeUri(context).toString()
+        )
+
+        FolderSyncManager.setEnabled(context, true)
+        assertTrue(
+            "Toggling on again should resume with the remembered folder",
+            FolderSyncManager.isEnabled(context)
+        )
+        FolderSyncManager.setEnabled(context, false)
+        FolderSyncManager.resetForTest()
+    }
+
+    @Test
+    fun testFolderSyncWritesChecklistAndTracksChanges() {
+        val context = RuntimeEnvironment.getApplication()
+        FolderSyncManager.resetForTest()
+        val docsDir = java.io.File(context.cacheDir, "synctest-tracks-${System.nanoTime()}")
+        docsDir.mkdirs()
+        registerSyncProvider("com.punt.writetest", context, docsDir)
+        seedTasks(context, "Buy milk" to null, "Water plants" to null)
+
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = controller.get()
+
+        FolderSyncManager.setSyncFolder(context, android.net.Uri.parse("content://com.punt.writetest/tree/root"))
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        val syncedFile = java.io.File(docsDir, FolderSyncManager.SYNC_FILE_NAME)
+        assertTrue("punt.md should be created inside the sync folder", syncedFile.exists())
+        val initialContent = syncedFile.readText()
+        assertTrue("Sync file should list tasks as unchecked", initialContent.contains("- [ ] Buy milk"))
+        assertTrue(initialContent.contains("- [ ] Water plants"))
+        assertFalse("Sync file must not use frontmatter", initialContent.startsWith("---"))
+
+        val markDone = MainActivity::class.java.getDeclaredMethod("markReminderDone", String::class.java)
+        markDone.isAccessible = true
+        markDone.invoke(activity, "Buy milk")
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        val updatedContent = syncedFile.readText()
+        assertTrue("Marking done should flip the checklist entry", updatedContent.contains("- [x] Buy milk"))
+        assertTrue("Other tasks should stay unchecked", updatedContent.contains("- [ ] Water plants"))
+        FolderSyncManager.setEnabled(context, false)
+        FolderSyncManager.resetForTest()
+    }
+
+    @Test
+    fun testFolderSyncWritesEmptyFileWhenNoTasks() {
+        val context = RuntimeEnvironment.getApplication()
+        FolderSyncManager.resetForTest()
+        val docsDir = java.io.File(context.cacheDir, "synctest-empty-${System.nanoTime()}")
+        docsDir.mkdirs()
+        registerSyncProvider("com.punt.emptytest", context, docsDir)
+
+        FolderSyncManager.setSyncFolder(context, android.net.Uri.parse("content://com.punt.emptytest/tree/root"))
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        val syncedFile = java.io.File(docsDir, FolderSyncManager.SYNC_FILE_NAME)
+        assertTrue("Sync file should exist even with no tasks", syncedFile.exists())
+        assertEquals("Empty task list should sync to an empty file", "", syncedFile.readText())
+        FolderSyncManager.setEnabled(context, false)
+        FolderSyncManager.resetForTest()
+    }
+
+    @Test
+    fun testAboutDialogRowsHaveDescriptionsAndFolderSyncToggleWorks() {
+        val context = RuntimeEnvironment.getApplication()
+        FolderSyncManager.resetForTest()
+        prefsForFolderSync(context).edit().clear().commit()
+
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = controller.get()
+
+        activity.showAboutDialog()
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+        val dialog = ShadowAlertDialog.getLatestDialog() as? AlertDialog
+        assertNotNull(dialog)
+
+        for (title in listOf("Import", "Export", "Server Sync", "Folder sync", "Donate", "Feedback")) {
+            val titleTv = findAboutDialogTitle(dialog!!, title)
+            assertNotNull("About dialog should contain a $title row", titleTv)
+            val row = titleTv!!.parent as? android.view.ViewGroup
+            assertNotNull(row)
+            val descTv = row!!.getChildAt(1) as? TextView
+            assertNotNull("Row $title should carry a description", descTv)
+            assertTrue(descTv!!.text.isNotBlank())
+        }
+
+        val folderSyncRow = findAboutDialogTitle(dialog!!, "Folder sync")!!.parent as android.view.ViewGroup
+        assertEquals(
+            "Folder sync row should show off state before a folder is picked",
+            activity.getString(R.string.folder_sync_desc_off),
+            (folderSyncRow.getChildAt(1) as TextView).text.toString()
+        )
+
+        folderSyncRow.performClick()
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+        val launched = shadowOf(activity).nextStartedActivityForResult
+        assertNotNull("Tapping Folder sync with no folder should open the tree picker", launched)
+        assertEquals(android.content.Intent.ACTION_OPEN_DOCUMENT_TREE, launched.intent.action)
+
+        shadowOf(activity).receiveResult(
+            launched.intent,
+            android.app.Activity.RESULT_OK,
+            android.content.Intent().setData(android.net.Uri.parse("content://com.punt.abouttest/tree/root"))
+        )
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        assertTrue("Picking a folder should enable folder sync", FolderSyncManager.isEnabled(activity))
+        assertEquals(
+            "content://com.punt.abouttest/tree/root",
+            FolderSyncManager.getTreeUri(activity).toString()
+        )
+
+        activity.showAboutDialog()
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+        val dialog2 = ShadowAlertDialog.getLatestDialog() as? AlertDialog
+        assertNotNull(dialog2)
+        assertEquals(
+            "Folder sync row should reflect the on state",
+            activity.getString(R.string.folder_sync_desc_on),
+            ((findAboutDialogTitle(dialog2!!, "Folder sync")!!.parent as android.view.ViewGroup).getChildAt(1) as TextView).text.toString()
+        )
+        findAboutDialogTitle(dialog2, "Folder sync")!!.performClick()
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        assertFalse("Tapping Folder sync while on should turn sync off", FolderSyncManager.isEnabled(activity))
+        assertEquals("Folder sync off", ShadowToast.getTextOfLatestToast())
+        assertEquals(
+            "Remembered folder should survive toggling off from the dialog",
+            "content://com.punt.abouttest/tree/root",
+            FolderSyncManager.getTreeUri(activity).toString()
+        )
+        FolderSyncManager.resetForTest()
+    }
+}
+
+private class SyncDocsTestProvider(val docsDir: java.io.File) : android.content.ContentProvider() {
+
+    override fun onCreate(): Boolean = true
+
+    override fun query(
+        uri: android.net.Uri,
+        projection: Array<out String>?,
+        selection: String?,
+        selectionArgs: Array<out String>?,
+        sortOrder: String?
+    ): android.database.Cursor? {
+        if (uri.lastPathSegment != "children") return null
+        val columns = projection ?: arrayOf(
+            android.provider.DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+            android.provider.DocumentsContract.Document.COLUMN_DISPLAY_NAME
+        )
+        val cursor = android.database.MatrixCursor(columns)
+        val docFile = java.io.File(docsDir, FolderSyncManager.SYNC_FILE_NAME)
+        if (docFile.exists()) {
+            cursor.newRow()
+                .add(android.provider.DocumentsContract.Document.COLUMN_DOCUMENT_ID, "root/${FolderSyncManager.SYNC_FILE_NAME}")
+                .add(android.provider.DocumentsContract.Document.COLUMN_DISPLAY_NAME, FolderSyncManager.SYNC_FILE_NAME)
+        }
+        return cursor
+    }
+
+    override fun insert(uri: android.net.Uri, values: android.content.ContentValues?): android.net.Uri? {
+        val displayName = values?.getAsString(android.provider.DocumentsContract.Document.COLUMN_DISPLAY_NAME)
+            ?: return null
+        java.io.File(docsDir, displayName).createNewFile()
+        return android.net.Uri.parse("content://com.punt.synctest/doc/root/$displayName")
+    }
+
+    override fun openFile(uri: android.net.Uri, mode: String): android.os.ParcelFileDescriptor {
+        val displayName = uri.lastPathSegment ?: FolderSyncManager.SYNC_FILE_NAME
+        val docFile = java.io.File(docsDir, displayName)
+        if (mode.contains("w")) docFile.writeText("") else docFile.createNewFile()
+        return android.os.ParcelFileDescriptor.open(docFile, android.os.ParcelFileDescriptor.parseMode(mode))
+    }
+
+    override fun update(
+        uri: android.net.Uri,
+        values: android.content.ContentValues?,
+        selection: String?,
+        selectionArgs: Array<out String>?
+    ): Int = 0
+
+    override fun delete(uri: android.net.Uri, selection: String?, selectionArgs: Array<out String>?): Int = 0
+
+    override fun getType(uri: android.net.Uri): String = "text/markdown"
 }

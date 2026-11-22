@@ -37,6 +37,16 @@
     <string name="app_version_format">Version %s</string>
     <string name="feedback">Feedback</string>
     <string name="donate">Donate</string>
+    <string name="folder_sync">Folder sync</string>
+    <string name="folder_sync_desc_off">Off. Tap to pick a folder whose punt.md will mirror your tasks.</string>
+    <string name="folder_sync_desc_on">On. punt.md in your chosen folder updates on every task change.</string>
+    <string name="about_desc_import">Add tasks from a markdown checklist</string>
+    <string name="about_desc_export">Share or copy your tasks as markdown</string>
+    <string name="about_desc_server_sync">Pair with a Punt server to keep devices in sync</string>
+    <string name="about_desc_donate">Support continued development</string>
+    <string name="about_desc_feedback">Report a bug or suggest a feature</string>
+    <string name="toast_folder_sync_enabled">Folder sync on — punt.md updates on every change</string>
+    <string name="toast_folder_sync_disabled">Folder sync off</string>
     <string name="snooze">Punt</string>
     <string name="snooze_upper">Punt</string>
     <string name="unsnooze">Unpunt</string>
