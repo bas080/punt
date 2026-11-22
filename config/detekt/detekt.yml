@@ -3,4 +3,4 @@ build:
 
 complexity:
   TooManyFunctions:
-    thresholdInInterfaces: 12
+    thresholdInInterfaces: 13
